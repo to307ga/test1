@@ -1,0 +1,7 @@
+{
+  "action": "create_dkim",
+  "domain": "goo.ne.jp",
+  "environment": "dev",
+  "projectName": "aws-ses-migration",
+  "dkimSeparator": "gooid-21-dev"
+}

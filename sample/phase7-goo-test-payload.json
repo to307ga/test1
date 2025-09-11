@@ -1,0 +1,7 @@
+{
+  "action": "phase_manager",
+  "phase": "7",
+  "domain": "goo.ne.jp",
+  "environment": "prod",
+  "projectName": "aws-byodmim"
+}

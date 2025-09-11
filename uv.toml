@@ -1,0 +1,2 @@
+# OneDrive対応: シンボリックリンクを避けてコピーモードを使用
+link-mode = "copy"

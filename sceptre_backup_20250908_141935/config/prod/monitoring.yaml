@@ -1,0 +1,68 @@
+# Monitoring Stack Configuration for Production
+template:
+  type: file
+  path: ../templates/monitoring.yaml
+
+dependencies:
+  - prod/base.yaml
+  - prod/ses.yaml
+
+parameters:
+  ProjectCode: ses-migration
+  Environment: production
+  DomainName: goo.ne.jp
+
+  # Alert thresholds
+  SendSuccessRateThreshold: 95.0
+  BounceRateThreshold: 5.0
+  ComplaintRateThreshold: 0.1
+
+  # Log retention periods
+  RetentionDays: 731
+  CloudWatchLogRetentionDays: 731
+
+  # Lambda Configuration
+  LambdaMemorySize: 512
+  LambdaTimeout: 60
+  LambdaRuntime: python3.9
+
+  # Required parameters
+  AllowedIPRanges:
+    - 10.0.0.0/8
+    - 192.168.100.0/24
+
+  # Feature Flags
+  EnableCustomMetrics: "true"
+  EnableDataMasking: "true"
+  EnableCloudWatchAlarms: "true"
+  EnableInsightsQueries: "true"
+  EnableTokyoRegionFeatures: "true"
+  EnableJapaneseCompliance: "true"
+  EnableJapaneseMonitoring: "true"
+  EnableTokyoRegionMetrics: "true"
+  EnableBYODKIMMonitoring: "true"
+
+  # BYODKIM Configuration
+  BYODKIMSelector: "gooid-21-prod"
+
+  # CloudWatch Settings
+  CloudWatchMetricNamespace: "ses-migration/production/Monitoring"
+  CloudWatchDashboardName: "ses-migration-production-dashboard"
+
+  # Output values from Base stack
+  SNSTopicArn: !stack_output prod/base.yaml::NotificationTopicArn
+  S3BucketName: !stack_output prod/base.yaml::RawLogsBucketName
+
+  # Output values from SES stack
+  SESLogGroupName: !stack_output prod/ses.yaml::SESLogGroupName
+
+tags:
+  Service: monitoring
+  Component: cloudwatch
+  Environment: prod
+  Project: ses-migration
+  ManagedBy: sceptre
+  Owner: infrastructure-team
+  CostCenter: IT-001
+  Production: true
+  Critical: true

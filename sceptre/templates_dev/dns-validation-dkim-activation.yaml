@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DNS validation and DKIM activation'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+    Default: aws-ses-migration
+
+  Environment:
+    Type: String
+    Description: Environment name
+    AllowedValues:
+      - development
+      - staging
+      - production
+      - prod
+      - dev
+    Default: development
+
+  DKIMManagerFunctionArn:
+    Type: String
+    Description: ARN of the DKIM Manager Lambda function
+
+  DomainName:
+    Type: String
+    Description: Domain name for DKIM validation
+    Default: goo.ne.jp
+
+Resources:
+  # EventBridge Rule to trigger Phase 7 execution
+  Phase7TriggerRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-phase-7-trigger"
+      Description: "Trigger Phase 7: DNS validation and DKIM activation"
+      State: ENABLED
+      EventPattern:
+        source: ["aws.byodmim"]
+        detail-type: ["Phase 7 Trigger"]
+        detail:
+          phase: ["7"]
+          environment: [!Ref Environment]
+          project: [!Ref ProjectName]
+      Targets:
+        - Arn: !Ref DKIMManagerFunctionArn
+          Id: "DKIMManagerPhase7Target"
+          Input: !Sub |
+            {
+              "phase": "7",
+              "action": "phase_manager",
+              "domain": "${DomainName}",
+              "environment": "${Environment}",
+              "projectName": "${ProjectName}"
+            }
+
+  # Lambda permission for EventBridge
+  DKIMManagerEventBridgePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DKIMManagerFunctionArn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt Phase7TriggerRule.Arn
+
+Outputs:
+  Phase7TriggerRuleArn:
+    Description: ARN of the Phase 7 trigger EventBridge rule
+    Value: !GetAtt Phase7TriggerRule.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-phase-7-trigger-arn"
+
+  Phase7Status:
+    Description: Phase 7 DNS validation and DKIM activation status
+    Value: "Ready for Phase 7 execution"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-phase-7-status"

@@ -1,0 +1,38 @@
+# Phase 8: Monitoring System for Development Environment
+# Monitoring system setup for dev environment
+
+template:
+  type: file
+  path: ../templates_dev/monitoring-system.yaml
+
+dependencies:
+  - dev/phase-7-dns-validation-dkim-activation.yaml
+
+parameters:
+  ProjectName: !stack_output dev/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: !stack_output dev/phase-1-infrastructure-foundation.yaml::Environment
+  DomainName: !stack_output dev/phase-1-infrastructure-foundation.yaml::DomainName
+
+  # Required from previous phases
+  DKIMManagerFunctionArn: !stack_output dev/phase-2-dkim-system.yaml::DKIMManagerFunctionArn
+
+  # テスト用: 毎日午前9時チェック (一時的設定)
+  MonitoringSchedule: "cron(0 9 * * ? *)"  # 毎日9:00 JST
+
+  # 2日証明書テスト用設定
+  CertificateValidityDays: 2   # 2日間の証明書有効期間
+  CriticalAlertDays: 1         # 1日前にクリティカル判定
+  WarningAlertDays: 1          # 1日前にワーニング
+  RenewalAlertDays: 1          # 1日前に更新通知
+
+tags:
+  Service: monitoring
+  Component: phase-8-monitoring-system
+  Environment: dev
+  Project: ses-migration
+  ManagedBy: sceptre
+  Owner: development-team
+  CostCenter: IT-DEV-001
+  Production: false
+  Critical: false
+  Purpose: development-monitoring

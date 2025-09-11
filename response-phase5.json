@@ -1,0 +1,1 @@
+{"errorMessage": "Unknown action: send_dns_notification", "errorType": "ValueError", "requestId": "dfb4f1d1-3b26-40af-a6c4-19675cbb1fdc", "stackTrace": ["  File \"/var/task/index.py\", line 52, in lambda_handler\n    raise ValueError(f\"Unknown action: {action}\")\n"]}

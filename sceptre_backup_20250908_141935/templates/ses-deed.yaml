@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'SES Email Identity with DEED (Deterministic Easy DKIM) - Multi-Region Best Practice 2025'
+
+Parameters:
+  ProjectCode:
+    Type: String
+    Default: 'ses-migration'
+    Description: 'Project identifier for resource naming'
+  Environment:
+    Type: String
+    Default: 'production'
+    Description: 'Environment (production, staging, development)'
+  DomainName:
+    Type: String
+    Default: 'goo.ne.jp'
+    Description: 'Domain name for SES email identity'
+  IdentityType:
+    Type: String
+    Default: 'Parent'
+    AllowedValues: ['Parent', 'Replica']
+    Description: 'Whether this is a parent identity or replica for DEED'
+  ParentRegion:
+    Type: String
+    Default: 'us-east-1'
+    Description: 'Parent region for DEED replica (ignored if IdentityType is Parent)'
+
+Conditions:
+  IsParentIdentity: !Equals [!Ref IdentityType, 'Parent']
+  IsReplicaIdentity: !Equals [!Ref IdentityType, 'Replica']
+
+Resources:
+  # Parent SES Identity with Easy DKIM
+  SESEmailIdentityParent:
+    Type: AWS::SES::EmailIdentity
+    Condition: IsParentIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      DkimSigningAttributes:
+        NextSigningKeyLength: 'RSA_2048_BIT'
+      DkimAttributes:
+        SigningEnabled: true
+      FeedbackAttributes:
+        EmailForwardingEnabled: false
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DKIMType
+          Value: 'EasyDKIM-Parent-2048bit'
+        - Key: DEEDRole
+          Value: 'Parent'
+        - Key: ManagedBy
+          Value: 'CloudFormation'
+
+  # Replica SES Identity for DEED
+  SESEmailIdentityReplica:
+    Type: AWS::SES::EmailIdentity
+    Condition: IsReplicaIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      DkimSigningAttributes:
+        # DEED configuration - inherits from parent region
+        DomainSigningAttributesOrigin: !Sub 'AWS_SES_${ParentRegion}'
+      DkimAttributes:
+        SigningEnabled: true
+      FeedbackAttributes:
+        EmailForwardingEnabled: false
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DKIMType
+          Value: 'EasyDKIM-Replica-DEED'
+        - Key: DEEDRole
+          Value: 'Replica'
+        - Key: ParentRegion
+          Value: !Ref ParentRegion
+        - Key: ManagedBy
+          Value: 'CloudFormation'
+
+  # Configuration Set
+  SESConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Properties:
+      Name: !Sub '${ProjectCode}-${Environment}-${IdentityType}-ses-config'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DEEDRole
+          Value: !Ref IdentityType
+
+Outputs:
+  SESEmailIdentityName:
+    Description: 'SES email identity name'
+    Value: !If
+      - IsParentIdentity
+      - !Ref SESEmailIdentityParent
+      - !Ref SESEmailIdentityReplica
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-${IdentityType}-DEED-SESEmailIdentityName'
+
+  SESConfigurationSetName:
+    Description: 'SES configuration set name'
+    Value: !Ref SESConfigurationSet
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-${IdentityType}-DEED-SESConfigurationSetName'
+
+  DKIMType:
+    Description: 'DKIM authentication type and DEED role'
+    Value: !If
+      - IsParentIdentity
+      - 'Easy DKIM Parent (2048-bit RSA)'
+      - !Sub 'Easy DKIM Replica from ${ParentRegion} (DEED)'
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-${IdentityType}-DEED-Type'
+
+  SetupInstructions:
+    Description: 'Setup instructions based on identity type'
+    Value: !If
+      - IsParentIdentity
+      - 'Parent: Add 3 CNAME records to DNS. Then create replica identities in other regions.'
+      - 'Replica: No DNS changes needed. Inherits from parent region DNS configuration.'
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-${IdentityType}-DEED-Instructions'

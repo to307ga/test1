@@ -1,0 +1,179 @@
+name: Terraform Test CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'templates/terraform/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'templates/terraform/**'
+
+env:
+  TF_VERSION: "1.6.0"
+  AWS_REGION: "us-east-1"
+
+jobs:
+  test:
+    name: Terraform Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Terraform Init
+      working-directory: templates/terraform
+      run: |
+        terraform init
+
+    - name: Terraform Format Check
+      working-directory: templates/terraform
+      run: |
+        terraform fmt -check -recursive
+
+    - name: Terraform Validate
+      working-directory: templates/terraform
+      run: |
+        terraform validate
+
+    - name: Run UNIT Tests
+      working-directory: templates/terraform
+      run: |
+        echo "Running UNIT tests..."
+        terraform test tests/unit/
+
+    - name: Run Integration Tests
+      working-directory: templates/terraform
+      run: |
+        echo "Running Integration tests..."
+        terraform test tests/integration/
+
+    - name: Terraform Plan
+      working-directory: templates/terraform
+      run: |
+        terraform plan -var-file="test.tfvars" -out=tfplan
+      env:
+        TF_VAR_project_code: "ses-migration"
+        TF_VAR_environment: "test"
+        TF_VAR_domain_name: "test.example.com"
+        TF_VAR_allowed_ip_ranges: '["10.0.0.0/8", "192.168.1.0/24"]'
+        TF_VAR_retention_days: "2555"
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  compliance:
+    name: Compliance Check
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Install Checkov
+      run: |
+        pip install checkov
+
+    - name: Run Checkov Security Scan
+      working-directory: templates/terraform
+      run: |
+        checkov -d . --framework terraform --output sarif --output-file-path checkov-results.sarif
+
+    - name: Upload Checkov scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'templates/terraform/checkov-results.sarif'
+
+  deploy:
+    name: Deploy to Test Environment
+    runs-on: ubuntu-latest
+    needs: [test, security, compliance]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Terraform Init
+      working-directory: templates/terraform
+      run: |
+        terraform init
+
+    - name: Terraform Apply
+      working-directory: templates/terraform
+      run: |
+        terraform apply -auto-approve -var-file="test.tfvars"
+      env:
+        TF_VAR_project_code: "ses-migration"
+        TF_VAR_environment: "test"
+        TF_VAR_domain_name: "test.example.com"
+        TF_VAR_allowed_ip_ranges: '["10.0.0.0/8", "192.168.1.0/24"]'
+        TF_VAR_retention_days: "2555"
+
+    - name: Post-deployment Tests
+      working-directory: templates/terraform
+      run: |
+        echo "Running post-deployment tests..."
+        # Add any post-deployment validation tests here
+        # For example, test that resources are accessible
+        # aws s3 ls s3://$(terraform output -raw log_bucket_name)
+        # aws ses get-identity-verification-attributes --identities $(terraform output -raw ses_domain_identity)

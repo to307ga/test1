@@ -1,0 +1,35 @@
+template:
+  type: file
+  path: ../templates_dev/enhanced-kinesis.yaml
+
+dependencies:
+  - dev/base.yaml
+
+parameters:
+  ProjectCode: aws-ses-migration
+  Environment: development
+
+  # Required parameters from Base stack
+  RawLogsBucketName: !stack_output dev/base.yaml::RawLogsBucketName
+  MaskedLogsBucketName: !stack_output dev/base.yaml::MaskedLogsBucketName
+  ErrorLogsBucketName: !stack_output dev/base.yaml::ErrorLogsBucketName
+  KMSKeyArn: !stack_output dev/base.yaml::KMSKeyArn
+  LambdaRuntime: !stack_output dev/base.yaml::LambdaRuntime
+
+  # Kinesis Configuration
+  BufferSize: 64  # For development environment
+  BufferInterval: 300
+  CompressionFormat: GZIP
+  RetentionDays: 90  # Short-term storage for development environment
+  AdminIPRange: "10.0.0.0/8"
+  OperatorIPRange: "192.168.1.0/24"
+
+tags:
+  Service: infrastructure
+  Component: enhanced-kinesis
+  Environment: dev
+  Project: ses-migration
+  ManagedBy: sceptre
+  Owner: infrastructure-team
+  CostCenter: IT-001
+  DataProcessing: true

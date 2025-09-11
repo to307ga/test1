@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'SES Email Identity with BYODKIM - Manual Key Management'
+
+Parameters:
+  ProjectCode:
+    Type: String
+    Default: 'ses-migration'
+    Description: 'Project identifier for resource naming'
+  Environment:
+    Type: String
+    Default: 'production'
+    Description: 'Environment (production, staging, development)'
+  DomainName:
+    Type: String
+    Default: 'goo.ne.jp'
+    Description: 'Domain name for SES email identity'
+  BYODKIMSelector:
+    Type: String
+    Default: 'gooid-21-prod'
+    Description: 'BYODKIM selector for DNS TXT record'
+  BYODKIMPrivateKey:
+    Type: String
+    NoEcho: true
+    Description: 'Base64-encoded RSA private key for BYODKIM (store in SSM Parameter Store recommended)'
+    Default: '{{resolve:ssm:/ses/byodkim/private-key:1}}'
+
+Resources:
+  # SES Email Identity with BYODKIM
+  SESEmailIdentityBYODKIM:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      DkimSigningAttributes:
+        # BYODKIM Configuration
+        DomainSigningSelector: !Ref BYODKIMSelector
+        DomainSigningPrivateKey: !Ref BYODKIMPrivateKey
+      DkimAttributes:
+        SigningEnabled: true
+      FeedbackAttributes:
+        EmailForwardingEnabled: false
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DKIMType
+          Value: 'BYODKIM'
+        - Key: DKIMSelector
+          Value: !Ref BYODKIMSelector
+        - Key: ManagedBy
+          Value: 'CloudFormation'
+
+  # Configuration Set
+  SESConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Properties:
+      Name: !Sub '${ProjectCode}-${Environment}-byodkim-config'
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: DKIMType
+          Value: 'BYODKIM'
+
+Outputs:
+  SESEmailIdentityName:
+    Description: 'SES email identity name'
+    Value: !Ref SESEmailIdentityBYODKIM
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-BYODKIM-SESEmailIdentityName'
+
+  SESConfigurationSetName:
+    Description: 'SES configuration set name'
+    Value: !Ref SESConfigurationSet
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-BYODKIM-SESConfigurationSetName'
+
+  BYODKIMSelector:
+    Description: 'BYODKIM selector for DNS configuration'
+    Value: !Ref BYODKIMSelector
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-BYODKIM-Selector'
+
+  BYODKIMDNSRecordName:
+    Description: 'DNS TXT record name for BYODKIM public key'
+    Value: !Sub '${BYODKIMSelector}._domainkey.${DomainName}'
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-BYODKIM-DNSRecordName'
+
+  DNSSetupInstructions:
+    Description: 'Manual DNS setup required'
+    Value: 'Create TXT record with BYODKIM public key at the DNS record name above'
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-BYODKIM-DNSInstructions'
+
+  PublicKeyExtractionCommand:
+    Description: 'Command to extract public key from private key'
+    Value: 'openssl rsa -in private_key.pem -pubout -outform DER | openssl base64 -A'
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-BYODKIM-PublicKeyCommand'

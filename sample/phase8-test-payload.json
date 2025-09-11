@@ -1,0 +1,6 @@
+{
+  "source": "manual_test",
+  "action": "scheduled_monitoring",
+  "domain": "goo.ne.jp",
+  "environment": "prod"
+}

@@ -1,0 +1,314 @@
+{
+  "project_name": "aws-byodmim",
+  "description": "AWS SES BYODKIM Migration and Management System",
+  "version": "0.1.0",
+  "agent_rules": {
+    "file_creation": {
+      "code_files": {
+        "extensions": [".py", ".yaml", ".yml", ".json", ".toml", ".tf", ".sh", ".ps1"],
+        "language": "english_only",
+        "encoding": "utf-8",
+        "line_ending": "lf",
+        "bom": false,
+        "naming_convention": "kebab-case"
+      },
+      "documentation_files": {
+        "extensions": [".md", ".txt"],
+        "language": "japanese_allowed",
+        "encoding": "utf-8",
+        "line_ending": "lf",
+        "bom": false,
+        "naming_convention": "kebab-case"
+      }
+    },
+    "command_execution": {
+      "python_execution": {
+        "prefix": "uv run",
+        "examples": [
+          "uv run python script.py",
+          "uv run pytest",
+          "uv run black --check ."
+        ]
+      },
+      "sceptre_execution": {
+        "prefix": "uv run sceptre",
+        "change_commands": {
+          "commands": ["create", "launch", "delete", "update", "execute"],
+          "require_yes_flag": true,
+          "examples": [
+            "uv run sceptre launch stack-name --yes",
+            "uv run sceptre delete stack-name --yes",
+            "uv run sceptre update stack-name --yes"
+          ]
+        },
+        "reference_commands": {
+          "commands": ["list", "describe", "get", "status", "validate"],
+          "require_yes_flag": false,
+          "examples": [
+            "uv run sceptre list stacks",
+            "uv run sceptre describe stack-name",
+            "uv run sceptre status stack-name"
+          ]
+        }
+      }
+    },
+    "code_standards": {
+      "python": {
+        "comments": "english_only",
+        "function_names": "snake_case",
+        "variable_names": "snake_case",
+        "class_names": "PascalCase",
+        "error_messages": "english_only",
+        "log_messages": "english_only",
+        "docstrings": "english_only"
+      },
+      "yaml": {
+        "keys": "english_only",
+        "values": "english_only",
+        "comments": "english_only"
+      },
+      "json": {
+        "keys": "english_only",
+        "values": "english_only"
+      }
+    },
+    "file_structure": {
+      "directories": {
+        "scripts": "Utility scripts and tools",
+        "config": "Sceptre configuration files",
+        "templates": "CloudFormation templates",
+        "lambda": "Lambda function code",
+        "docs": "Documentation files",
+        "tests": "Test files"
+      },
+      "naming_convention": "kebab-case",
+      "examples": {
+        "good": [
+          "dkim-certificate-manager.py",
+          "sceptre-config.yaml",
+          "cloudformation-template.json"
+        ],
+        "bad": [
+          "dkim-certificate-management.py",
+          "sceptre_config.yaml",
+          "cloudformation-template.json"
+        ]
+      }
+    },
+    "template_creation": {
+      "separation_rule": "Templates and parameter sheets must be created separately",
+      "template_files": {
+        "location": "templates/",
+        "description": "CloudFormation template files (.yaml, .json)",
+        "naming_convention": "kebab-case",
+        "examples": [
+          "dkim-manager.yaml",
+          "kms-keys.yaml",
+          "monitoring.yaml"
+        ]
+      },
+      "parameter_sheets": {
+        "location": "config/",
+        "description": "Parameter configuration files for different environments",
+        "environment_directories": {
+          "development": "config/development/",
+          "staging": "config/staging/",
+          "production": "config/production/"
+        },
+        "naming_convention": "kebab-case",
+        "file_extension": ".yaml",
+        "examples": [
+          "config/development/dkim-manager-params.yaml",
+          "config/staging/dkim-manager-params.yaml",
+          "config/production/dkim-manager-params.yaml"
+        ]
+      },
+      "directory_structure": {
+        "templates": "templates/",
+        "config": "config/",
+        "environment_separation": true,
+        "example_structure": {
+          "templates": [
+            "dkim-manager.yaml",
+            "kms-keys.yaml",
+            "monitoring.yaml"
+          ],
+          "config": {
+            "development": [
+              "dkim-manager-params.yaml",
+              "kms-keys-params.yaml",
+              "monitoring-params.yaml"
+            ],
+            "staging": [
+              "dkim-manager-params.yaml",
+              "kms-keys-params.yaml",
+              "monitoring-params.yaml"
+            ],
+            "production": [
+              "dkim-manager-params.yaml",
+              "kms-keys-params.yaml",
+              "monitoring-params.yaml"
+            ]
+          }
+        }
+      }
+    },
+    "error_handling": {
+      "error_messages": "english_only",
+      "log_messages": "english_only",
+      "exception_messages": "english_only",
+      "error_resolution_rules": {
+        "prohibited_actions": [
+          "Deleting configuration or code without investigating the correct values first",
+          "Removing properties or settings simply because they cause errors"
+        ],
+        "required_process": [
+          "Analyze error messages in detail",
+          "Research correct syntax using official documentation or MCP servers",
+          "Fix with correct values (deletion as last resort)",
+          "Provide clear explanation if deletion is necessary"
+        ],
+        "deletion_allowed_cases": [
+          "Officially deprecated or discontinued in documentation",
+          "Determined unnecessary by project requirements",
+          "Clear alternative solution exists"
+        ]
+      },
+      "examples": {
+        "good": "Invalid DKIM key length. Must be 2048 or 4096 bits",
+        "bad": "Invalid DKIM key length. Must be 2048 or 4096 bits"
+      }
+    },
+    "environment_variables": {
+      "naming_convention": "UPPER_SNAKE_CASE",
+      "language": "english_only",
+      "examples": {
+        "good": [
+          "DKIM_KEY_LENGTH",
+          "SES_REGION",
+          "NOTIFICATION_EMAIL"
+        ],
+        "bad": [
+          "DKIM_KEY_LENGTH_JAPANESE",
+          "SES_REGION_JAPANESE",
+          "NOTIFICATION_EMAIL_JAPANESE"
+        ]
+      }
+    },
+    "testing": {
+      "test_file_naming": "test_*.py",
+      "test_function_naming": "test_*",
+      "language": "english_only",
+      "examples": {
+        "good": [
+          "test_dkim_manager.py",
+          "test_create_dkim_certificate()",
+          "test_validate_key_length()"
+        ],
+        "bad": [
+          "test_dkim_management_japanese.py",
+          "test_create_dkim_certificate_japanese()",
+          "test_validate_key_length_japanese()"
+        ]
+      }
+    },
+    "documentation": {
+      "readme": {
+        "language": "japanese_allowed",
+        "purpose": "Project overview and setup instructions"
+      },
+      "technical_docs": {
+        "language": "japanese_allowed",
+        "purpose": "Design documents and specifications"
+      },
+      "api_docs": {
+        "language": "english_preferred",
+        "purpose": "Function specifications and parameter descriptions"
+      }
+    },
+    "validation": {
+      "automatic_checks": [
+        "encoding_utf8",
+        "line_ending_lf",
+        "naming_convention",
+        "language_consistency"
+      ],
+      "tools": [
+        "pre-commit",
+        "black",
+        "flake8",
+        "isort"
+      ]
+    },
+    "exceptions": {
+      "allowed_cases": [
+        "External system integration requiring Japanese",
+        "Legacy system compatibility",
+        "Legal requirements"
+      ],
+      "approval_process": [
+        "Document exception reason",
+        "Consider alternatives",
+        "Team approval",
+        "Documentation update"
+      ]
+    }
+  },
+  "project_structure": {
+    "root_files": [
+      "README.md",
+      "project-rules.md",
+      "pyproject.toml",
+      ".editorconfig",
+      "pre-commit-config.yaml",
+      "project.json"
+    ],
+    "directories": {
+      "scripts": "Utility scripts and automation tools",
+      "config": "Sceptre configuration files",
+      "templates": "CloudFormation templates",
+      "lambda": "Lambda function code",
+      "docs": "Documentation files",
+      "tests": "Test files"
+    }
+  },
+  "dependencies": {
+    "runtime": [
+      "boto3>=1.40.25",
+      "click>=8.2.1",
+      "pyyaml>=6.0.2",
+      "sceptre>=4.5.3"
+    ],
+    "development": [
+      "pre-commit>=3.0.0",
+      "black>=23.0.0",
+      "flake8>=6.0.0",
+      "isort>=5.12.0",
+      "pytest>=7.0.0",
+      "pytest-cov>=4.0.0"
+    ]
+  },
+  "aws_services": {
+    "primary": [
+      "SES",
+      "Lambda",
+      "KMS",
+      "Secrets Manager",
+      "S3",
+      "CloudWatch",
+      "EventBridge"
+    ],
+    "secondary": [
+      "IAM",
+      "SNS",
+      "CloudFormation",
+      "Route53"
+    ]
+  },
+  "compliance": {
+    "encryption": "FIPS 140-2 Level 2",
+    "key_management": "AWS KMS",
+    "audit": "CloudTrail",
+    "monitoring": "CloudWatch"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "phase": "4",
+  "action": "generate_dns_config",
+  "domain": "goo.ne.jp",
+  "environment": "prod",
+  "projectName": "aws-ses-migration",
+  "dkimSeparator": "gooid-21-pro"
+}

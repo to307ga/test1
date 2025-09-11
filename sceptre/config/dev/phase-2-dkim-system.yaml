@@ -1,0 +1,24 @@
+# Phase 2: DKIM Management System for Development Environment
+# Steps 7-10: DKIM Manager Lambda, Lambda execution role, KMS access, Secrets access
+
+template_path: ../templates_dev/dkim-manager-lambda.yaml
+
+parameters:
+  ProjectName: !stack_output dev/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: !stack_output dev/phase-1-infrastructure-foundation.yaml::Environment
+  DKIMManagerRoleArn: !stack_output dev/phase-1-infrastructure-foundation.yaml::DKIMManagerRoleArn
+  DKIMConfigSecretArn: !stack_output dev/phase-1-infrastructure-foundation.yaml::DKIMConfigSecretArn
+  DKIMCertificatesBucketName: !stack_output dev/phase-1-infrastructure-foundation.yaml::DKIMCertificatesBucketName
+  DKIMEncryptionKeyArn: !stack_output dev/phase-1-infrastructure-foundation.yaml::DKIMEncryptionKeyArn
+  # CryptographyLayerArn removed - Layer will be created automatically by CloudFormation
+  CryptographyLayerKey: cryptography-layer.zip  # Layer ファイルのS3キー
+  CertificateValidityDays: 2    # 2 days validity for testing
+  RenewalAlertDays: 1           # Alert 1 day before expiration
+
+dependencies:
+  - dev/phase-1-infrastructure-foundation.yaml
+
+tags:
+  Phase: "2-dkim-system"
+  Purpose: "DKIM management system"
+  Environment: dev

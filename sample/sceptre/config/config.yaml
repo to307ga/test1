@@ -1,0 +1,3 @@
+# Sceptre configuration file
+project_code: "aws-byodmim"
+region: "ap-northeast-1"

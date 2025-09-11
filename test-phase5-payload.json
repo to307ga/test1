@@ -1,0 +1,7 @@
+{
+  "action": "execute_phase_5",
+  "domain": "goo.ne.jp",
+  "environment": "prod",
+  "projectName": "aws-ses-migration",
+  "dkimSeparator": "gooid-21-pro"
+}

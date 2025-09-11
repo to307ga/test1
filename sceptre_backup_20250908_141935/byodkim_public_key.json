@@ -1,0 +1,15 @@
+{
+    "KeyId": "arn:aws:kms:ap-northeast-1:007773581311:key/24e61966-5b88-44f4-bd88-dc6a5f90092f",
+    "PublicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6M1gyHo6CzmW7t3OHBD7zJFt6phxKfRlAjr/MtAfCfVZQSsBRM7s8c0OX7HF+cK1RyC5yiA2Xpai+RdqM/JaKra3EFbKmSAJo5ot4cTFIRbRuemN1WNwaQjLvJcadz+QxRy8d7J3ZN517pLVp7SglAJ6S0g2hJNt+5hOYqEmj1cbVtLZ5j7iKzn+X51XdJJckPLjRvtBPlbdUsUjF6+tRp21bW/gM+e5zzZU9eEIjTuojUXwnfTV7yivFIIFqiBgFod4IXWGk3GTecYOk/TsRr3GDgAdIHP1g+x7iyohw/ssTFI0rNGszKknue0kZ3EHSE9dUyjf2yxFnDg4tK5NzQIDAQAB",
+    "CustomerMasterKeySpec": "RSA_2048",
+    "KeySpec": "RSA_2048",
+    "KeyUsage": "SIGN_VERIFY",
+    "SigningAlgorithms": [
+        "RSASSA_PKCS1_V1_5_SHA_256",
+        "RSASSA_PKCS1_V1_5_SHA_384",
+        "RSASSA_PKCS1_V1_5_SHA_512",
+        "RSASSA_PSS_SHA_256",
+        "RSASSA_PSS_SHA_384",
+        "RSASSA_PSS_SHA_512"
+    ]
+}

@@ -1,0 +1,20 @@
+# Phase 1: Infrastructure Foundation Phase (Consolidated)
+# Steps 1-6: All infrastructure components in one stack
+
+template_path: phase-1-infrastructure-foundation.yaml
+
+parameters:
+  ProjectName: aws-byodmim
+  Environment: prod
+  DomainName: goo.ne.jp
+  DKIMSeparator: gooid-21-pro
+  LogRetentionDays: 90
+  DNSTeamEmail: tomonaga@mx2.mesh.ne.jp
+  LogsRetentionDays: 90
+  LogsTransitionToIADays: 30
+  LogsTransitionToGlacierDays: 30
+
+tags:
+  Phase: "1-infrastructure-foundation"
+  Purpose: "Complete infrastructure foundation"
+  Environment: prod

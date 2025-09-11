@@ -1,0 +1,27 @@
+# Phase 7: DNS Validation and DKIM Activation for Development Environment
+# DNS validation and DKIM activation for dev environment
+
+template:
+  type: file
+  path: ../templates_dev/dns-validation-dkim-activation.yaml
+
+dependencies:
+  - dev/phase-5-dns-team-collaboration.yaml
+
+parameters:
+  ProjectName: !stack_output dev/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: dev  # Use dev for consistency with template AllowedValues
+  DomainName: !stack_output dev/phase-1-infrastructure-foundation.yaml::DomainName
+  DKIMManagerFunctionArn: !stack_output dev/phase-2-dkim-system.yaml::DKIMManagerFunctionArn
+
+tags:
+  Service: validation
+  Component: phase-7-dns-validation-dkim-activation
+  Environment: dev
+  Project: ses-migration
+  ManagedBy: sceptre
+  Owner: development-team
+  CostCenter: IT-DEV-001
+  Production: false
+  Critical: false
+  Purpose: dns-validation-dkim-activation

@@ -1,0 +1,50 @@
+{
+  "domain": "goo.ne.jp",
+  "separator": "gooid-21-pro",
+  "key_length": "2048",
+  "algorithm": "RSA-SHA256",
+  "selectors": [
+    "gooid-21-pro-20250910-1",
+    "gooid-21-pro-20250910-2",
+    "gooid-21-pro-20250910-3"
+  ],
+  "private_key": "",
+  "public_key": "",
+  "dns_records": [
+    {
+      "name": "gooid-21-pro-20250910-1._domainkey.goo.ne.jp",
+      "type": "TXT",
+      "value": "k=rsa; p=Fs/OhFZMih689FSRTHw8MHPJGLCvVb6Rtr7lmZTGJ9C6HjWqYoJ3I5+n3eVTrqjkZpS8fhYpd0thSTp/N0+TRelFTq5X6moOG92leGH6aBV2CsaNnf0P2ZwVB5Or/WJw+6hzJP9crPmkFeCDyqiO2oejq2y1T6Yj1te6wkmgo6AHfjlNA76huP/0lpc9yHffWNzor2c9jwrmQruokNO7lAeDJxUSDnyQ86R0h6eFir2FG3VjeTJStHJRc59yjkZ6gyOFGjyUUrPgriJ9CuG68CEKjOTAzHBoU/LwEFRb6sYuPvdWyri7fKbcS010X8++K7qf8M4Tl9xdkMm5gt7AQA==",
+      "selector": "gooid-21-pro-20250910-1"
+    },
+    {
+      "name": "gooid-21-pro-20250910-2._domainkey.goo.ne.jp",
+      "type": "TXT",
+      "value": "k=rsa; p=Uavxs+jv5WHcannUr+eR/Lpc47qBmcbbSYfVHdiL5m5spAG38yG9c2Q40BrQgtEuAFyT0MsuiibSFlKv8ANxNQ28a2yZCzOZFqbn6kNK37c8U4d/Gj6eyYIdJoPpPJtHweoe2+xAc37eCgViHGiwZZ88jx8MT63wN+zfc6vppBWMlClrJ5ZV5t9yl4/gRZ/jgb4Og+nC4zPuXv/Py/Nbv4fE7rmGJYwJ5O3sPS8izUP9A6X4wopspOs1/3CCWlHuo2sADdA4XSvT7xHPyZszwMkc7F118c9ulMgS8raDFv9gjF/rHsGPDOVqgjyMF06Gp4hcUQULz6iy9h7Q/ds+1w==",
+      "selector": "gooid-21-pro-20250910-2"
+    },
+    {
+      "name": "gooid-21-pro-20250910-3._domainkey.goo.ne.jp",
+      "type": "TXT",
+      "value": "k=rsa; p=4RHoXO3BVFkqjY9RmRC5KLC/VKDM/X1HYxAnVZYE/hlljJo0clXypRE6VJlxfHy7lXKTnFEKN/wFcxDQYgzVkZrimSAICKpV1L+2349t3S+fLcJaj885004ZyVbJTe1V4fZRczE0cWMFrC4wWf1ycuWZw6xggp3MgTCkCRfHGFdgimeC+d62h5Mr+OjyBXhMPW0HqEfDVEVIkL6gWVhidlcaDTEuD7Mq6xaZ5QZjuzRU8ORtfX8jlvpkex4uixq7433qWf1ig8kQqoCWueY5imwrTi+Mt3B7gWUt/ry13xRoNyX9Ep79oq/AhnsYmHz8RwcuSpaZZXr8gSkvgEV2QA==",
+      "selector": "gooid-21-pro-20250910-3"
+    }
+  ],
+  "status": "dkim_enabled",
+  "created_at": "2025-09-10T06:36:49.045883",
+  "expires_at": "2025-09-12T06:36:49.045900",
+  "rotation_enabled": true,
+  "custom_selectors": [
+    "gooid-21-pro-20250910-1",
+    "gooid-21-pro-20250910-2",
+    "gooid-21-pro-20250910-3"
+  ],
+  "byodkim_enabled": true,
+  "signing_enabled": true,
+  "enabled_at": "2025-09-11T03:51:29.863289",
+  "current_phase": "5",
+  "phase_5_completed_at": "2025-09-10T06:41:08.016192",
+  "dns_notification_sent": true,
+  "sns_topic_arn": "arn:aws:sns:ap-northeast-1:007773581311:aws-ses-migration-prod-dns-team-notifications",
+  "ready_for_dns_setup": true
+}

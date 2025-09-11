@@ -1,0 +1,20 @@
+# Phase 4: DNS Configuration Preparation Phase
+# Steps 14-18: RSA key pair generation, DNS CNAME records, private key encryption, public key storage
+
+template_path: dns-preparation.yaml
+
+parameters:
+  ProjectName: !stack_output prod/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: !stack_output prod/phase-1-infrastructure-foundation.yaml::Environment
+  DKIMManagerFunctionArn: !stack_output prod/phase-2-dkim-system.yaml::DKIMManagerFunctionArn
+  DomainName: !stack_output prod/phase-1-infrastructure-foundation.yaml::DomainName
+
+dependencies:
+  - prod/phase-1-infrastructure-foundation.yaml
+  - prod/phase-2-dkim-system.yaml
+  - prod/phase-3-ses-byodkim.yaml
+
+tags:
+  Phase: "4-dns-preparation"
+  Purpose: "DNS configuration preparation"
+  Environment: prod

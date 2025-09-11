@@ -1,0 +1,7 @@
+{
+  "action": "phase_manager",
+  "phase": "7",
+  "domain": "example.com",
+  "environment": "prod",
+  "projectName": "aws-byodmim"
+}

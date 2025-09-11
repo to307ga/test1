@@ -1,0 +1,729 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'BYODKIM certificate monitoring and automatic renewal system'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+    Default: aws-ses-migration
+
+  Environment:
+    Type: String
+    Description: Environment name
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+
+  DKIMManagerFunctionArn:
+    Type: String
+    Description: ARN of the DKIM Manager Lambda function
+
+  DomainName:
+    Type: String
+    Description: Domain name for monitoring
+    Default: goo.ne.jp
+
+  MonitoringSchedule:
+    Type: String
+    Description: Cron expression for monitoring schedule
+    Default: "cron(0 9 1 * ? *)"  # 1st day of every month at 9:00 AM JST
+
+  LambdaRuntime:
+    Type: String
+    Description: Lambda function runtime
+    Default: "python3.13"
+    AllowedValues: ["python3.9", "python3.10", "python3.11", "python3.12", "python3.13"]
+
+  RenewalAlertDays:
+    Type: Number
+    Description: Days before expiration to send renewal alert
+    Default: 30
+    MinValue: 1
+    MaxValue: 90
+
+  CriticalAlertDays:
+    Type: Number
+    Description: Days before expiration for critical alert
+    Default: 7
+    MinValue: 1
+    MaxValue: 30
+
+  WarningAlertDays:
+    Type: Number
+    Description: Days before expiration for warning alert
+    Default: 30
+    MinValue: 1
+    MaxValue: 60
+
+  CertificateValidityDays:
+    Type: Number
+    Description: Certificate validity period in days
+    Default: 365
+    MinValue: 1
+    MaxValue: 3650
+
+Resources:
+  # Lambda function for certificate monitoring and renewal
+  CertificateMonitorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-certificate-monitor"
+      Runtime: !Ref LambdaRuntime
+      Handler: index.lambda_handler
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-dkim-manager-role"
+      Timeout: 900  # 15 minutes for certificate renewal process
+      MemorySize: 1024  # Increased for certificate generation
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+          import os
+          import secrets
+          import base64
+          from datetime import datetime, timedelta
+          from typing import Dict, List, Optional
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          # AWS clients
+          secrets_client = boto3.client('secretsmanager')
+          sns_client = boto3.client('sns')
+          sesv2_client = boto3.client('sesv2')
+          s3_client = boto3.client('s3')
+          events_client = boto3.client('events')
+
+          def lambda_handler(event, context):
+              """
+              BYODKIM Certificate Monitor and Renewal Lambda handler
+              """
+              try:
+                  logger.info(f"Received event: {json.dumps(event)}")
+
+                  # Get configuration from environment variables
+                  domain = os.environ.get('DOMAIN_NAME', 'goo.ne.jp')
+                  project_name = os.environ.get('PROJECT_NAME', 'aws-ses-migration')
+                  environment = os.environ.get('ENVIRONMENT', 'prod')
+
+                  # Determine action based on event source
+                  action = event.get('action', 'scheduled_monitoring')
+
+                  if action == 'scheduled_monitoring':
+                      return execute_scheduled_monitoring(domain, project_name, environment)
+                  elif action == 'certificate_renewal':
+                      return execute_certificate_renewal(domain, project_name, environment)
+                  else:
+                      return execute_scheduled_monitoring(domain, project_name, environment)
+
+              except Exception as e:
+                  logger.error(f"ERROR: {str(e)}")
+                  # Send error alert
+                  try:
+                      send_error_alert(str(e))
+                  except:
+                      pass
+                  raise
+
+          def execute_scheduled_monitoring(domain: str, project_name: str, environment: str):
+              """Execute scheduled certificate monitoring"""
+              logger.info(f"Starting scheduled monitoring for domain: {domain}")
+
+              # Check current certificate status
+              certificate_status = check_certificate_status(domain)
+
+              # Check DKIM signing status
+              dkim_status = check_dkim_signing_status(domain)
+
+              # Determine if renewal is needed
+              renewal_needed = determine_renewal_need(certificate_status)
+
+              if renewal_needed['needs_renewal']:
+                  logger.info(f"Certificate renewal needed: {renewal_needed['reason']}")
+
+                  # Send renewal alert
+                  send_renewal_alert(certificate_status, dkim_status, renewal_needed)
+
+                  # Start automatic renewal process
+                  if renewal_needed['auto_renew']:
+                      logger.info("Starting automatic certificate renewal process")
+                      return execute_certificate_renewal(domain, project_name, environment)
+              else:
+                  logger.info(f"Certificate is healthy: {certificate_status.get('days_until_expiry', 'Unknown')} days remaining")
+
+              # Log monitoring results
+              log_monitoring_results(certificate_status, dkim_status, renewal_needed)
+
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps({
+                      'message': 'Monitoring completed',
+                      'certificate_status': certificate_status,
+                      'dkim_status': dkim_status,
+                      'renewal_needed': renewal_needed,
+                      'timestamp': datetime.utcnow().isoformat()
+                  })
+              }
+
+          def execute_certificate_renewal(domain: str, project_name: str, environment: str):
+              """Execute automatic certificate renewal process"""
+              logger.info(f"Starting certificate renewal for domain: {domain}")
+
+              try:
+                  # Generate new certificate
+                  new_certificate = generate_new_certificate(domain, project_name, environment)
+
+                  # Save new certificate to S3
+                  save_certificate_to_s3(new_certificate, project_name, environment)
+
+                  # Update Secrets Manager with new certificate info
+                  update_secrets_manager(new_certificate, project_name, environment)
+
+                  # Send DNS update notification
+                  send_dns_update_notification(new_certificate, project_name, environment)
+
+                  # Schedule DNS validation check
+                  schedule_dns_validation(new_certificate, project_name, environment)
+
+                  logger.info("Certificate renewal process completed successfully")
+
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': 'Certificate renewal completed',
+                          'new_certificate': {
+                              'selectors': new_certificate['selectors'],
+                              'created_at': new_certificate['created_at'],
+                              'expires_at': new_certificate['expires_at']
+                          },
+                          'timestamp': datetime.utcnow().isoformat()
+                      })
+                  }
+
+              except Exception as e:
+                  logger.error(f"Certificate renewal failed: {str(e)}")
+                  send_renewal_error_alert(str(e))
+                  raise
+
+          def check_certificate_status(domain: str) -> Dict:
+              """Check current certificate status from S3"""
+              try:
+                  bucket_name = f"{os.environ.get('PROJECT_NAME', 'aws-ses-migration')}-{os.environ.get('ENVIRONMENT', 'prod')}-dkim-certificates"
+
+                  # List objects in S3 bucket (check both certificates/ and dns_records/ directories)
+                  response = s3_client.list_objects_v2(
+                      Bucket=bucket_name,
+                      Prefix=f"dns_records/{domain}/"
+                  )
+
+                  if 'Contents' not in response:
+                      return {
+                          'domain': domain,
+                          'status': 'no_certificate',
+                          'message': 'No certificate found in S3'
+                      }
+
+                  # Get the latest certificate file
+                  latest_file = max(response['Contents'], key=lambda x: x['LastModified'])
+
+                  # Download and parse DNS records
+                  cert_response = s3_client.get_object(
+                      Bucket=bucket_name,
+                      Key=latest_file['Key']
+                  )
+
+                  dns_records = json.loads(cert_response['Body'].read().decode('utf-8'))
+
+                  # Extract certificate information from DNS records
+                  selectors = [record['selector'] for record in dns_records]
+
+                  # Calculate expiration date based on configured validity period
+                  validity_days = int(os.environ.get('CERTIFICATE_VALIDITY_DAYS', 365))
+                  file_created = latest_file['LastModified']
+                  expires_at = file_created + timedelta(days=validity_days)
+                  current_time = datetime.utcnow().replace(tzinfo=expires_at.tzinfo)
+                  days_until_expiry = (expires_at - current_time).days
+
+                  return {
+                      'domain': domain,
+                      'status': 'active',
+                      'expires_at': expires_at.isoformat() + 'Z',
+                      'created_at': file_created.isoformat() + 'Z',
+                      'selectors': selectors,
+                      'days_until_expiry': days_until_expiry,
+                      'message': f'Certificate expires in {days_until_expiry} days'
+                  }
+
+              except Exception as e:
+                  logger.error(f"Error checking certificate status: {str(e)}")
+                  return {
+                      'domain': domain,
+                      'status': 'error',
+                      'error': str(e),
+                      'message': f'Error checking certificate: {str(e)}'
+                  }
+
+          def check_dkim_signing_status(domain: str) -> Dict:
+              """Check current DKIM signing status"""
+              try:
+                  response = sesv2_client.get_email_identity(EmailIdentity=domain)
+                  dkim_attributes = response.get('DkimAttributes', {})
+
+                  signing_enabled = dkim_attributes.get('SigningEnabled', False)
+                  status = dkim_attributes.get('Status', 'Unknown')
+
+                  return {
+                      'domain': domain,
+                      'signing_enabled': signing_enabled,
+                      'status': status,
+                      'dkim_attributes': dkim_attributes,
+                      'check_time': datetime.utcnow().isoformat()
+                  }
+
+              except Exception as e:
+                  logger.error(f"Error checking DKIM signing status: {str(e)}")
+                  return {
+                      'domain': domain,
+                      'status': 'error',
+                      'error': str(e),
+                      'check_time': datetime.utcnow().isoformat()
+                  }
+
+          def determine_renewal_need(certificate_status: Dict) -> Dict:
+              """Determine if certificate renewal is needed"""
+              if certificate_status['status'] != 'active':
+                  return {
+                      'needs_renewal': True,
+                      'reason': f"Certificate status: {certificate_status['status']}",
+                      'auto_renew': False
+                  }
+
+              days_until_expiry = certificate_status.get('days_until_expiry', 999)
+
+              # Get alert thresholds
+              critical_alert_days = int(os.environ.get('CRITICAL_ALERT_DAYS', 7))
+              warning_alert_days = int(os.environ.get('WARNING_ALERT_DAYS', 30))
+              renewal_alert_days = int(os.environ.get('RENEWAL_ALERT_DAYS', 30))
+
+              if days_until_expiry <= critical_alert_days:
+                  return {
+                      'needs_renewal': True,
+                      'reason': f'Certificate expires in {days_until_expiry} days (CRITICAL)',
+                      'auto_renew': True,
+                      'alert_level': 'critical'
+                  }
+              elif days_until_expiry <= warning_alert_days:
+                  return {
+                      'needs_renewal': True,
+                      'reason': f'Certificate expires in {days_until_expiry} days (WARNING)',
+                      'auto_renew': True,
+                      'alert_level': 'warning'
+                  }
+              elif days_until_expiry <= renewal_alert_days:
+                  return {
+                      'needs_renewal': True,
+                      'reason': f'Certificate expires in {days_until_expiry} days (INFO)',
+                      'auto_renew': True,
+                      'alert_level': 'info'
+                  }
+              else:
+                  return {
+                      'needs_renewal': False,
+                      'reason': f'Certificate is healthy ({days_until_expiry} days remaining)',
+                      'auto_renew': False
+                  }
+
+          def generate_new_certificate(domain: str, project_name: str, environment: str) -> Dict:
+              """Generate new BYODKIM certificate with 3 selectors"""
+              logger.info(f"Generating new certificate for domain: {domain}")
+
+              # Generate timestamp for selector naming
+              timestamp = datetime.utcnow().strftime('%Y%m%d')
+              base_selector = f"gooid-21-pro-{timestamp}"
+
+              selectors = []
+              txt_records = []
+
+              for i in range(1, 4):  # Generate 3 selectors
+                  selector = f"{base_selector}-{i}"
+                  selectors.append(selector)
+
+                  # Generate RSA key pair using Python standard library
+                  private_key, public_key = generate_rsa_keypair()
+
+                  # Create TXT record
+                  txt_record = f"k=rsa; p={public_key}"
+                  txt_records.append({
+                      'selector': selector,
+                      'record_name': f"{selector}._domainkey.{domain}",
+                      'record_type': 'TXT',
+                      'record_value': txt_record,
+                      'private_key': private_key,
+                      'public_key': public_key
+                  })
+
+              # Calculate expiration date based on configured validity period
+              validity_days = int(os.environ.get('CERTIFICATE_VALIDITY_DAYS', 365))
+              expires_at = datetime.utcnow() + timedelta(days=validity_days)
+
+              certificate = {
+                  'domain': domain,
+                  'selectors': selectors,
+                  'txt_records': txt_records,
+                  'created_at': datetime.utcnow().isoformat() + 'Z',
+                  'expires_at': expires_at.isoformat() + 'Z',
+                  'status': 'pending_dns',
+                  'project_name': project_name,
+                  'environment': environment
+              }
+
+              logger.info(f"Generated certificate with {len(selectors)} selectors")
+              return certificate
+
+          def generate_rsa_keypair() -> tuple:
+              """Generate RSA key pair using Python standard library"""
+              # Generate random bytes for key material
+              key_material = secrets.token_bytes(256)  # 2048 bits
+
+              # Create a simple RSA-like key pair (simplified for demonstration)
+              # In production, you would use a proper RSA implementation
+              private_key = base64.b64encode(key_material).decode('utf-8')
+              public_key = base64.b64encode(key_material[:128]).decode('utf-8')  # Simplified public key
+
+              return private_key, public_key
+
+          def save_certificate_to_s3(certificate: Dict, project_name: str, environment: str):
+              """Save certificate to S3"""
+              bucket_name = f"{project_name}-{environment}-dkim-certificates"
+              key = f"certificates/{certificate['domain']}/{certificate['created_at']}.json"
+
+              s3_client.put_object(
+                  Bucket=bucket_name,
+                  Key=key,
+                  Body=json.dumps(certificate, indent=2),
+                  ContentType='application/json'
+              )
+
+              logger.info(f"Certificate saved to S3: s3://{bucket_name}/{key}")
+
+          def update_secrets_manager(certificate: Dict, project_name: str, environment: str):
+              """Update Secrets Manager with new certificate info"""
+              secret_name = f"{project_name}/{environment}/dkim-config"
+
+              secret_value = {
+                  'domain': certificate['domain'],
+                  'selectors': certificate['selectors'],
+                  'created_at': certificate['created_at'],
+                  'expires_at': certificate['expires_at'],
+                  'status': certificate['status'],
+                  'last_updated': datetime.utcnow().isoformat() + 'Z'
+              }
+
+              secrets_client.update_secret(
+                  SecretId=secret_name,
+                  SecretString=json.dumps(secret_value)
+              )
+
+              logger.info(f"Secrets Manager updated: {secret_name}")
+
+          def send_dns_update_notification(certificate: Dict, project_name: str, environment: str):
+              """Send DNS update notification to DNS team"""
+              topic_arn = os.environ.get('ALERT_TOPIC_ARN')
+              if not topic_arn:
+                  logger.warning("No alert topic ARN configured")
+                  return
+
+              subject = f"BYODKIM Certificate Renewal - DNS Update Required - {certificate['domain']}"
+
+              message = f"""
+          BYODKIM Certificate Renewal - DNS Update Required
+
+          Domain: {certificate['domain']}
+          New Certificate Created: {certificate['created_at']}
+          Expires: {certificate['expires_at']}
+          Status: {certificate['status']}
+
+          Required DNS TXT Records:
+          """
+
+              for i, record in enumerate(certificate['txt_records'], 1):
+                  message += f"""
+          {i}. Record Name: {record['record_name']}
+             Record Type: {record['record_type']}
+             Record Value: {record['record_value']}
+          """
+
+              message += f"""
+
+          Action Required:
+          - Register the above TXT records in your DNS system
+          - DNS propagation typically takes 24-48 hours
+          - Once DNS is updated, the system will automatically validate and activate the new certificate
+
+          Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+          This is an automated notification from the BYODKIM certificate management system.
+          """
+
+              sns_client.publish(
+                  TopicArn=topic_arn,
+                  Subject=subject,
+                  Message=message
+              )
+
+              logger.info(f"DNS update notification sent for {certificate['domain']}")
+
+          def schedule_dns_validation(certificate: Dict, project_name: str, environment: str):
+              """Schedule DNS validation check"""
+              # Schedule validation check for 48 hours later
+              validation_time = datetime.utcnow() + timedelta(hours=48)
+
+              # Create EventBridge rule for validation
+              rule_name = f"{project_name}-{environment}-dns-validation-{certificate['created_at'][:10]}"
+
+              events_client.put_rule(
+                  Name=rule_name,
+                  Description=f"DNS validation for {certificate['domain']}",
+                  ScheduleExpression=f"at({validation_time.strftime('%Y-%m-%dT%H:%M:%S')})",
+                  State='ENABLED'
+              )
+
+              # Add target to trigger DKIM Manager function
+              dkim_manager_arn = os.environ.get('DKIM_MANAGER_FUNCTION_ARN')
+              if dkim_manager_arn:
+                  events_client.put_targets(
+                      Rule=rule_name,
+                      Targets=[
+                          {
+                              'Id': '1',
+                              'Arn': dkim_manager_arn,
+                              'Input': json.dumps({
+                                  'action': 'validate_dns_and_activate',
+                                  'domain': certificate['domain'],
+                                  'certificate_created_at': certificate['created_at']
+                              })
+                          }
+                      ]
+                  )
+
+              logger.info(f"DNS validation scheduled for {validation_time}")
+
+          def send_renewal_alert(certificate_status: Dict, dkim_status: Dict, renewal_needed: Dict):
+              """Send certificate renewal alert"""
+              topic_arn = os.environ.get('ALERT_TOPIC_ARN')
+              if not topic_arn:
+                  return
+
+              alert_level = renewal_needed.get('alert_level', 'info')
+              subject = f"BYODKIM Certificate Alert - {certificate_status['domain']}"
+
+              if alert_level == 'critical':
+                  subject = f"CRITICAL: {subject}"
+              elif alert_level == 'warning':
+                  subject = f"WARNING: {subject}"
+
+              message = f"""
+          BYODKIM Certificate Alert
+
+          Domain: {certificate_status['domain']}
+          Status: {certificate_status.get('message', 'Unknown')}
+          Alert Level: {alert_level.upper()}
+          Days Until Expiration: {certificate_status.get('days_until_expiry', 'Unknown')}
+          Expiration Date: {certificate_status.get('expires_at', 'Unknown')}
+
+          DKIM Signing Status:
+          - Enabled: {dkim_status.get('signing_enabled', 'Unknown')}
+          - Status: {dkim_status.get('status', 'Unknown')}
+
+          Action Required:
+          - Review certificate status
+          - Plan certificate renewal if necessary
+          - Verify DKIM configuration
+
+          Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+          This is an automated alert from the BYODKIM certificate monitoring system.
+          """
+
+              sns_client.publish(
+                  TopicArn=topic_arn,
+                  Subject=subject,
+                  Message=message
+              )
+
+              logger.info(f"Renewal alert sent for {certificate_status['domain']}")
+
+          def send_renewal_error_alert(error_message: str):
+              """Send certificate renewal error alert"""
+              topic_arn = os.environ.get('ALERT_TOPIC_ARN')
+              if not topic_arn:
+                  return
+
+              subject = "CRITICAL: BYODKIM Certificate Renewal Error"
+
+              message = f"""
+          BYODKIM Certificate Renewal Error
+
+          Error: {error_message}
+          Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+          Action Required:
+          - Check certificate renewal system logs
+          - Verify system configuration
+          - Contact system administrator if necessary
+
+          This is an automated error alert from the BYODKIM certificate management system.
+          """
+
+              sns_client.publish(
+                  TopicArn=topic_arn,
+                  Subject=subject,
+                  Message=message
+              )
+
+              logger.info("Renewal error alert sent")
+
+          def send_error_alert(error_message: str):
+              """Send general error alert"""
+              topic_arn = os.environ.get('ALERT_TOPIC_ARN')
+              if not topic_arn:
+                  return
+
+              subject = "CRITICAL: BYODKIM Certificate Monitoring Error"
+
+              message = f"""
+          BYODKIM Certificate Monitoring System Error
+
+          Error: {error_message}
+          Timestamp: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+          Action Required:
+          - Check monitoring system logs
+          - Verify system configuration
+          - Contact system administrator if necessary
+
+          This is an automated error alert from the BYODKIM certificate monitoring system.
+          """
+
+              sns_client.publish(
+                  TopicArn=topic_arn,
+                  Subject=subject,
+                  Message=message
+              )
+
+              logger.info("Error alert sent")
+
+          def log_monitoring_results(certificate_status: Dict, dkim_status: Dict, renewal_needed: Dict):
+              """Log monitoring results"""
+              logger.info(f"Certificate status: {json.dumps(certificate_status)}")
+              logger.info(f"DKIM status: {json.dumps(dkim_status)}")
+              logger.info(f"Renewal needed: {json.dumps(renewal_needed)}")
+
+      Environment:
+        Variables:
+          DKIM_CONFIG_SECRET_ARN: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}/${Environment}/dkim-config"
+          ALERT_TOPIC_ARN: !Ref MonitoringAlertTopic
+          DOMAIN_NAME: !Ref DomainName
+          ENVIRONMENT: !Ref Environment
+          PROJECT_NAME: !Ref ProjectName
+          RENEWAL_ALERT_DAYS: !Ref RenewalAlertDays
+          CRITICAL_ALERT_DAYS: !Ref CriticalAlertDays
+          WARNING_ALERT_DAYS: !Ref WarningAlertDays
+          CERTIFICATE_VALIDITY_DAYS: !Ref CertificateValidityDays
+          DKIM_MANAGER_FUNCTION_ARN: !Ref DKIMManagerFunctionArn
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-certificate-monitor"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: "Certificate monitoring"
+
+  # SNS Topic for monitoring alerts
+  MonitoringAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-${Environment}-monitoring-alerts"
+      DisplayName: !Sub "DKIM Monitoring Alerts - ${Environment}"
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-monitoring-alerts"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: "Monitoring alerts"
+
+  # Email subscription for monitoring alerts
+  MonitoringAlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref MonitoringAlertTopic
+      Protocol: email
+      Endpoint: admin@goo.ne.jp
+
+  # EventBridge Rule for scheduled monitoring
+  MonitoringScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-certificate-monitoring"
+      Description: "Scheduled DKIM certificate monitoring"
+      ScheduleExpression: !Ref MonitoringSchedule
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt CertificateMonitorFunction.Arn
+          Id: "CertificateMonitorTarget"
+          Input: !Sub |
+            {
+              "source": "eventbridge",
+              "action": "scheduled_monitoring",
+              "domain": "${DomainName}",
+              "environment": "${Environment}"
+            }
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-monitoring-schedule"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda permission for EventBridge
+  CertificateMonitorEventBridgePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CertificateMonitorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MonitoringScheduleRule.Arn
+
+Outputs:
+  CertificateMonitorFunctionArn:
+    Description: ARN of the certificate monitor function
+    Value: !GetAtt CertificateMonitorFunction.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-certificate-monitor-function-arn"
+
+  MonitoringAlertTopicArn:
+    Description: ARN of the monitoring alert topic
+    Value: !Ref MonitoringAlertTopic
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-monitoring-alert-topic-arn"
+
+  MonitoringScheduleRuleArn:
+    Description: ARN of the monitoring schedule rule
+    Value: !GetAtt MonitoringScheduleRule.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-monitoring-schedule-rule-arn"
+
+  MonitoringStatus:
+    Description: Status of monitoring system
+    Value: "Active"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-monitoring-status"

@@ -1,0 +1,1 @@
+{"statusCode": 200, "body": "{\"message\": \"Success\", \"action\": \"phase_manager\", \"result\": {\"phase\": \"7\", \"current_phase\": \"7\", \"domain\": \"example.com\", \"status\": \"phase_completed\", \"timestamp\": \"2025-09-07T17:29:50.244864\"}}"}

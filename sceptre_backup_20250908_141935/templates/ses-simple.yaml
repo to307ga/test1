@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'SES Email Identity with BYODKIM Support - Simple Version'
+
+Parameters:
+  ProjectCode:
+    Type: String
+    Default: 'ses-migration'
+  Environment:
+    Type: String
+    Default: 'production'
+  DomainName:
+    Type: String
+    Default: 'goo.ne.jp'
+  BYODKIMSelector:
+    Type: String
+    Default: 'gooid-21-prod'
+
+Resources:
+  # SES Email Identity - Basic Setup
+  SESEmailIdentityBase:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      DkimAttributes:
+        SigningEnabled: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-ses-identity"
+        - Key: DKIMMode
+          Value: 'BYODKIM_READY'
+        - Key: Selector
+          Value: !Ref BYODKIMSelector
+
+  # Configuration Set
+  SESConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Properties:
+      Name: !Sub "${ProjectCode}-${Environment}-ses-config"
+
+Outputs:
+  SESEmailIdentityName:
+    Description: SES email identity name
+    Value: !Ref SESEmailIdentityBase
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-Simple-SESEmailIdentityName"
+
+  SESConfigurationSetName:
+    Description: SES configuration set name
+    Value: !Ref SESConfigurationSet
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-Simple-SESConfigurationSetName"
+
+  BYODKIMSelector:
+    Description: BYODKIM selector for DNS configuration
+    Value: !Ref BYODKIMSelector
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-Simple-BYODKIMSelector"
+
+  BYODKIMDNSRecordName:
+    Description: DNS record name for BYODKIM public key
+    Value: !Sub "${BYODKIMSelector}._domainkey.${DomainName}"
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-Simple-BYODKIMDNSRecordName"
