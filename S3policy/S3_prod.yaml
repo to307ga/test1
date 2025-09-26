@@ -1,0 +1,56 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "IP-whitelist 1,2=VDI / 3,4=Ootemachi",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": [
+                "s3:AbortMultipartUpload",
+                "s3:DeleteObject",
+                "s3:ListMultipartUploadParts",
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:GetBucketLocation",
+                "s3:ListBucket",
+                "s3:ListBucketMultipartUploads"
+            ],
+            "Resource": [
+                "arn:aws:s3:::backup-gooid-idhub-pro",
+                "arn:aws:s3:::backup-gooid-idhub-pro/*"
+            ],
+            "Condition": {
+                "Bool": {
+                    "aws:SecureTransport": "false"
+                },
+                "IpAddress": {
+                    "aws:SourceIp": [
+                        "153.254.171.0/28",
+                        "203.138.153.247/32",
+                        "153.143.181.0/28",
+                        "153.143.181.16/28",
+                        "202.217.75.82/31",
+                        "202.217.75.84/30",
+                        "202.217.0.0/16",
+                        "155.190.0.0/16"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "AllowSSLRequestsOnly",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::backup-gooid-idhub-pro",
+                "arn:aws:s3:::backup-gooid-idhub-pro/*"
+            ],
+            "Condition": {
+                "Bool": {
+                    "aws:SecureTransport": "false"
+                }
+            }
+        }
+    ]
+}
