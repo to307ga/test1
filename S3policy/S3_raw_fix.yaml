@@ -2,6 +2,7 @@
     "Version": "2012-10-17",
     "Statement": [
         {
+            "Sid": "DenyHumanAccessFromUnauthorizedIPs",
             "Effect": "Deny",
             "Principal": "*",
             "Action": "s3:*",
@@ -10,25 +11,34 @@
                 "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
             ],
             "Condition": {
-                "IpAddressIfExists": {
+                "NotIpAddress": {
                     "aws:SourceIp": [
                         "10.99.0.0/16",
                         "10.88.80.0/20",
                         "10.80.11.0/28",
                         "10.80.0.0/24",
-                        "10.99.0.0/24",
-                        "202.217.0.0/16"
+                        "202.217.0.0/16",
+                        "153.254.171.0/28",
+                        "203.138.153.247/32",
+                        "153.143.181.0/28",
+                        "153.143.181.16/28",
+                        "202.217.75.82/31",
+                        "202.217.75.84/30",
+                        "155.190.0.0/16"
                     ]
                 },
-                "StringEquals": {
-                    "aws:PrincipalServiceName": "firehose.amazonaws.com"
-                },
-                "Bool": {
-                    "aws:ViaAWSService": "true"
+                "StringNotEquals": {
+                    "aws:PrincipalServiceName": [
+                        "firehose.amazonaws.com",
+                        "lambda.amazonaws.com",
+                        "s3.amazonaws.com",
+                        "cloudformation.amazonaws.com"
+                    ]
                 }
             }
         },
         {
+            "Sid": "DenyNonSSLRequests",
             "Effect": "Deny",
             "Principal": "*",
             "Action": "s3:*",
@@ -43,6 +53,7 @@
             }
         },
         {
+            "Sid": "AllowAWSServicesFromSameAccount",
             "Effect": "Allow",
             "Principal": {
                 "Service": [
@@ -69,7 +80,10 @@
                     "aws:SourceAccount": "007773581311"
                 },
                 "ArnLike": {
-                    "aws:SourceArn": "arn:aws:firehose:ap-northeast-1:007773581311:deliverystream/*"
+                    "aws:SourceArn": [
+                        "arn:aws:firehose:ap-northeast-1:007773581311:deliverystream/*",
+                        "arn:aws:lambda:ap-northeast-1:007773581311:function/*"
+                    ]
                 }
             }
         }
