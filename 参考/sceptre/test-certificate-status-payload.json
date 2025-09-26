@@ -1,0 +1,5 @@
+{
+  "action": "get_certificate_status",
+  "domain": "goo.ne.jp",
+  "selector": "selector1"
+}

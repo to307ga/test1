@@ -1,0 +1,28 @@
+# Phase 8: Unified DKIM Monitoring System
+# Complete certificate monitoring with automated cross-system integration
+# Replaces all previous monitoring configurations with a single, comprehensive solution
+
+template:
+  type: file
+  path: phase-8-monitoring.yaml
+
+parameters:
+  ProjectName: !stack_output prod/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: !stack_output prod/phase-1-infrastructure-foundation.yaml::Environment
+  DomainName: !stack_output prod/phase-1-infrastructure-foundation.yaml::DomainName
+  MonitoringSchedule: "cron(0 0 * * ? *)"  # Daily at 09:00 JST (00:00 UTC)
+  DKIMManagerFunctionArn: !stack_output prod/phase-2-dkim-system.yaml::DKIMManagerFunctionArn
+  DNSNotifierFunctionArn: !stack_output prod/phase-5-dns-team-collaboration.yaml::DNSNotifierFunctionArn
+  RenewalAlertDays: !stack_output prod/phase-2-dkim-system.yaml::RenewalAlertDays  # Inherit from Phase 2 DKIM system
+  NotificationTopicArn: !stack_output prod/base.yaml::NotificationTopicArn  # Unified notification system
+
+dependencies:
+  - prod/phase-1-infrastructure-foundation.yaml
+  - prod/phase-2-dkim-system.yaml
+  - prod/phase-5-dns-team-collaboration.yaml
+
+tags:
+  Phase: "8-unified-monitoring"
+  Purpose: "Complete DKIM monitoring with automation"
+  System: "Certificate monitoring + Cross-system integration"
+  Architecture: "Unified single-template solution"

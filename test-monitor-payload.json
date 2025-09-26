@@ -1,0 +1,5 @@
+{
+  "environment": "prod",
+  "project_name": "aws-ses-migration",
+  "domain": "goo.ne.jp"
+}

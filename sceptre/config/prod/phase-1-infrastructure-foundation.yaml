@@ -1,7 +1,9 @@
 # Phase 1: Infrastructure Foundation Phase (Consolidated)
 # Steps 1-6: All infrastructure components in one stack
 
-template_path: phase-1-infrastructure-foundation.yaml
+template:
+  type: file
+  path: phase-1-infrastructure-foundation.yaml
 
 parameters:
   ProjectName: aws-ses-migration

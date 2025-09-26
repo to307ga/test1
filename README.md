@@ -1,8 +1,9 @@
-# AWS SES マイグレーション プロジェクト
+# AWS SES への移行プロジェクト
 
 オンプレミス環境のPostfix + CuenoteからAWS SESへのマイグレーションプロジェクト
 
-## 📋 プロジェクト概要
+
+## �📋 プロジェクト概要
 
 ### 目的
 - オンプレミス環境で運用しているPostfix + Cuenoteのメール送信システムをAWS SESへマイグレーション
@@ -99,55 +100,9 @@ AWS_SES_NOT_DNS/
 - 適切なIAM権限
 - Terraform または Sceptre のインストール
 
-### Option 1: Sceptre + CloudFormation
+### デプロイ方法
 
-```bash
-# Sceptreのインストール
-pip install sceptre
-
-# 開発環境の設定確認
-cd sceptre/dev
-sceptre list
-
-# 開発環境のデプロイ
-sceptre launch base
-sceptre launch ses
-sceptre launch monitoring
-sceptre launch security
-
-# 本番環境の設定確認
-cd ../prod
-sceptre list
-
-# 本番環境のデプロイ
-sceptre launch base
-sceptre launch ses
-sceptre launch monitoring
-sceptre launch security
-```
-
-### Option 2: Terraform
-
-```bash
-# Terraformの初期化
-cd terraform
-terraform init
-
-# 設定確認
-terraform plan
-
-# デプロイ
-terraform apply
-```
-
-## ⚙️ 設定パラメータ
-
-### 主要パラメータ（仮定値）
-- **ドメイン名**: goo.ne.jp
-- **送信クォータ**: 5,300,000通/日
-- **許可IPレンジ**: 10.0.0.0/8, 192.168.1.0/24
-- **ログ保持期間**: 7年（2555日）
-- **リージョン**: ap-northeast-1 (Tokyo)
+デプロイ手順及びパラメータの説明は各環境パラメータファイル格納ディレクトリのREADME.md参照
 
 ### 実サーバー確認後に変更が必要な項目
 - Postfix設定（リレー先、認証方式）
@@ -246,6 +201,70 @@ aws ses get-send-quota
 - **DNS管理チーム**: [連絡先]
 - **セキュリティチーム**: [連絡先]
 - **AWSサポート**: [契約情報]
+
+## � Quick Setup
+
+```bash
+# 1. プロジェクトをクローン
+git clone <repository-url>
+cd AWS_SES_BYODKIM
+
+# 2. 依存関係をインストール
+uv sync
+
+# 3. 企業環境SSL設定（重要！）
+uv run python scripts/setup_ssl.py
+
+# 4. sceptreコマンドをテスト
+cd sceptre
+uv run sceptre --help
+```
+
+## 🚨 開発ルール（AIアシスタント必読）
+
+**注意**: 新しい会話開始時に必ずAIアシスタントにこのルールを守るよう指示してください。
+
+```
+「README.mdの開発ルールに従って作業してください」
+```
+
+### コマンド実行規則
+- **必須**: `uv run` プレフィックスを全てのPythonとSceptreコマンドに使用
+- **Sceptreコマンドは必ずsceptreディレクトリで実行**
+  - 現在のディレクトリをsceptreコマンド実行前に確認
+  - sceptreディレクトリにいない場合は `cd sceptre` で移動
+  - sceptreディレクトリにいる場合は直接コマンド実行
+  - sceptreは現在の作業ディレクトリで`config`ディレクトリを探す
+- Sceptreリソース変更コマンド (create/update/delete/launch) には **必ず** `--yes` フラグを追加
+- Sceptre読み取り専用コマンド (validate/status/describe/list/dump) には `--yes` フラグを**使用しない**
+- **例**:
+  - プロジェクトルートから: `cd sceptre; uv run sceptre launch stack --yes`
+  - sceptreディレクトリから: `uv run sceptre launch stack --yes`
+- 生の `python` や `sceptre` コマンドは絶対に使用しない
+
+### 言語ポリシー
+- **日本語**: `.md` ファイルのみ
+- **英語**: `.yaml`, `.yml`, `.py`, `.json`, `.sh`, `.ps1` ファイルは英語のみ
+- CloudFormationテンプレートとSceptre設定は英語のみ
+
+### プロジェクトコンテキスト
+- EasyDKIMからBYODKIMへの移行
+- Infrastructure as Code にSceptreを使用
+- DKIM署名にKMS非対称キーを使用
+- 年次ローテーション (365日) vs 月次 (30日)
+- DKIMSelector: "gooid-21" (prod), "gooid-21-dev" (dev)
+
+### 企業環境対応
+- SSL証明書回避策が設定済み:
+  - `.env` ファイルで `PYTHONHTTPSVERIFY=0`
+  - `pyproject.toml` でSSL環境変数設定
+  - AWS設定で `cli_verify_ssl = false`
+  - その為 sceptre 実行時には --no-verify-sslフラグは不要
+- 適切なパラメータファイルをCloudFormationスタックに使用
+- prod/dev環境の分離を維持
+- AWSセキュリティベストプラクティスに従う
+
+
 
 ## 📝 変更履歴
 

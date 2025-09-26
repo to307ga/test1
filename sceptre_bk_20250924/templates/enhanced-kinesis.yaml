@@ -1,0 +1,516 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Enhanced Kinesis Data Firehose for AWS SES Migration with KMS encryption and advanced features'
+
+Parameters:
+  ProjectCode:
+    Type: String
+    Description: Project code for resource naming
+    Default: ses-migration
+
+  Environment:
+    Type: String
+    Description: Environment name
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+      - prod
+      - dev
+
+  RawLogsBucketName:
+    Type: String
+    Description: Raw logs S3 bucket name (imported from base stack)
+
+  MaskedLogsBucketName:
+    Type: String
+    Description: Masked logs S3 bucket name (imported from base stack)
+
+  ErrorLogsBucketName:
+    Type: String
+    Description: Error logs S3 bucket name (imported from base stack)
+
+  KMSKeyArn:
+    Type: String
+    Description: KMS Key ARN for encryption (imported from base stack)
+
+  BufferSize:
+    Type: Number
+    Description: 'Firehose buffer size in MB'
+    Default: 128
+    MinValue: 1
+    MaxValue: 128
+
+  BufferInterval:
+    Type: Number
+    Description: 'Firehose buffer interval in seconds'
+    Default: 300
+    MinValue: 60
+    MaxValue: 900
+
+  CompressionFormat:
+    Type: String
+    Description: 'Compression format for S3 delivery'
+    Default: 'GZIP'
+    AllowedValues: ['UNCOMPRESSED', 'GZIP', 'ZIP', 'Snappy']
+
+  RetentionDays:
+    Type: Number
+    Description: Log retention period in days for S3
+    Default: 2555
+    MinValue: 1
+    MaxValue: 2555
+
+  AdminIPRange:
+    Type: String
+    Description: 'IP range for admin access'
+    Default: '10.0.0.0/8'
+
+  OperatorIPRange:
+    Type: String
+    Description: 'IP range for operator access'
+    Default: '192.168.1.0/24'
+
+  LambdaRuntime:
+    Type: String
+    Description: Lambda function runtime
+    Default: "python3.13"
+    AllowedValues: ["python3.9", "python3.10", "python3.11", "python3.12", "python3.13"]
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, 'production']
+
+Resources:
+  # IAM Role for Kinesis Data Firehose Transform Lambda
+  KinesisTransformLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-${Environment}-kinesis-transform-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: 'KinesisTransformPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Resource: !Ref KMSKeyArn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${RawLogsBucketName}/*'
+                  - !Sub 'arn:aws:s3:::${MaskedLogsBucketName}/*'
+                  - !Sub 'arn:aws:s3:::${ErrorLogsBucketName}/*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-${Environment}-kinesis-transform-role'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: 'ses-migration'
+
+  # IAM Role for Enhanced Kinesis Data Firehose
+  EnhancedDataFirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-${Environment}-enhanced-firehose-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref 'AWS::AccountId'
+      Policies:
+        - PolicyName: 'EnhancedFirehoseDeliveryPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${RawLogsBucketName}'
+                  - !Sub 'arn:aws:s3:::${RawLogsBucketName}/*'
+                  - !Sub 'arn:aws:s3:::${MaskedLogsBucketName}'
+                  - !Sub 'arn:aws:s3:::${MaskedLogsBucketName}/*'
+                  - !Sub 'arn:aws:s3:::${ErrorLogsBucketName}'
+                  - !Sub 'arn:aws:s3:::${ErrorLogsBucketName}/*'
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                  - kms:ReEncrypt*
+                Resource: !Ref KMSKeyArn
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:GetFunctionConfiguration
+                Resource: !GetAtt DataTransformLambda.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-${Environment}-enhanced-firehose-role'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: 'ses-migration'
+
+  # Lambda Function for Data Transformation and Masking with gzip support
+  DataTransformLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectCode}-${Environment}-data-transform'
+      Runtime: !Ref LambdaRuntime
+      Handler: index.lambda_handler
+      Role: !GetAtt KinesisTransformLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          RAW_LOGS_BUCKET: !Ref RawLogsBucketName
+          MASKED_LOGS_BUCKET: !Ref MaskedLogsBucketName
+          ERROR_LOGS_BUCKET: !Ref ErrorLogsBucketName
+          KMS_KEY_ID: !Ref KMSKeyArn
+          ADMIN_IP_RANGE: !Ref AdminIPRange
+          OPERATOR_IP_RANGE: !Ref OperatorIPRange
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import re
+          import os
+          import gzip
+          import base64
+          import ipaddress
+          from datetime import datetime
+
+          def lambda_handler(event, context):
+              """
+              Enhanced data transformation with gzip support and personal information masking
+              """
+              output = []
+
+              for record in event['records']:
+                  try:
+                      # Decode the data
+                      compressed_payload = base64.b64decode(record['data'])
+
+                      # Handle gzip compressed data
+                      try:
+                          payload = gzip.decompress(compressed_payload).decode('utf-8')
+                      except:
+                          # If not compressed, try direct decode
+                          payload = compressed_payload.decode('utf-8')
+
+                      # Parse JSON if possible
+                      try:
+                          log_data = json.loads(payload)
+                      except:
+                          log_data = {'raw_message': payload}
+
+                      # Determine access level based on source IP (if available)
+                      source_ip = log_data.get('sourceIPAddress', '')
+                      access_level = determine_access_level(source_ip)
+
+                      # Apply masking based on access level
+                      if access_level == 'admin':
+                          # Admin can see raw data
+                          transformed_data = log_data
+                      else:
+                          # Apply data masking for operators and general users
+                          transformed_data = mask_sensitive_data(log_data)
+
+                      # Add processing metadata
+                      transformed_data['_processing_info'] = {
+                          'access_level': access_level,
+                          'processed_at': datetime.utcnow().isoformat(),
+                          'environment': os.environ['ENVIRONMENT']
+                      }
+
+                      # Compress the output
+                      output_data = json.dumps(transformed_data, ensure_ascii=False)
+                      compressed_output = gzip.compress(output_data.encode('utf-8'))
+
+                      output_record = {
+                          'recordId': record['recordId'],
+                          'result': 'Ok',
+                          'data': base64.b64encode(compressed_output).decode('utf-8')
+                      }
+
+                      output.append(output_record)
+
+                      # Send metrics
+                      send_metrics(access_level, len(output_data))
+
+                  except Exception as e:
+                      print(f"Error processing record {record['recordId']}: {str(e)}")
+
+                      # Return error record for Firehose error handling
+                      output.append({
+                          'recordId': record['recordId'],
+                          'result': 'ProcessingFailed'
+                      })
+
+              return {'records': output}
+
+          def determine_access_level(source_ip):
+              """
+              Determine access level based on source IP address
+              """
+              if not source_ip:
+                  return 'general'
+
+              try:
+                  ip_obj = ipaddress.ip_address(source_ip)
+                  admin_network = ipaddress.ip_network(os.environ['ADMIN_IP_RANGE'])
+                  operator_network = ipaddress.ip_network(os.environ['OPERATOR_IP_RANGE'])
+
+                  if ip_obj in admin_network:
+                      return 'admin'
+                  elif ip_obj in operator_network:
+                      return 'operator'
+                  else:
+                      return 'general'
+              except:
+                  return 'general'
+
+          def mask_sensitive_data(data):
+              """
+              Enhanced data masking for personal information protection
+              """
+              if isinstance(data, dict):
+                  masked_data = {}
+                  for key, value in data.items():
+                      if isinstance(value, str):
+                          masked_data[key] = mask_string_data(value)
+                      elif isinstance(value, (dict, list)):
+                          masked_data[key] = mask_sensitive_data(value)
+                      else:
+                          masked_data[key] = value
+                  return masked_data
+              elif isinstance(data, list):
+                  return [mask_sensitive_data(item) for item in data]
+              elif isinstance(data, str):
+                  return mask_string_data(data)
+              else:
+                  return data
+
+          def mask_string_data(data):
+              """
+              Apply string-level masking for email addresses and IP addresses
+              """
+              # Email address masking - complete domain masking
+              email_pattern = r'\b([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b'
+
+              def mask_email(match):
+                  local = match.group(1)
+                  domain = match.group(2)
+
+                  # Local part masking (first character + asterisks)
+                  if len(local) <= 1:
+                      masked_local = local
+                  else:
+                      masked_local = local[0] + '*' * (len(local) - 1)
+
+                  # Complete domain masking for AUTO version
+                  masked_domain = '***.***'
+
+                  return f"{masked_local}@{masked_domain}"
+
+              masked_data = re.sub(email_pattern, mask_email, data)
+
+              # IP address masking - show only first octet
+              ip_pattern = r'\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b'
+              masked_data = re.sub(ip_pattern, r'\1.*.*.*', masked_data)
+
+              return masked_data
+
+          def send_metrics(access_level, data_size):
+              """
+              Send processing metrics to CloudWatch
+              """
+              try:
+                  cloudwatch = boto3.client('cloudwatch')
+                  cloudwatch.put_metric_data(
+                      Namespace='SES/DataTransform',
+                      MetricData=[
+                          {
+                              'MetricName': 'ProcessedDataSize',
+                              'Value': data_size,
+                              'Unit': 'Bytes',
+                              'Dimensions': [
+                                  {
+                                      'Name': 'AccessLevel',
+                                      'Value': access_level
+                                  },
+                                  {
+                                      'Name': 'Environment',
+                                      'Value': os.environ['ENVIRONMENT']
+                                  }
+                              ]
+                          },
+                          {
+                              'MetricName': 'ProcessedRecords',
+                              'Value': 1,
+                              'Unit': 'Count',
+                              'Dimensions': [
+                                  {
+                                      'Name': 'AccessLevel',
+                                      'Value': access_level
+                                  },
+                                  {
+                                      'Name': 'Environment',
+                                      'Value': os.environ['ENVIRONMENT']
+                                  }
+                              ]
+                          }
+                      ]
+                  )
+              except Exception as e:
+                  print(f"Failed to send metrics: {str(e)}")
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-${Environment}-data-transform'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: 'ses-migration'
+
+  # Enhanced Kinesis Data Firehose Delivery Stream for Raw Logs
+  RawLogsFirehoseStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub '${ProjectCode}-${Environment}-raw-logs-stream'
+      DeliveryStreamType: DirectPut
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !Sub 'arn:aws:s3:::${RawLogsBucketName}'
+        BufferingHints:
+          IntervalInSeconds: !Ref BufferInterval
+          SizeInMBs: !Ref BufferSize
+        CompressionFormat: !Ref CompressionFormat
+        EncryptionConfiguration:
+          KMSEncryptionConfig:
+            AWSKMSKeyARN: !Ref KMSKeyArn
+        Prefix: !Sub 'raw-logs/environment=${Environment}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/'
+        ErrorOutputPrefix: !Sub 'errors/raw-logs/environment=${Environment}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/!{firehose:error-output-type}/'
+        RoleARN: !GetAtt EnhancedDataFirehoseRole.Arn
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: Lambda
+              Parameters:
+                - ParameterName: LambdaArn
+                  ParameterValue: !GetAtt DataTransformLambda.Arn
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Sub '/aws/kinesisfirehose/${ProjectCode}-${Environment}-raw-logs'
+          LogStreamName: !Sub '${ProjectCode}-${Environment}-raw-logs-stream'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-${Environment}-raw-logs-stream'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: 'ses-migration'
+        - Key: DataType
+          Value: 'raw'
+
+  # Enhanced Kinesis Data Firehose Delivery Stream for Masked Logs
+  MaskedLogsFirehoseStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub '${ProjectCode}-${Environment}-masked-logs-stream'
+      DeliveryStreamType: DirectPut
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !Sub 'arn:aws:s3:::${MaskedLogsBucketName}'
+        BufferingHints:
+          IntervalInSeconds: !Ref BufferInterval
+          SizeInMBs: !Ref BufferSize
+        CompressionFormat: !Ref CompressionFormat
+        EncryptionConfiguration:
+          KMSEncryptionConfig:
+            AWSKMSKeyARN: !Ref KMSKeyArn
+        Prefix: !Sub 'masked-logs/environment=${Environment}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/'
+        ErrorOutputPrefix: !Sub 'errors/masked-logs/environment=${Environment}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/!{firehose:error-output-type}/'
+        RoleARN: !GetAtt EnhancedDataFirehoseRole.Arn
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: Lambda
+              Parameters:
+                - ParameterName: LambdaArn
+                  ParameterValue: !GetAtt DataTransformLambda.Arn
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Sub '/aws/kinesisfirehose/${ProjectCode}-${Environment}-masked-logs'
+          LogStreamName: !Sub '${ProjectCode}-${Environment}-masked-logs-stream'
+          LogStreamName: !Sub '${ProjectCode}-${Environment}-masked-logs-stream'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-${Environment}-masked-logs-stream'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: 'ses-migration'
+        - Key: DataType
+          Value: 'masked'
+
+Outputs:
+  EnhancedDataTransformLambdaArn:
+    Description: Enhanced data transformation Lambda function ARN
+    Value: !GetAtt DataTransformLambda.Arn
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-EnhancedDataTransformLambda'
+
+  EnhancedRawLogsFirehoseStreamName:
+    Description: Enhanced raw logs Firehose stream name
+    Value: !Ref RawLogsFirehoseStream
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-EnhancedRawLogsFirehoseStream'
+
+  EnhancedMaskedLogsFirehoseStreamName:
+    Description: Enhanced masked logs Firehose stream name
+    Value: !Ref MaskedLogsFirehoseStream
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-EnhancedMaskedLogsFirehoseStream'

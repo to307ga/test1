@@ -1,0 +1,50 @@
+# Clean Base Configuration for PROD
+template:
+  type: file
+  path: base.yaml
+
+parameters:
+  ProjectCode: aws-ses-migration
+  Environment: prod
+  RetentionDays: 365
+  TransitionToIADays: 30
+  TransitionToIntelligentTieringDays: 90
+  TransitionToGlacierDays: 730
+  TransitionToDeepArchiveDays: 1095
+  NotificationEmail: tomonaga@mx2.mesh.ne.jp
+
+  # Lambda Configuration
+  LambdaRuntime: python3.13
+
+  # S3 Access Logging Configuration
+  AccessLogDestinationBucket: service-logs-gooid-idhub2
+
+  # IP Restrictions (VDI/Ootemachi networks)
+  AllowedSourceIPs:
+    - "10.99.0.0/16"      # VDI/Ootemachi network
+    - "10.88.80.0/20"     # VDI/Ootemachi network
+    - "10.80.11.0/28"     # VDI/Ootemachi network
+    - "10.80.0.0/24"      # VDI/Ootemachi network
+    - "10.99.0.0/24"      # VDI/Ootemachi network
+    - "202.217.0.0/16"    # SplashTop network
+
+  # S3 Actions for Service Principals
+  S3AllowedActions:
+    - "s3:AbortMultipartUpload"
+    - "s3:DeleteObject"
+    - "s3:GetBucketLocation"
+    - "s3:GetObject"
+    - "s3:ListBucket"
+    - "s3:ListBucketMultipartUploads"
+    - "s3:ListMultipartUploadParts"
+    - "s3:PutObject"
+
+  # Service Principals for Raw Logs Bucket
+  RawLogsServicePrincipals:
+    - "firehose.amazonaws.com"
+    - "delivery.logs.amazonaws.com"
+
+  # Service Principals for Processing (Masked/Error Logs)
+  ProcessingServicePrincipals:
+    - "lambda.amazonaws.com"
+    - "firehose.amazonaws.com"

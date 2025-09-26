@@ -1,0 +1,9 @@
+{
+  "action": "phase_manager",
+  "phase": "7",
+  "domain": "goo.ne.jp",
+  "environment": "prod",
+  "projectName": "aws-ses-migration",
+  "dkim_selector": "gooid-21-pro-20250912-1",
+  "dkim_separator": "gooid-21-pro"
+}

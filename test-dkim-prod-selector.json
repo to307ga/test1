@@ -1,0 +1,4 @@
+{
+  "action": "create_dkim_certificate",
+  "selector_number": "1"
+}

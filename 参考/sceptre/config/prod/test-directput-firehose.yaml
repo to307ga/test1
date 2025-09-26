@@ -1,0 +1,5 @@
+template_path: test-directput-firehose.yaml
+parameters:
+  ProjectCode: aws-ses-migration
+  Environment: prod
+  RawLogsBucketName: aws-ses-migration-prod-raw-logs-627642418836

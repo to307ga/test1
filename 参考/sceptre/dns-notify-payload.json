@@ -1,0 +1,1 @@
+{"domain":"goo.ne.jp","dnsRecords":[{"name":"gooid-21-pro-20250908-1._domainkey.goo.ne.jp","type":"TXT","value":"k=rsa; p=test-public-key-1","selector":"gooid-21-pro-20250908-1"}],"environment":"prod","projectName":"aws-ses-migration"}

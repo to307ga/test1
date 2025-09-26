@@ -1,0 +1,22 @@
+# Phase 1: Infrastructure Foundation Phase (Consolidated)
+# Steps 1-6: All infrastructure components in one stack
+
+template_path: phase-1-infrastructure-foundation.yaml
+
+parameters:
+  ProjectName: aws-ses-migration
+  Environment: prod
+  DomainName: goo.ne.jp
+  DKIMSeparator: gooid-21-pro
+  LogRetentionDays: 90
+  DNSTeamEmail: goo-idpay-sys@ml.nttdocomo.com
+  LogsRetentionDays: 90
+  LogsTransitionToIADays: 30
+  LogsTransitionToGlacierDays: 30
+  AccessLogDestinationBucket: service-logs-gooid-idhub
+  LambdaRuntime: python3.13
+
+tags:
+  Phase: "1-infrastructure-foundation"
+  Purpose: "Complete infrastructure foundation"
+  Environment: prod

@@ -121,7 +121,6 @@ Parameters:
     Type: String
     Description: Masked CloudWatch Insights query name (imported from monitoring stack)
 
-  # ????????????????????????????
   EnableTokyoRegionFeatures:
     Type: String
     Description: Enable Tokyo region specific features
@@ -792,40 +791,3 @@ Outputs:
     Value: !If [EnableIAMUsersCondition, !Ref SESMonitoringUser, !Ref "AWS::NoValue"]
     Export:
       Name: !Sub "${ProjectCode}-${Environment}-MonitoringUserName"
-
-  SecurityLogGroupName:
-    Description: Name of the CloudWatch log group for security events
-    Value: !If [EnableAccessControlCondition, !Ref SecurityLogGroup, !Ref "AWS::NoValue"]
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-SecurityLogGroupName"
-
-  SecurityDashboardName:
-    Description: Name of the CloudWatch security dashboard
-    Value: !If [EnableAccessControlCondition, !Ref SecurityDashboard, !Ref "AWS::NoValue"]
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-SecurityDashboardName"
-
-  SecurityMonitoringRoleArn:
-    Description: ARN of the IAM role for security monitoring
-    Value: !If [EnableAccessControlCondition, !GetAtt SecurityMonitoringRole.Arn, !Ref "AWS::NoValue"]
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-SecurityMonitoringRoleArn"
-
-  JapaneseComplianceSecurityLogGroupName:
-    Description: Name of the Japanese compliance CloudWatch log group for security
-    Value: !If [EnableJapaneseComplianceCondition, !Ref JapaneseComplianceSecurityLogGroup, !Ref "AWS::NoValue"]
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-JapaneseComplianceSecurityLogGroupName"
-
-  JapaneseSecurityDashboardName:
-    Description: Name of the Japanese security CloudWatch dashboard
-    Value: !If [EnableJapaneseSecurityCondition, !Ref JapaneseSecurityDashboard, !Ref "AWS::NoValue"]
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-JapaneseSecurityDashboardName"
-
-  TokyoRegionSecurityMetricsName:
-    Description: Name of the Tokyo region security metrics CloudWatch dashboard
-    Value: !If [EnableTokyoRegionSecurityCondition, !Ref TokyoRegionSecurityMetrics, !Ref "AWS::NoValue"]
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-TokyoRegionSecurityMetricsName"
-

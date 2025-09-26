@@ -1,0 +1,1 @@
+{"errorMessage": "Syntax error in module 'index': unexpected indent (index.py, line 532)", "errorType": "Runtime.UserCodeSyntaxError", "requestId": "", "stackTrace": ["  File \"/var/task/index.py\" Line 532\n                              def create_dkim_certificate(secret_arn, bucket_name, dkim_separator=None):\n"]}

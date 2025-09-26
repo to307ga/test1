@@ -1,0 +1,32 @@
+# Independent SES-Kinesis Integration Bridge
+# Purpose: Connect existing SES Configuration Set to Kinesis data processing
+# Design: Complete separation from phase-3 BYODKIM configuration
+
+template:
+  type: file
+  path: ses-kinesis-bridge.yaml
+
+parameters:
+  ProjectName: !stack_output prod/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: !stack_output prod/phase-1-infrastructure-foundation.yaml::Environment
+
+  # Reference existing SES Configuration Set (from phase-3)
+  SESConfigurationSetName: !stack_output prod/phase-3-ses-byodkim.yaml::ConfigurationSetName
+
+  # Connect to both enhanced-kinesis data processing streams
+  KinesisRawLogsFirehoseStreamArn: !stack_output prod/enhanced-kinesis.yaml::EnhancedRawLogsFirehoseStreamArn
+  KinesisMaskedLogsFirehoseStreamArn: !stack_output prod/enhanced-kinesis.yaml::EnhancedMaskedLogsFirehoseStreamArn
+
+  # Feature control
+  EnableSESKinesisIntegration: "true"
+
+dependencies:
+  - prod/phase-1-infrastructure-foundation.yaml
+  - prod/phase-3-ses-byodkim.yaml  # Only for ConfigurationSet reference
+  - prod/enhanced-kinesis.yaml     # Only for Kinesis Firehose reference
+
+tags:
+  Phase: "ses-kinesis-bridge"
+  Purpose: "Independent SES-Kinesis integration bridge"
+  Environment: prod
+  Architecture: "complete-separation"

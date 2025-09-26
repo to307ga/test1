@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'SES Test Email Sender - Lambda function to test SES email sending and log flow'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+    Default: aws-ses-migration
+
+  Environment:
+    Type: String
+    Description: Environment name
+    Default: prod
+
+  # Email Configuration
+  SourceEmailDomain:
+    Type: String
+    Description: Source domain for sending emails (from phase-3)
+
+  TestRecipientEmail:
+    Type: String
+    Description: Verified recipient email address for testing
+    Default: goo-idpay-sys@ml.nttdocomo.com
+
+  # SES Configuration
+  SESConfigurationSetName:
+    Type: String
+    Description: Name of the SES Configuration Set to use
+
+Resources:
+  # IAM Role for Test Email Lambda
+  TestEmailSenderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-test-email-sender-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SESTestEmailSendingPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                  - ses:GetIdentityVerificationAttributes
+                  - ses:GetAccountSendingEnabled
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-test-email-sender-role"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda function for sending test emails
+  TestEmailSenderFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-test-email-sender"
+      Runtime: python3.13
+      Handler: index.lambda_handler
+      Role: !GetAtt TestEmailSenderRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          SOURCE_DOMAIN: !Ref SourceEmailDomain
+          RECIPIENT_EMAIL: !Ref TestRecipientEmail
+          CONFIGURATION_SET: !Ref SESConfigurationSetName
+          PROJECT_NAME: !Ref ProjectName
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from datetime import datetime
+
+          def lambda_handler(event, context):
+              ses_client = boto3.client('ses')
+
+              try:
+                  source_domain = os.environ['SOURCE_DOMAIN']
+                  recipient = os.environ['RECIPIENT_EMAIL']
+                  config_set = os.environ['CONFIGURATION_SET']
+                  project = os.environ['PROJECT_NAME']
+                  env = os.environ['ENVIRONMENT']
+
+                  timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                  sender = f"test@{source_domain}"
+
+                  subject = f"SES Test Email - {project} {env} - {timestamp}"
+                  body_text = f"""
+SES Test Email Sending
+
+Project: {project}
+Environment: {env}
+Timestamp: {timestamp}
+Configuration Set: {config_set}
+
+This is a test email for SES-Kinesis integration verification.
+Testing log flow from SES to Kinesis Firehose to S3.
+                  """
+
+                  response = ses_client.send_email(
+                      Source=sender,
+                      Destination={
+                          'ToAddresses': [recipient]
+                      },
+                      Message={
+                          'Subject': {
+                              'Data': subject,
+                              'Charset': 'UTF-8'
+                          },
+                          'Body': {
+                              'Text': {
+                                  'Data': body_text,
+                                  'Charset': 'UTF-8'
+                              }
+                          }
+                      },
+                      ConfigurationSetName=config_set
+                  )
+
+                  message_id = response['MessageId']
+
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': 'Test email sent successfully',
+                          'messageId': message_id,
+                          'sender': sender,
+                          'recipient': recipient,
+                          'configurationSet': config_set,
+                          'timestamp': timestamp
+                      })
+                  }
+
+              except Exception as e:
+                  print(f"Error sending test email: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({
+                          'error': str(e),
+                          'message': 'Failed to send test email'
+                      })
+                  }
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-test-email-sender"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CloudWatch Log Group for Test Email Sender
+  TestEmailSenderLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectName}-${Environment}-test-email-sender"
+      RetentionInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-test-email-sender-logs"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  TestEmailSenderFunctionName:
+    Description: Name of the test email sender Lambda function
+    Value: !Ref TestEmailSenderFunction
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-test-email-sender-function-name"
+
+  TestEmailSenderFunctionArn:
+    Description: ARN of the test email sender Lambda function
+    Value: !GetAtt TestEmailSenderFunction.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-test-email-sender-function-arn"
+
+  TestConfiguration:
+    Description: Test email configuration summary
+    Value: !Sub "Sender: test@${SourceEmailDomain}, Recipient: ${TestRecipientEmail}, ConfigSet: ${SESConfigurationSetName}"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-test-email-config"

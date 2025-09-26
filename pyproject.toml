@@ -11,3 +11,11 @@ dependencies = [
     "pyyaml>=6.0.2",
     "sceptre>=4.5.3",
 ]
+
+[tool.uv]
+env = [
+    "PYTHONHTTPSVERIFY=0",
+    "CURL_CA_BUNDLE=",
+    "REQUESTS_CA_BUNDLE=",
+    "PYTHONWARNINGS=ignore:Unverified HTTPS request",
+]

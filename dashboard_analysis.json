@@ -1,0 +1,54 @@
+{
+  "aws-ses-migration-prod-monitoring": {
+    "widgets": [
+      {
+        "type": "metric",
+        "properties": {
+          "metrics": [
+            ["aws-ses-migration/prod", "DKIMStatus"],
+            [".", "CertificateExpiry"]
+          ],
+          "title": "DKIM Certificate Status"
+        }
+      },
+      {
+        "type": "log",
+        "properties": {
+          "query": "SOURCE '/aws/lambda/aws-ses-migration-prod-monitoring' | fields @timestamp, @message",
+          "title": "Monitoring System Logs"
+        }
+      }
+    ]
+  },
+  "ses-migration-production-dashboard": {
+    "widgets": [
+      {
+        "type": "metric",
+        "properties": {
+          "metrics": [
+            ["ses-migration/production/Monitoring", "BounceRate", "Environment", "prod"],
+            [".", "ComplaintRate", ".", "."],
+            [".", "SendSuccessRate", ".", "."]
+          ],
+          "title": "SES Performance Metrics (Tokyo Region)"
+        }
+      },
+      {
+        "type": "metric",
+        "properties": {
+          "metrics": [
+            ["ses-migration/production/Monitoring", "ApplicationErrors", "Environment", "prod"]
+          ],
+          "title": "Application Errors (Tokyo Region)"
+        }
+      },
+      {
+        "type": "log",
+        "properties": {
+          "query": "SOURCE \"/aws/ses/aws-ses-migration-prod\" | fields @timestamp, eventType, destination, sourceIp | filter eventType = \"bounce\" or eventType = \"complaint\"",
+          "title": "Recent SES Events (Last 20) - Tokyo Region"
+        }
+      }
+    ]
+  }
+}

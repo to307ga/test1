@@ -15,6 +15,7 @@ Parameters:
       - staging
       - production
       - prod
+      - dev
     Default: development
 
   DomainName:
@@ -30,6 +31,147 @@ Parameters:
     Type: String
     Description: DKIM separator prefix (date will be automatically appended)
     Default: gooid-21-pro
+
+  # Security Parameters
+  SESAllowedIPs:
+    Type: CommaDelimitedList
+    Description: IP addresses allowed for SES operations (CIDR notation)
+
+  EnableSESIPFiltering:
+    Type: String
+    Description: Enable IP-based access control for SES
+    AllowedValues: ["true", "false"]
+
+  # SES Monitoring Parameters
+  BounceRateThreshold:
+    Type: Number
+    Description: Bounce rate threshold (percentage) for CloudWatch alarm
+    Default: 5.0
+    MinValue: 0.1
+    MaxValue: 100.0
+
+  ComplaintRateThreshold:
+    Type: Number
+    Description: Complaint rate threshold (percentage) for CloudWatch alarm
+    Default: 0.1
+    MinValue: 0.01
+    MaxValue: 100.0
+
+  EnableSESMonitoring:
+    Type: String
+    Description: Enable SES CloudWatch monitoring and alarms
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  SESAlarmSNSTopicArn:
+    Type: String
+    Description: SNS Topic ARN for SES alarm notifications
+    Default: ""
+
+  CloudWatchLogRetentionDays:
+    Type: Number
+    Description: CloudWatch Logs retention period in days
+    Default: 90
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 2555]
+
+  # Feature Flags - SES Core Functions
+  EnableBounceComplaintHandling:
+    Type: String
+    Description: Enable automated bounce and complaint handling for SES
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableKinesisLogging:
+    Type: String
+    Description: Enable Kinesis logging for SES events
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableDKIM:
+    Type: String
+    Description: Enable DKIM signing for email authentication
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableDomainVerification:
+    Type: String
+    Description: Enable automatic domain verification process
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableBYODKIMAutomation:
+    Type: String
+    Description: Enable BYODKIM key generation (manual control for DNS coordination)
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+  BYODKIMRotationMode:
+    Type: String
+    Description: BYODKIM rotation mode - MANUAL for DNS coordination safety
+    Default: "MANUAL"
+    AllowedValues: ["MANUAL", "AUTOMATED"]
+
+  BYODKIMDNSConfirmationRequired:
+    Type: String
+    Description: Require DNS confirmation before SES key activation
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  BYODKIMRotationNotificationEmail:
+    Type: String
+    Description: Email for BYODKIM rotation notifications and DNS coordination
+    Default: ""
+
+  # Feature Flags - Regional and Japanese-specific Features
+  EnableTokyoRegionFeatures:
+    Type: String
+    Description: Enable Tokyo region specific optimizations and features
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableJapaneseCompliance:
+    Type: String
+    Description: Enable Japanese regulatory compliance features (PDPA, etc.)
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableTokyoSES:
+    Type: String
+    Description: Enable Tokyo SES specific routing and optimizations
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+  EnableJapaneseEmailTemplates:
+    Type: String
+    Description: Enable Japanese email template optimizations (encoding, formatting)
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  # SES Metrics and Namespace
+  CloudWatchMetricNamespace:
+    Type: String
+    Description: Custom CloudWatch metric namespace for SES operations
+    Default: "ses-migration/prod/SES"
+
+Conditions:
+  EnableSESIPFilteringCondition: !Equals [!Ref EnableSESIPFiltering, 'true']
+  EnableSESMonitoringCondition: !Equals [!Ref EnableSESMonitoring, 'true']
+  HasSNSTopicForAlarms: !Not [!Equals [!Ref SESAlarmSNSTopicArn, ""]]
+
+  # Feature Flag Conditions
+  EnableBounceComplaintHandlingCondition: !Equals [!Ref EnableBounceComplaintHandling, 'true']
+  EnableDKIMCondition: !Equals [!Ref EnableDKIM, 'true']
+  EnableDomainVerificationCondition: !Equals [!Ref EnableDomainVerification, 'true']
+  EnableBYODKIMAutomationCondition: !Equals [!Ref EnableBYODKIMAutomation, 'true']
+  EnableTokyoRegionFeaturesCondition: !Equals [!Ref EnableTokyoRegionFeatures, 'true']
+  EnableJapaneseComplianceCondition: !Equals [!Ref EnableJapaneseCompliance, 'true']
+  EnableTokyoSESCondition: !Equals [!Ref EnableTokyoSES, 'true']
+  EnableJapaneseEmailTemplatesCondition: !Equals [!Ref EnableJapaneseEmailTemplates, 'true']
+
+  # BYODKIM Safety Conditions
+  ManualBYODKIMRotationCondition: !Equals [!Ref BYODKIMRotationMode, 'MANUAL']
+  AutomatedBYODKIMRotationCondition: !Equals [!Ref BYODKIMRotationMode, 'AUTOMATED']
+  RequireDNSConfirmationCondition: !Equals [!Ref BYODKIMDNSConfirmationRequired, 'true']
 
 Resources:
   # SES Email Identity for the domain (DKIM configuration disabled - will be configured in Phase 4-7)
@@ -72,11 +214,12 @@ Resources:
   # Event Destination for bounce/complaint tracking
   EventDestination:
     Type: AWS::SES::ConfigurationSetEventDestination
+    Condition: EnableBounceComplaintHandlingCondition
     Properties:
       ConfigurationSetName: !Ref ConfigurationSet
       EventDestination:
         Name: !Sub "${ProjectName}-${Environment}-event-destination"
-        Enabled: true
+        Enabled: !Ref EnableBounceComplaintHandling
         MatchingEventTypes:
           - bounce
           - complaint
@@ -91,6 +234,7 @@ Resources:
               DimensionValueSource: "messageTag"
               DefaultDimensionValue: "default"
 
+
   # CloudWatch Log Group for SES events
   SESLogGroup:
     Type: AWS::Logs::LogGroup
@@ -104,6 +248,28 @@ Resources:
           Value: !Ref ProjectName
         - Key: Environment
           Value: !Ref Environment
+
+  # SES IP-Restricted IAM Policy
+  SESIPRestrictedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: EnableSESIPFilteringCondition
+    Properties:
+      ManagedPolicyName: !Sub "${ProjectName}-${Environment}-ses-ip-restricted-policy"
+      Description: "SES sending policy with IP restrictions"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - "ses:SendEmail"
+              - "ses:SendRawEmail"
+              - "ses:GetSendQuota"
+              - "ses:GetSendStatistics"
+            Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${DomainName}"
+            Condition:
+              IpAddress:
+                "aws:SourceIp": !Ref SESAllowedIPs
+
 
   # EventBridge rule to trigger phased DKIM setup (Phase 4-7 implementation)
   DKIMPhaseManagerRule:
@@ -130,6 +296,106 @@ Resources:
               "environment": "${Environment}",
               "projectName": "${ProjectName}"
             }
+
+  # CloudWatch Alarms for SES Monitoring
+  SESBounceRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableSESMonitoringCondition
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${Environment}-ses-bounce-rate-high"
+      AlarmDescription: !Sub "SES bounce rate is above ${BounceRateThreshold}% for domain ${DomainName}"
+      MetricName: Bounce
+      Namespace: AWS/SES
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref BounceRateThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: Identity
+          Value: !Ref DomainName
+      AlarmActions: !If
+        - HasSNSTopicForAlarms
+        - [!Ref SESAlarmSNSTopicArn]
+        - []
+      OKActions: !If
+        - HasSNSTopicForAlarms
+        - [!Ref SESAlarmSNSTopicArn]
+        - []
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ses-bounce-rate-alarm"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: AlarmType
+          Value: "SES-BounceRate"
+
+  SESComplaintRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableSESMonitoringCondition
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${Environment}-ses-complaint-rate-high"
+      AlarmDescription: !Sub "SES complaint rate is above ${ComplaintRateThreshold}% for domain ${DomainName}"
+      MetricName: Complaint
+      Namespace: AWS/SES
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref ComplaintRateThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: Identity
+          Value: !Ref DomainName
+      AlarmActions: !If
+        - HasSNSTopicForAlarms
+        - [!Ref SESAlarmSNSTopicArn]
+        - []
+      OKActions: !If
+        - HasSNSTopicForAlarms
+        - [!Ref SESAlarmSNSTopicArn]
+        - []
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ses-complaint-rate-alarm"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: AlarmType
+          Value: "SES-ComplaintRate"
+
+  SESSendingQuotaAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableSESMonitoringCondition
+    Properties:
+      AlarmName: !Sub "${ProjectName}-${Environment}-ses-sending-quota-usage-high"
+      AlarmDescription: !Sub "SES sending quota usage is above 80% for ${ProjectName}-${Environment}"
+      MetricName: Send
+      Namespace: AWS/SES
+      Statistic: Sum
+      Period: 86400  # 24 hours
+      EvaluationPeriods: 1
+      Threshold: 1920  # 80% of default 24-hour quota (2400 emails)
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions: !If
+        - HasSNSTopicForAlarms
+        - [!Ref SESAlarmSNSTopicArn]
+        - []
+      OKActions: !If
+        - HasSNSTopicForAlarms
+        - [!Ref SESAlarmSNSTopicArn]
+        - []
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ses-sending-quota-alarm"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: AlarmType
+          Value: "SES-SendingQuota"
 
   # Lambda permission for EventBridge
   DKIMManagerEventBridgePermission:
@@ -176,3 +442,59 @@ Outputs:
     Value: !GetAtt DKIMPhaseManagerRule.Arn
     Export:
       Name: !Sub "${ProjectName}-${Environment}-dkim-phase-manager-rule"
+
+  SESIPRestrictedPolicyArn:
+    Description: ARN of the SES IP-restricted policy
+    Condition: EnableSESIPFilteringCondition
+    Value: !Ref SESIPRestrictedPolicy
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-ip-restricted-policy-arn"
+
+  SESBounceRateAlarmArn:
+    Description: ARN of the SES bounce rate alarm
+    Condition: EnableSESMonitoringCondition
+    Value: !GetAtt SESBounceRateAlarm.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-bounce-rate-alarm-arn"
+
+  SESComplaintRateAlarmArn:
+    Description: ARN of the SES complaint rate alarm
+    Condition: EnableSESMonitoringCondition
+    Value: !GetAtt SESComplaintRateAlarm.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-complaint-rate-alarm-arn"
+
+  SESSendingQuotaAlarmArn:
+    Description: ARN of the SES sending quota alarm
+    Condition: EnableSESMonitoringCondition
+    Value: !GetAtt SESSendingQuotaAlarm.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-sending-quota-alarm-arn"
+
+  # Feature Flag Status Outputs
+  SESFeatureFlagStatus:
+    Description: Current SES feature flag configuration status
+    Value: !Sub |
+      SES Core Features:
+      - DKIM: ${EnableDKIM}
+      - Bounce/Complaint Handling: ${EnableBounceComplaintHandling}
+      - Domain Verification: ${EnableDomainVerification}
+      - BYODKIM Automation: ${EnableBYODKIMAutomation}
+
+      Regional Features:
+      - Tokyo Region Features: ${EnableTokyoRegionFeatures}
+      - Japanese Compliance: ${EnableJapaneseCompliance}
+      - Tokyo SES: ${EnableTokyoSES}
+      - Japanese Email Templates: ${EnableJapaneseEmailTemplates}
+
+      Monitoring:
+      - SES Monitoring: ${EnableSESMonitoring}
+      - IP Filtering: ${EnableSESIPFiltering}
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-feature-flags-status"
+
+  CloudWatchMetricNamespace:
+    Description: SES CloudWatch metrics namespace
+    Value: !Ref CloudWatchMetricNamespace
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-metric-namespace"

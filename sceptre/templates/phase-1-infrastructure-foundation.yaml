@@ -156,6 +156,12 @@ Resources:
                   - sns:Publish
                 Resource: !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${Environment}-*"
 
+              # CloudWatch permissions for custom metrics
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+
   # CloudFormation execution role
   CloudFormationRole:
     Type: AWS::IAM::Role
@@ -421,10 +427,10 @@ Resources:
         RestrictPublicBuckets: true
       LoggingConfiguration:
         DestinationBucketName: !Ref AccessLogDestinationBucket
-        LogFilePrefix: !Sub 'logs/${ProjectName}-${Environment}-lambda-layers/ap-northeast-1/byodkim-${Environment}/'
+        LogFilePrefix: !Sub 'logs/${ProjectName}-${Environment}-lambda-layers-v2/ap-northeast-1/byodkim-${Environment}/'
       Tags:
         - Key: Name
-          Value: !Sub "${ProjectName}-${Environment}-lambda-layers"
+          Value: !Sub "${ProjectName}-${Environment}-lambda-layers-v2"
         - Key: Project
           Value: !Ref ProjectName
         - Key: Environment
@@ -916,13 +922,13 @@ Outputs:
     Description: Name of the Lambda layers S3 bucket
     Value: !Ref LambdaLayersBucket
     Export:
-      Name: !Sub "${ProjectName}-${Environment}-lambda-layers-bucket-name"
+      Name: !Sub "${ProjectName}-${Environment}-lambda-layers-v2-bucket-name"
 
   LambdaLayersBucketArn:
     Description: ARN of the Lambda layers S3 bucket
     Value: !GetAtt LambdaLayersBucket.Arn
     Export:
-      Name: !Sub "${ProjectName}-${Environment}-lambda-layers-bucket-arn"
+      Name: !Sub "${ProjectName}-${Environment}-lambda-layers-v2-bucket-arn"
 
   # CloudWatch Logs Outputs
   DKIMManagerLogGroupName:

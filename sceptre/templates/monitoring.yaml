@@ -10,12 +10,12 @@ Parameters:
   Environment:
     Type: String
     Description: Environment name
-    Default: production
+    Default: prod
 
   ProjectCode:
     Type: String
     Description: Project code for resource naming
-    Default: ses-migration
+    Default: aws-ses-migration
 
   RetentionDays:
     Type: Number
@@ -832,13 +832,6 @@ Outputs:
     Export:
       Name: !Sub "${ProjectCode}-${Environment}-ErrorQueryDefinitionName"
 
-  MonitoringDashboardName:
-    Condition: EnableCustomMetricsCondition
-    Description: Name of the CloudWatch monitoring dashboard
-    Value: !Ref MonitoringDashboard
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-MonitoringDashboardName"
-
   ApplicationLogGroupName:
     Description: Name of the CloudWatch log group for application logs
     Value: !Ref ApplicationLogGroup
@@ -851,13 +844,6 @@ Outputs:
     Value: !Ref JapaneseComplianceMonitoringLogGroup
     Export:
       Name: !Sub "${ProjectCode}-${Environment}-JapaneseComplianceMonitoringLogGroupName"
-
-  TokyoRegionMonitoringDashboardName:
-    Condition: EnableTokyoRegionFeaturesCondition
-    Description: Name of the Tokyo region monitoring CloudWatch dashboard
-    Value: !Ref TokyoRegionMonitoringDashboard
-    Export:
-      Name: !Sub "${ProjectCode}-${Environment}-TokyoRegionMonitoringDashboardName"
 
   JapaneseMonitoringQueryName:
     Condition: EnableJapaneseMonitoringCondition

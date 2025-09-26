@@ -1,0 +1,7 @@
+{
+  "action": "create_certificate",
+  "domain": "goo.ne.jp",
+  "environment": "prod",
+  "projectName": "aws-ses-migration",
+  "dkimSeparator": "test-auto"
+}

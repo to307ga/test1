@@ -1,7 +1,6 @@
-# Phase 2: DKIM Management System Construction Phase
-# Steps 7-10: DKIM Manager Lambda, Lambda execution role, KMS access, Secrets access
-
-template_path: dkim-manager-lambda.yaml
+template:
+  type: file
+  path: dkim-manager-lambda.yaml
 
 parameters:
   ProjectName: !stack_output prod/phase-1-infrastructure-foundation.yaml::ProjectName
@@ -10,15 +9,20 @@ parameters:
   DKIMConfigSecretArn: !stack_output prod/phase-1-infrastructure-foundation.yaml::DKIMConfigSecretArn
   DKIMCertificatesBucketName: !stack_output prod/phase-1-infrastructure-foundation.yaml::DKIMCertificatesBucketName
   DKIMEncryptionKeyArn: !stack_output prod/phase-1-infrastructure-foundation.yaml::DKIMEncryptionKeyArn
-  # CryptographyLayerArn removed - Layer will be created automatically by CloudFormation
-  CryptographyLayerKey: cryptography-layer.zip  # Layer ファイルのS3キー
-  CertificateValidityDays: 2    # 2 days validity for testing
-  RenewalAlertDays: 1           # Alert 1 day before expiration
+  LambdaRuntime: "python3.13"
+  CertificateValidityDays: 2  # 2 days validity for testing (production: 456 days)
+  RenewalAlertDays: 1          # Test mode: Alert 1 day before expiration (production: 60 days for DNS coordination)
+  DKIMSeparator: "gooid-21-pro" # Fixed value for prod environment
+
+  # BYODKIM Safety Control Parameters
+  BYODKIMAutoApplyToSES: "false"           # 新鍵をSESに自動適用しない
+  BYODKIMRotationMode: "MANUAL"            # 手動制御モード
+  DNSTeamNotificationEmail: "goo-idpay-sys@ml.nttdocomo.com"  # DNS担当者への通知
 
 dependencies:
   - prod/phase-1-infrastructure-foundation.yaml
 
 tags:
-  Phase: "2-dkim-system"
-  Purpose: "DKIM management system"
-  Environment: prod
+  Phase: "2-v2"
+  Component: "DKIM-Manager-V2"
+  Implementation: "AWS-Official-OpenSSL"

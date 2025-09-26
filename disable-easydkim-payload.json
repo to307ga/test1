@@ -1,0 +1,6 @@
+{
+  "action": "disable_easydkim",
+  "domain": "goo.ne.jp",
+  "environment": "prod",
+  "projectName": "aws-ses-migration"
+}

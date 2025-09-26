@@ -9,16 +9,16 @@ dependencies:
 
 parameters:
   ProjectCode: aws-ses-migration
-  Environment: production
+  Environment: prod
   DomainName: goo.ne.jp
 
   # User Configuration
   AdminUsername: prod-admin
   ReadonlyUsername: prod-readonly
   MonitoringUsername: prod-monitoring
-  AdminEmail: admin@goo.ne.jp
-  ReadonlyEmail: readonly@goo.ne.jp
-  MonitoringEmail: monitoring@goo.ne.jp
+  AdminEmail: goo-idpay-sys@ml.nttdocomo.com
+  ReadonlyEmail: goo-idpay-sys@ml.nttdocomo.com
+  MonitoringEmail: goo-idpay-sys@ml.nttdocomo.com
   AdminPhone: "+81901234567"
   ReadonlyPhone: "+81901234568"
   MonitoringPhone: "+81901234569"
@@ -32,12 +32,12 @@ parameters:
   EnableIAMGroups: "true"
   EnableIAMUsers: "true"
   EnableIAMPolicies: "true"
-  EnableAccessControl: "true"
+  EnableAccessControl: "false"
   EnableIPRestriction: "true"
   EnablePersonalInformationProtection: "true"
-  EnableJapaneseSecurity: "true"
-  EnableJapaneseCompliance: "true"
-  EnableTokyoRegionSecurity: "true"
+  EnableJapaneseSecurity: "false"
+  EnableJapaneseCompliance: "false"
+  EnableTokyoRegionSecurity: "false"
   EnableTokyoRegionFeatures: "true"
 
   # CloudWatch Settings

@@ -1,0 +1,163 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Independent SES-Kinesis Bridge - Adds Kinesis integration to existing SES Configuration'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+    Default: aws-ses-migration
+
+  Environment:
+    Type: String
+    Description: Environment name
+    AllowedValues:
+      - development
+      - staging
+      - production
+      - prod
+      - dev
+    Default: prod
+
+  # Reference to existing resources
+  SESConfigurationSetName:
+    Type: String
+    Description: Name of the existing SES Configuration Set (from phase-3)
+
+  # Kinesis Integration Parameters
+  KinesisRawLogsFirehoseStreamArn:
+    Type: String
+    Description: ARN of the Kinesis Data Firehose Stream for SES raw logs
+
+  KinesisMaskedLogsFirehoseStreamArn:
+    Type: String
+    Description: ARN of the Kinesis Data Firehose Stream for SES masked logs
+
+  # Feature Flags
+  EnableSESKinesisIntegration:
+    Type: String
+    Description: Enable SES-Kinesis integration
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+Conditions:
+  EnableSESKinesisIntegrationCondition: !Equals [!Ref EnableSESKinesisIntegration, 'true']
+
+Resources:
+  # SES Event Destination for Raw Logs Firehose
+  SESRawLogsEventDestination:
+    Type: AWS::SES::ConfigurationSetEventDestination
+    Condition: EnableSESKinesisIntegrationCondition
+    Properties:
+      ConfigurationSetName: !Ref SESConfigurationSetName
+      EventDestination:
+        Name: !Sub "${ProjectName}-${Environment}-raw-logs-event-destination"
+        Enabled: true
+        MatchingEventTypes:
+          - send
+          - delivery
+          - bounce
+          - complaint
+          - reject
+          - open
+          - click
+        KinesisFirehoseDestination:
+          DeliveryStreamARN: !Ref KinesisRawLogsFirehoseStreamArn
+          IAMRoleARN: !GetAtt SESKinesisIntegrationRole.Arn
+
+  # SES Event Destination for Masked Logs Firehose
+  SESMaskedLogsEventDestination:
+    Type: AWS::SES::ConfigurationSetEventDestination
+    Condition: EnableSESKinesisIntegrationCondition
+    Properties:
+      ConfigurationSetName: !Ref SESConfigurationSetName
+      EventDestination:
+        Name: !Sub "${ProjectName}-${Environment}-masked-logs-event-destination"
+        Enabled: true
+        MatchingEventTypes:
+          - send
+          - delivery
+          - bounce
+          - complaint
+          - reject
+          - open
+          - click
+        KinesisFirehoseDestination:
+          DeliveryStreamARN: !Ref KinesisMaskedLogsFirehoseStreamArn
+          IAMRoleARN: !GetAtt SESKinesisIntegrationRole.Arn
+
+  # IAM Role for SES-Kinesis Integration (Independent naming)
+  SESKinesisIntegrationRole:
+    Type: AWS::IAM::Role
+    Condition: EnableSESKinesisIntegrationCondition
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-ses-kinesis-integration-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                "AWS:SourceAccount": !Ref "AWS::AccountId"
+                "AWS:SourceArn": !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${SESConfigurationSetName}"
+      Policies:
+        - PolicyName: KinesisFirehoseIntegrationPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - firehose:PutRecord
+                  - firehose:PutRecordBatch
+                  - firehose:DescribeDeliveryStream
+                Resource:
+                  - !Ref KinesisRawLogsFirehoseStreamArn
+                  - !Ref KinesisMaskedLogsFirehoseStreamArn
+              - Effect: Allow
+                Action:
+                  - firehose:ListDeliveryStreams
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ses-kinesis-integration-role"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: "SES-Kinesis-Integration"
+
+  # CloudWatch Log Group for Integration events
+  SESKinesisIntegrationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/ses-kinesis-integration/${ProjectName}-${Environment}"
+      RetentionInDays: 90
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectName}-${Environment}-ses-kinesis-integration-logs"
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  SESKinesisEventDestinationName:
+    Description: Name of the SES Kinesis Event Destination
+    Value: !Sub "${ProjectName}-${Environment}-kinesis-integration-events"
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-kinesis-event-destination-name"
+
+  SESKinesisIntegrationRoleArn:
+    Description: ARN of the SES Kinesis Integration Role
+    Value: !GetAtt SESKinesisIntegrationRole.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-kinesis-integration-role-arn"
+
+  SESKinesisIntegrationLogGroupName:
+    Description: Name of the SES Kinesis Integration Log Group
+    Value: !Ref SESKinesisIntegrationLogGroup
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ses-kinesis-integration-log-group-name"

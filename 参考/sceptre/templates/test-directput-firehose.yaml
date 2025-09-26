@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Simple Test DirectPut Firehose Stream - Step by Step Debugging'
+
+Parameters:
+  ProjectCode:
+    Type: String
+    Default: 'aws-ses-migration'
+    Description: 'Project code for resource naming'
+
+  Environment:
+    Type: String
+    Default: 'prod'
+    Description: 'Environment name'
+
+  RawLogsBucketName:
+    Type: String
+    Description: 'Raw logs S3 bucket name'
+
+Resources:
+  # CloudWatch Log Group for Firehose
+  TestDirectPutFirehoseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/kinesisfirehose/${ProjectCode}-${Environment}-test-directput-stream'
+      RetentionInDays: 7
+
+  # CloudWatch Log Stream for Firehose
+  TestDirectPutFirehoseLogStream:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName: !Ref TestDirectPutFirehoseLogGroup
+      LogStreamName: 'DestinationDelivery'
+
+  # Simple Test DirectPut Firehose Stream (With CloudWatch Logging)
+  TestDirectPutFirehoseStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub '${ProjectCode}-${Environment}-test-directput-stream'
+      DeliveryStreamType: DirectPut
+      S3DestinationConfiguration:
+        BucketARN: !Sub 'arn:aws:s3:::${RawLogsBucketName}'
+        Prefix: 'test-directput/'
+        ErrorOutputPrefix: 'errors/test-directput/'
+        BufferingHints:
+          IntervalInSeconds: 10
+          SizeInMBs: 1
+        CompressionFormat: UNCOMPRESSED
+        RoleARN: !GetAtt TestDirectPutFirehoseRole.Arn
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref TestDirectPutFirehoseLogGroup
+          LogStreamName: !Sub '${ProjectCode}-${Environment}-test-directput-stream'
+
+  # Simple IAM Role for Test DirectPut Firehose
+  TestDirectPutFirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-${Environment}-test-directput-firehose-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref 'AWS::AccountId'
+      Policies:
+        - PolicyName: TestDirectPutFirehoseDeliveryPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${RawLogsBucketName}'
+                  - !Sub 'arn:aws:s3:::${RawLogsBucketName}/*'
+                Effect: Allow
+              - Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt TestDirectPutFirehoseLogGroup.Arn
+                Effect: Allow
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-${Environment}-test-directput-firehose-role'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: 'ses-migration'
+
+Outputs:
+  TestDirectPutFirehoseStreamName:
+    Description: 'Test DirectPut Firehose Stream Name'
+    Value: !Ref TestDirectPutFirehoseStream
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-test-directput-firehose-stream-name'
+
+  TestDirectPutFirehoseStreamArn:
+    Description: 'Test DirectPut Firehose Stream ARN'
+    Value: !GetAtt TestDirectPutFirehoseStream.Arn
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-test-directput-firehose-stream-arn'
+
+  TestDirectPutFirehoseLogGroupName:
+    Description: 'Test DirectPut Firehose CloudWatch Log Group Name'
+    Value: !Ref TestDirectPutFirehoseLogGroup
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-test-directput-firehose-log-group-name'

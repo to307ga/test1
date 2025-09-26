@@ -1,0 +1,1 @@
+{"statusCode": 500, "error": "An error occurred (ValidationException) when calling the GetSecretValue operation: Invalid name. Must be a valid name containing alphanumeric characters, or any of the following: -/_+=.@!"}

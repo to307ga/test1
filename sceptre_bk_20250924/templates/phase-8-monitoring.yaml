@@ -1,0 +1,343 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Phase 8: Unified DKIM Monitoring System with Automated Cross-System Integration'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Project name for resource naming
+    Default: aws-ses-migration
+
+  Environment:
+    Type: String
+    Description: Environment name
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: prod
+
+  DomainName:
+    Type: String
+    Description: Domain name for monitoring
+    Default: goo.ne.jp
+
+  MonitoringSchedule:
+    Type: String
+    Description: Cron expression for daily certificate monitoring
+    Default: "cron(0 9 * * ? *)"
+
+  DKIMManagerFunctionArn:
+    Type: String
+    Description: ARN of the DKIM Manager Lambda function
+
+  DNSNotifierFunctionArn:
+    Type: String
+    Description: ARN of the DNS Notifier Lambda function
+
+  RenewalAlertDays:
+    Type: Number
+    Description: Alert threshold in days before certificate expiration
+    Default: 16
+    MinValue: 1
+    MaxValue: 365
+
+  NotificationTopicArn:
+    Type: String
+    Description: ARN of the base infrastructure SNS topic for unified notifications
+
+Resources:
+  # CloudWatch Log Group for Phase 8 monitoring
+  MonitoringLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-${Environment}-monitoring'
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Phase
+          Value: "8"
+
+  # Certificate Monitoring Lambda Function with SNS integration
+  CertificateMonitorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-certificate-monitor"
+      Runtime: "python3.13"
+      Handler: index.lambda_handler
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-${Environment}-dkim-manager-role"
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+          import os
+          from datetime import datetime, timedelta
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              """Unified certificate monitoring with automated system integration"""
+              try:
+                  logger.info(f"Certificate monitoring triggered: {json.dumps(event, indent=2)}")
+
+                  # Get certificate status from Secrets Manager
+                  secrets_client = boto3.client('secretsmanager')
+
+                  try:
+                      response = secrets_client.get_secret_value(
+                          SecretId=f"{event.get('environment', 'prod')}-dkim-config"
+                      )
+                      config = json.loads(response['SecretString'])
+                      logger.info("Retrieved certificate configuration")
+
+                      # Check certificate expiration status
+                      domain = event.get('domain', 'goo.ne.jp')
+                      certificates = config.get('certificates', {}).get(domain, [])
+
+                      for cert in certificates:
+                          expires_at = cert.get('expires_at')
+                          if expires_at:
+                              expiry_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                              days_until_expiry = (expiry_date - datetime.now().replace(tzinfo=expiry_date.tzinfo)).days
+
+                              logger.info(f"Certificate expires in {days_until_expiry} days")
+
+                              # Alert and trigger automation based on RenewalAlertDays parameter
+                              renewal_alert_days = int(os.environ.get('RENEWAL_ALERT_DAYS', 16))
+                              if days_until_expiry <= renewal_alert_days:
+                                  logger.warning(f"Certificate expiring soon: {days_until_expiry} days")
+
+                                  # Send SNS notification to trigger automated responses
+                                  sns_client = boto3.client('sns')
+                                  topic_arn = os.environ.get('MONITORING_TOPIC_ARN')
+
+                                  if topic_arn:
+                                      severity = "CRITICAL" if days_until_expiry <= 2 else "WARNING"
+                                      alert_message = {
+                                          "timestamp": datetime.utcnow().isoformat() + "Z",
+                                          "severity": severity,
+                                          "service": "SES-BYODKIM",
+                                          "component": "Certificate",
+                                          "message": f"DKIM Certificate Alert: {domain} certificate expires in {days_until_expiry} days. DNS coordination needed for certificate renewal.",
+                                          "details": {
+                                              "domain": domain,
+                                              "certificate_expiry": expires_at,
+                                              "days_remaining": days_until_expiry,
+                                              "action_required": "DNS team coordination needed for certificate renewal",
+                                              "reference_docs": "BYODKIM Safety Rotation Procedures"
+                                          },
+                                          "routing": {
+                                              "primary": "goo-idpay-sys@ml.nttdocomo.com",
+                                              "dns_team": "goo-idpay-sys@ml.nttdocomo.com",
+                                              "escalation": severity == "CRITICAL"
+                                          },
+                                          "automation": {
+                                              "alert_type": "certificate_expiring",
+                                              "environment": event.get('environment', 'prod'),
+                                              "project_name": event.get('project_name', 'aws-ses-migration'),
+                                              "actions_required": {
+                                                  "certificate_renewal": True,
+                                                  "dns_notification": True
+                                              }
+                                          }
+                                      }
+
+                                      sns_client.publish(
+                                          TopicArn=topic_arn,
+                                          Subject=f"[{severity}] DKIM Certificate Alert - {domain} ({days_until_expiry} days)",
+                                          Message=json.dumps(alert_message, indent=2),
+                                          MessageAttributes={
+                                              'alert_type': {
+                                                  'DataType': 'String',
+                                                  'StringValue': 'certificate_expiring'
+                                              },
+                                              'severity': {
+                                                  'DataType': 'String',
+                                                  'StringValue': severity
+                                              },
+                                              'service': {
+                                                  'DataType': 'String',
+                                                  'StringValue': 'SES-BYODKIM'
+                                              }
+                                          }
+                                      )
+                                      logger.info(f"Automated alert sent - triggering DKIM Manager and DNS Team")
+                                  else:
+                                      logger.warning("MONITORING_TOPIC_ARN not configured")
+
+                      return {
+                          'statusCode': 200,
+                          'message': 'Certificate monitoring completed with automation',
+                          'timestamp': datetime.utcnow().isoformat()
+                      }
+
+                  except Exception as e:
+                      logger.error(f"Certificate monitoring failed: {str(e)}")
+                      return {
+                          'statusCode': 500,
+                          'error': str(e)
+                      }
+
+              except Exception as e:
+                  logger.error(f"Lambda function error: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'error': str(e)
+                  }
+      Environment:
+        Variables:
+          MONITORING_TOPIC_ARN: !Ref NotificationTopicArn
+          RENEWAL_ALERT_DAYS: !Ref RenewalAlertDays
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # SNS Subscription: Unified Monitoring to DKIM Manager (automatic certificate renewal)
+  DKIMManagerSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref NotificationTopicArn
+      Protocol: lambda
+      Endpoint: !Ref DKIMManagerFunctionArn
+      FilterPolicy:
+        alert_type:
+          - certificate_expiring
+
+  # SNS Subscription: Unified Monitoring to DNS Team (automatic notifications)
+  DNSTeamSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref NotificationTopicArn
+      Protocol: lambda
+      Endpoint: !Ref DNSNotifierFunctionArn
+      FilterPolicy:
+        alert_type:
+          - certificate_expiring
+
+  # EventBridge Rule for Daily Certificate Monitoring
+  DailyCertificateMonitoringRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-daily-certificate-monitor"
+      Description: "Daily certificate expiration monitoring with automated response"
+      ScheduleExpression: !Ref MonitoringSchedule
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt CertificateMonitorFunction.Arn
+          Id: "CertificateMonitorTarget"
+          Input: !Sub |
+            {
+              "source": "eventbridge",
+              "action": "certificate_monitoring",
+              "domain": "${DomainName}",
+              "environment": "${Environment}",
+              "project_name": "${ProjectName}"
+            }
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda permissions
+  CertificateMonitorEventBridgePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CertificateMonitorFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DailyCertificateMonitoringRule.Arn
+
+  DKIMManagerSNSPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DKIMManagerFunctionArn
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref NotificationTopicArn
+
+  DNSNotifierSNSPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DNSNotifierFunctionArn
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref NotificationTopicArn
+
+  # CloudWatch Dashboard for monitoring
+  MonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${ProjectName}-${Environment}-monitoring'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "${ProjectName}/${Environment}", "DKIMStatus" ],
+                  [ ".", "CertificateExpiry" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "ap-northeast-1",
+                "title": "DKIM Certificate Status",
+                "period": 300
+              }
+            },
+            {
+              "type": "log",
+              "x": 0,
+              "y": 6,
+              "width": 24,
+              "height": 6,
+              "properties": {
+                "query": "SOURCE '/aws/lambda/${ProjectName}-${Environment}-monitoring' | fields @timestamp, @message | sort @timestamp desc | limit 100",
+                "region": "ap-northeast-1",
+                "title": "Monitoring System Logs",
+                "view": "table"
+              }
+            }
+          ]
+        }
+
+Outputs:
+  MonitoringLogGroupArn:
+    Description: ARN of monitoring log group
+    Value: !GetAtt MonitoringLogGroup.Arn
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-monitoring-log-group-arn'
+
+  MonitoringTopicArn:
+    Description: ARN of unified notification topic (from base infrastructure)
+    Value: !Ref NotificationTopicArn
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-monitoring-topic-arn'
+
+  CertificateMonitorFunctionArn:
+    Description: ARN of certificate monitor function
+    Value: !GetAtt CertificateMonitorFunction.Arn
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-certificate-monitor-arn'
+
+  DashboardURL:
+    Description: URL to monitoring dashboard
+    Value: !Sub 'https://console.aws.amazon.com/cloudwatch/home?region=ap-northeast-1#dashboards:name=${ProjectName}-${Environment}-monitoring'
+
+  MonitoringStatus:
+    Description: Status of unified monitoring system
+    Value: "Phase 8 Unified Monitoring Active - Certificate monitoring with automated DKIM & DNS integration"
+    Export:
+      Name: !Sub '${ProjectName}-${Environment}-monitoring-status'

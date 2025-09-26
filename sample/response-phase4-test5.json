@@ -1,1 +1,0 @@
-{"errorMessage": "Syntax error in module 'index': unexpected indent (index.py, line 484)", "errorType": "Runtime.UserCodeSyntaxError", "requestId": "", "stackTrace": ["  File \"/var/task/index.py\" Line 484\n            validity_days = int(os.environ.get('CERTIFICATE_VALIDITY_DAYS', 365))\n"]}

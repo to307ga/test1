@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::627642418836:root"
+      },
+      "Action": "kms:*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": ["s3.amazonaws.com", "firehose.amazonaws.com", "ses.amazonaws.com", "lambda.amazonaws.com"]
+      },
+      "Action": ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey", "kms:ReEncrypt*"],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::627642418836:role/aws-ses-migration-prod-enhanced-firehose-role"
+      },
+      "Action": ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey", "kms:ReEncrypt*"],
+      "Resource": "*"
+    }
+  ]
+}

@@ -1,1 +1,0 @@
-{"errorMessage": "Syntax error in module 'index': unexpected indent (index.py, line 506)", "errorType": "Runtime.UserCodeSyntaxError", "requestId": "", "stackTrace": ["  File \"/var/task/index.py\" Line 506\n            result = {\n"]}

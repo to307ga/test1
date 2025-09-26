@@ -1,0 +1,1 @@
+{"errorMessage": "Syntax error in module 'index': invalid syntax (index.py, line 683)", "errorType": "Runtime.UserCodeSyntaxError", "requestId": "", "stackTrace": ["  File \"/var/task/index.py\" Line 683\n            import time                  dns_records = []\n"]}

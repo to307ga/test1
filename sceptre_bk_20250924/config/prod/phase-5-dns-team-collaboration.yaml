@@ -1,0 +1,22 @@
+# Phase 5: DNS Management Team Collaboration Phase
+# Step 19: DNS update request sending
+
+template_path: dns-team-collaboration.yaml
+
+parameters:
+  ProjectName: !stack_output prod/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: !stack_output prod/phase-1-infrastructure-foundation.yaml::Environment
+  DKIMManagerFunctionArn: !stack_output prod/phase-2-dkim-system.yaml::DKIMManagerFunctionArn
+  DNSTeamEmail: !stack_output prod/phase-1-infrastructure-foundation.yaml::DNSTeamEmail
+  SlackWebhookURL: ""  # SECURITY RISK: Do not specify token directly. Use AWS Secrets Manager when enabling Slack notifications.
+
+dependencies:
+  - prod/phase-1-infrastructure-foundation.yaml
+  - prod/phase-2-dkim-system.yaml
+  - prod/phase-3-ses-byodkim.yaml
+  - prod/phase-4-dns-preparation.yaml
+
+tags:
+  Phase: "5-dns-team-collaboration"
+  Purpose: "DNS management team collaboration"
+  Environment: prod

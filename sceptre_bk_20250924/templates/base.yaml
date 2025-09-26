@@ -1,0 +1,347 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Clean Base Infrastructure - S3, KMS, SNS Foundation Only'
+
+Parameters:
+  ProjectCode:
+    Type: String
+    Description: Project code for resource naming
+
+  Environment:
+    Type: String
+    Description: Environment name
+    AllowedValues:
+      - development
+      - staging
+      - production
+      - prod
+      - dev
+
+  RetentionDays:
+    Type: Number
+    Description: Log retention period in days
+    MinValue: 1
+    MaxValue: 2555
+
+  TransitionToIADays:
+    Type: Number
+    Description: Days to transition to IA
+    MinValue: 30
+    MaxValue: 365
+
+  TransitionToIntelligentTieringDays:
+    Type: Number
+    Description: Days to transition to Intelligent Tiering
+    MinValue: 1
+    MaxValue: 365
+
+  TransitionToGlacierDays:
+    Type: Number
+    Description: Days to transition to Glacier
+    MinValue: 90
+    MaxValue: 2555
+
+  TransitionToDeepArchiveDays:
+    Type: Number
+    Description: Days to transition to Deep Archive
+    MinValue: 180
+    MaxValue: 2555
+
+  NotificationEmail:
+    Type: String
+    Description: Email for notifications
+
+  LambdaRuntime:
+    Type: String
+    Description: Lambda function runtime
+    Default: "python3.13"
+    AllowedValues: ["python3.9", "python3.10", "python3.11", "python3.12", "python3.13"]
+
+  AccessLogDestinationBucket:
+    Type: String
+    Description: Destination bucket for S3 access logs
+    Default: service-logs-gooid-idhub
+
+  AllowedSourceIPs:
+    Type: CommaDelimitedList
+    Description: List of allowed source IP addresses/CIDR blocks
+    Default: "10.99.0.0/16,10.88.80.0/20,10.80.11.0/28,10.80.0.0/24,10.99.0.0/24"
+
+  S3AllowedActions:
+    Type: CommaDelimitedList
+    Description: List of allowed S3 actions for service principals
+    Default: "s3:AbortMultipartUpload,s3:DeleteObject,s3:GetBucketLocation,s3:GetObject,s3:ListBucket,s3:ListBucketMultipartUploads,s3:ListMultipartUploadParts,s3:PutObject"
+
+  RawLogsServicePrincipals:
+    Type: CommaDelimitedList
+    Description: Service principals allowed to access raw logs bucket
+    Default: "firehose.amazonaws.com,delivery.logs.amazonaws.com"
+
+  ProcessingServicePrincipals:
+    Type: CommaDelimitedList
+    Description: Service principals allowed to access masked/error logs buckets
+    Default: "lambda.amazonaws.com,firehose.amazonaws.com"
+
+Conditions:
+  IsProduction: !Or
+    - !Equals [!Ref Environment, 'production']
+    - !Equals [!Ref Environment, 'prod']
+  IsDevelopment: !Equals [!Ref Environment, 'development']
+
+Resources:
+  # KMS Key
+  KinesisFirehoseKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub 'KMS key for ${ProjectCode} ${Environment}'
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Effect: Allow
+            Principal:
+              Service: [firehose.amazonaws.com, lambda.amazonaws.com, s3.amazonaws.com, ses.amazonaws.com]
+            Action: [kms:Decrypt, kms:DescribeKey, kms:Encrypt, kms:GenerateDataKey, kms:ReEncrypt*]
+            Resource: '*'
+
+  # KMS Alias
+  KinesisFirehoseKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${ProjectCode}-${Environment}-kms-key'
+      TargetKeyId: !Ref KinesisFirehoseKMSKey
+
+  # Raw Logs S3 Bucket
+  RawLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectCode}-${Environment}-raw-logs-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref AccessLogDestinationBucket
+        LogFilePrefix: !Sub 'logs/${ProjectCode}-${Environment}-raw-logs-${AWS::AccountId}/ap-northeast-1/backup-gooid-idhub-${Environment}/'
+
+  # Masked Logs S3 Bucket
+  MaskedLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectCode}-${Environment}-masked-logs-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref AccessLogDestinationBucket
+        LogFilePrefix: !Sub 'logs/${ProjectCode}-${Environment}-masked-logs-${AWS::AccountId}/ap-northeast-1/backup-gooid-idhub-${Environment}/'
+
+  # Error Logs S3 Bucket
+  ErrorLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectCode}-${Environment}-error-logs-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref AccessLogDestinationBucket
+        LogFilePrefix: !Sub 'logs/${ProjectCode}-${Environment}-error-logs-${AWS::AccountId}/ap-northeast-1/backup-gooid-idhub-${Environment}/'
+
+  # SNS Topic
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectCode}-${Environment}-notifications"
+
+  # SNS Subscription
+  NotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref NotificationTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  # S3 Bucket Policies (incorporating AWS Config rules)
+  RawLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: RawLogsBucket
+    Properties:
+      Bucket: !Ref RawLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # AWS Config rule: IP restriction for VDI/Ootemachi access
+          - Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${RawLogsBucket}'
+              - !Sub 'arn:aws:s3:::${RawLogsBucket}/*'
+            Condition:
+              IpAddressIfExists:
+                'aws:SourceIp': !Ref AllowedSourceIPs
+              Bool:
+                'aws:ViaAWSService': 'false'
+          # AWS Config rule: HTTPS/SSL enforcement
+          - Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${RawLogsBucket}'
+              - !Sub 'arn:aws:s3:::${RawLogsBucket}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+          # Service access for Kinesis Firehose
+          - Effect: Allow
+            Principal:
+              Service: !Ref RawLogsServicePrincipals
+            Action: !Ref S3AllowedActions
+            Resource:
+              - !Sub 'arn:aws:s3:::${RawLogsBucket}'
+              - !Sub 'arn:aws:s3:::${RawLogsBucket}/*'
+
+  MaskedLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: MaskedLogsBucket
+    Properties:
+      Bucket: !Ref MaskedLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # AWS Config rule: IP restriction for VDI/Ootemachi access
+          - Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
+              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
+            Condition:
+              IpAddressIfExists:
+                'aws:SourceIp': !Ref AllowedSourceIPs
+              Bool:
+                'aws:ViaAWSService': 'false'
+          # AWS Config rule: HTTPS/SSL enforcement
+          - Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
+              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+          # Service access for processing
+          - Effect: Allow
+            Principal:
+              Service: !Ref ProcessingServicePrincipals
+            Action: !Ref S3AllowedActions
+            Resource:
+              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
+              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
+
+  ErrorLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: ErrorLogsBucket
+    Properties:
+      Bucket: !Ref ErrorLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # AWS Config rule: IP restriction for VDI/Ootemachi access
+          - Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${ErrorLogsBucket}'
+              - !Sub 'arn:aws:s3:::${ErrorLogsBucket}/*'
+            Condition:
+              IpAddressIfExists:
+                'aws:SourceIp': !Ref AllowedSourceIPs
+              Bool:
+                'aws:ViaAWSService': 'false'
+          # AWS Config rule: HTTPS/SSL enforcement
+          - Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${ErrorLogsBucket}'
+              - !Sub 'arn:aws:s3:::${ErrorLogsBucket}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+          # Service access for error handling
+          - Effect: Allow
+            Principal:
+              Service: !Ref ProcessingServicePrincipals
+            Action: !Ref S3AllowedActions
+            Resource:
+              - !Sub 'arn:aws:s3:::${ErrorLogsBucket}'
+              - !Sub 'arn:aws:s3:::${ErrorLogsBucket}/*'
+
+Outputs:
+  KMSKeyArn:
+    Description: KMS Key ARN
+    Value: !GetAtt KinesisFirehoseKMSKey.Arn
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-KMSKeyArn'
+
+  RawLogsBucketName:
+    Description: Raw logs bucket name
+    Value: !Ref RawLogsBucket
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-RawLogsBucket'
+
+  MaskedLogsBucketName:
+    Description: Masked logs bucket name
+    Value: !Ref MaskedLogsBucket
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-MaskedLogsBucket'
+
+  ErrorLogsBucketName:
+    Description: Error logs bucket name
+    Value: !Ref ErrorLogsBucket
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-ErrorLogsBucket'
+
+  NotificationTopicArn:
+    Description: SNS Topic ARN
+    Value: !Ref NotificationTopic
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-NotificationTopic'
+
+  LambdaRuntime:
+    Description: Lambda function runtime
+    Value: !Ref LambdaRuntime
+    Export:
+      Name: !Sub '${ProjectCode}-${Environment}-LambdaRuntime'

@@ -13,6 +13,8 @@ Parameters:
       - development
       - staging
       - production
+      - prod
+      - dev
 
   RetentionDays:
     Type: Number
@@ -80,7 +82,9 @@ Parameters:
     Default: "lambda.amazonaws.com,firehose.amazonaws.com"
 
 Conditions:
-  IsProduction: !Equals [!Ref Environment, 'production']
+  IsProduction: !Or
+    - !Equals [!Ref Environment, 'production']
+    - !Equals [!Ref Environment, 'prod']
   IsDevelopment: !Equals [!Ref Environment, 'development']
 
 Resources:
@@ -207,7 +211,9 @@ Resources:
               IpAddressIfExists:
                 'aws:SourceIp': !Ref AllowedSourceIPs
               Bool:
-                'aws:ViaAWSService': 'false'
+                'aws:ViaAWSService': 'true'
+              StringEquals:
+                'aws:PrincipalServiceName': 'firehose.amazonaws.com'
           # AWS Config rule: HTTPS/SSL enforcement
           - Effect: Deny
             Principal: '*'
@@ -221,11 +227,16 @@ Resources:
           # Service access for Kinesis Firehose
           - Effect: Allow
             Principal:
-              Service: !Ref RawLogsServicePrincipals
+              Service: !Ref ProcessingServicePrincipals
             Action: !Ref S3AllowedActions
             Resource:
               - !Sub 'arn:aws:s3:::${RawLogsBucket}'
               - !Sub 'arn:aws:s3:::${RawLogsBucket}/*'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+              ArnLike:
+                'aws:SourceArn': !Sub 'arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/*'
 
   MaskedLogsBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -235,36 +246,43 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          # AWS Config rule: IP restriction for VDI/Ootemachi access
-          - Effect: Deny
-            Principal: '*'
-            Action: 's3:*'
-            Resource:
-              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
-              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
-            Condition:
-              IpAddressIfExists:
-                'aws:SourceIp': !Ref AllowedSourceIPs
-              Bool:
-                'aws:ViaAWSService': 'false'
-          # AWS Config rule: HTTPS/SSL enforcement
-          - Effect: Deny
-            Principal: '*'
-            Action: 's3:*'
-            Resource:
-              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
-              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
-            Condition:
-              Bool:
-                'aws:SecureTransport': 'false'
-          # Service access for processing
-          - Effect: Allow
-            Principal:
-              Service: !Ref ProcessingServicePrincipals
-            Action: !Ref S3AllowedActions
-            Resource:
-              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
-              - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
+        # AWS Config rule: IP restriction for VDI/Ootemachi access
+        - Effect: Deny
+          Principal: '*'
+          Action: 's3:*'
+          Resource:
+            - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
+            - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
+          Condition:
+            IpAddressIfExists:
+              'aws:SourceIp': !Ref AllowedSourceIPs
+            Bool:
+              'aws:ViaAWSService': 'true'
+            StringEquals:
+              'aws:PrincipalServiceName': 'firehose.amazonaws.com'
+        # AWS Config rule: HTTPS/SSL enforcement
+        - Effect: Deny
+          Principal: '*'
+          Action: 's3:*'
+          Resource:
+            - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
+            - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
+          Condition:
+            Bool:
+              'aws:SecureTransport': 'false'
+        # Service access for processing
+        - Effect: Allow
+          Principal:
+            Service: !Ref ProcessingServicePrincipals
+          Action: !Ref S3AllowedActions
+          Resource:
+            - !Sub 'arn:aws:s3:::${MaskedLogsBucket}'
+            - !Sub 'arn:aws:s3:::${MaskedLogsBucket}/*'
+          Condition:
+            StringEquals:
+              'aws:SourceAccount': !Ref 'AWS::AccountId'
+            ArnLike:
+              'aws:SourceArn': !Sub 'arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/*'
 
   ErrorLogsBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -286,6 +304,8 @@ Resources:
                 'aws:SourceIp': !Ref AllowedSourceIPs
               Bool:
                 'aws:ViaAWSService': 'false'
+              StringNotEquals:
+                'aws:PrincipalServiceName': 'firehose.amazonaws.com'
           # AWS Config rule: HTTPS/SSL enforcement
           - Effect: Deny
             Principal: '*'
@@ -304,6 +324,11 @@ Resources:
             Resource:
               - !Sub 'arn:aws:s3:::${ErrorLogsBucket}'
               - !Sub 'arn:aws:s3:::${ErrorLogsBucket}/*'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+              ArnLike:
+                'aws:SourceArn': !Sub 'arn:aws:firehose:${AWS::Region}:${AWS::AccountId}:deliverystream/*'
 
 Outputs:
   KMSKeyArn:

@@ -1,0 +1,21 @@
+# Phase 8: Monitoring System Start Phase
+# Steps 26-28: Error logging, re-confirmation requests, scheduled monitoring setup
+
+template_path: phase-8-simple-monitoring.yaml
+
+parameters:
+  ProjectName: !stack_output prod/phase-1-infrastructure-foundation.yaml::ProjectName
+  Environment: !stack_output prod/phase-1-infrastructure-foundation.yaml::Environment
+  DomainName: !stack_output prod/phase-1-infrastructure-foundation.yaml::DomainName
+
+dependencies:
+  - prod/phase-1-infrastructure-foundation.yaml
+  - prod/phase-3-ses-byodkim.yaml
+  - prod/phase-4-dns-preparation.yaml
+  - prod/phase-5-dns-team-collaboration.yaml
+  - prod/phase-7-dns-validation-dkim-activation.yaml
+
+tags:
+  Phase: "8-monitoring-system"
+  Purpose: "Monitoring system start"
+  Environment: prod

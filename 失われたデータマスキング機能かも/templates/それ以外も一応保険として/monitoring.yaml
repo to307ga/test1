@@ -1,0 +1,867 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Monitoring and Logging for AWS SES Migration with Personal Information Protection and Data Masking - Tokyo Region (ap-northeast-1)'
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: Domain name for SES configuration
+    Default: goo.ne.jp
+
+  Environment:
+    Type: String
+    Description: Environment name
+    Default: production
+
+  ProjectCode:
+    Type: String
+    Description: Project code for resource naming
+    Default: ses-migration
+
+  RetentionDays:
+    Type: Number
+    Description: Log retention period in days
+    Default: 2555
+    MinValue: 1
+    MaxValue: 2555
+
+  AllowedIPRanges:
+    Type: CommaDelimitedList
+    Description: Allowed IP address ranges for access control
+    Default: "10.0.0.0/8,192.168.1.0/24"
+
+  CloudWatchLogRetentionDays:
+    Type: Number
+    Description: CloudWatch Logs retention period in days
+    Default: 2555
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 2555]
+
+  CloudWatchMetricNamespace:
+    Type: String
+    Description: CloudWatch metric namespace for monitoring
+    Default: "ses-migration/production/Monitoring"
+
+  LambdaRuntime:
+    Type: String
+    Description: Lambda function runtime
+    Default: "python3.13"
+    AllowedValues: ["python3.7", "python3.8", "python3.9", "python3.10", "python3.11", "python3.12", "python3.13"]
+
+  LambdaTimeout:
+    Type: Number
+    Description: Lambda function timeout in seconds
+    Default: 60
+    MinValue: 1
+    MaxValue: 900
+
+  LambdaMemorySize:
+    Type: Number
+    Description: Lambda function memory size in MB
+    Default: 256
+    AllowedValues: [128, 256, 512, 1024, 2048, 3008]
+
+  EnableCustomMetrics:
+    Type: String
+    Description: Enable custom metrics collection
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableDataMasking:
+    Type: String
+    Description: Enable personal information data masking
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableCloudWatchAlarms:
+    Type: String
+    Description: Enable CloudWatch alarms
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableInsightsQueries:
+    Type: String
+    Description: Enable CloudWatch Insights queries
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableBYODKIMMonitoring:
+    Type: String
+    Description: Enable BYODKIM-specific monitoring
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  BYODKIMSelector:
+    Type: String
+    Description: BYODKIM selector name for monitoring
+    Default: "gooid-21-prod"
+
+  BounceRateThreshold:
+    Type: Number
+    Description: Bounce rate threshold for alerts (%)
+    Default: 5.0
+    MinValue: 0.1
+    MaxValue: 100.0
+
+  ComplaintRateThreshold:
+    Type: Number
+    Description: Complaint rate threshold for alerts (%)
+    Default: 0.1
+    MinValue: 0.01
+    MaxValue: 100.0
+
+  SendSuccessRateThreshold:
+    Type: Number
+    Description: Send success rate threshold for alerts (%)
+    Default: 95.0
+    MinValue: 0.1
+    MaxValue: 100.0
+
+  SESLogGroupName:
+    Type: String
+    Description: SES log group name (imported from SES stack)
+
+  S3BucketName:
+    Type: String
+    Description: S3 bucket name for logs (imported from Base stack)
+
+  SNSTopicArn:
+    Type: String
+    Description: SNS topic ARN for notifications (imported from Base stack)
+
+  CloudWatchDashboardName:
+    Type: String
+    Description: CloudWatch dashboard name
+    Default: "ses-migration-production-dashboard"
+
+  # Enable Tokyo region specific features
+  EnableTokyoRegionFeatures:
+    Type: String
+    Description: Enable Tokyo region specific features
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableJapaneseCompliance:
+    Type: String
+    Description: Enable Japanese compliance features
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableJapaneseMonitoring:
+    Type: String
+    Description: Enable Japanese language monitoring
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+  EnableTokyoRegionMetrics:
+    Type: String
+    Description: Enable Tokyo region specific metrics
+    Default: "true"
+    AllowedValues: ["true", "false"]
+
+Conditions:
+  EnableCustomMetricsCondition: !Equals [!Ref EnableCustomMetrics, "true"]
+  EnableDataMaskingCondition: !Equals [!Ref EnableDataMasking, "true"]
+  EnableCloudWatchAlarmsCondition: !Equals [!Ref EnableCloudWatchAlarms, "true"]
+  EnableInsightsQueriesCondition: !Equals [!Ref EnableInsightsQueries, "true"]
+  EnableTokyoRegionFeaturesCondition: !Equals [!Ref EnableTokyoRegionFeatures, "true"]
+  EnableJapaneseComplianceCondition: !Equals [!Ref EnableJapaneseCompliance, "true"]
+  EnableJapaneseMonitoringCondition: !Equals [!Ref EnableJapaneseMonitoring, "true"]
+  EnableTokyoRegionMetricsCondition: !Equals [!Ref EnableTokyoRegionMetrics, "true"]
+  EnableBYODKIMMonitoringCondition: !Equals [!Ref EnableBYODKIMMonitoring, "true"]
+
+Resources:
+  # CloudWatch Alarms for SES
+  SESAlarmSendFailure:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableCloudWatchAlarmsCondition
+    Properties:
+      AlarmName: !Sub "${ProjectCode}-${Environment}-ses-send-failure"
+      AlarmDescription: !Sub "SES Send Success Rate is below ${SendSuccessRateThreshold}%"
+      MetricName: SendSuccessRate
+      Namespace: !Ref CloudWatchMetricNamespace
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref SendSuccessRateThreshold
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Ref SNSTopicArn
+      OKActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: breaching
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-ses-send-failure"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # SES Bounce Rate Alarm
+  SESBounceRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableCloudWatchAlarmsCondition
+    Properties:
+      AlarmName: !Sub "ses-migration-${Environment}-bounce-rate-alarm"
+      AlarmDescription: "SES bounce rate is too high"
+      MetricName: Bounce
+      Namespace: AWS/SES
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref BounceRateThreshold
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref SNSTopicArn
+      OKActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-bounce-rate-alarm"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # SES Complaint Rate Alarm
+  SESComplaintRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableCloudWatchAlarmsCondition
+    Properties:
+      AlarmName: !Sub "ses-migration-${Environment}-complaint-rate-alarm"
+      AlarmDescription: "SES complaint rate is too high"
+      MetricName: Complaint
+      Namespace: AWS/SES
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref ComplaintRateThreshold
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref SNSTopicArn
+      OKActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-complaint-rate-alarm"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # CloudWatch Composite Alarm for Critical Issues
+  # Reference existing alarms created by SES stack
+  SESCriticalAlarm:
+    Type: AWS::CloudWatch::CompositeAlarm
+    Condition: EnableCloudWatchAlarmsCondition
+    Properties:
+      AlarmName: !Sub "${ProjectCode}-${Environment}-ses-critical"
+      AlarmDescription: "Critical SES issues detected"
+      AlarmRule: !Sub "ALARM(${SESBounceRateAlarm}) OR ALARM(${SESComplaintRateAlarm})"
+      ActionsEnabled: true
+      AlarmActions:
+        - !Ref SNSTopicArn
+      OKActions:
+        - !Ref SNSTopicArn
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-ses-critical"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # CloudWatch Log Group for Application Logs
+  ApplicationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/application/${ProjectCode}/${Environment}"
+      RetentionInDays: !Ref RetentionDays
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-application-logs"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # CloudWatch Log Stream for Application Logs
+  ApplicationLogStream:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName: !Ref ApplicationLogGroup
+      LogStreamName: !Sub "${ProjectCode}-${Environment}-application-stream"
+
+  # CloudWatch Metric Filter for Application Errors
+  ApplicationErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Condition: EnableCustomMetricsCondition
+    Properties:
+      LogGroupName: !Ref ApplicationLogGroup
+      FilterName: !Sub "${ProjectCode}-${Environment}-application-errors"
+      FilterPattern: 'ERROR'
+      MetricTransformations:
+        - MetricName: ApplicationErrors
+          MetricNamespace: !Ref CloudWatchMetricNamespace
+          MetricValue: "1"
+
+  # CloudWatch Alarm for Application Errors
+  ApplicationErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableCloudWatchAlarmsCondition
+    Properties:
+      AlarmName: !Sub "${ProjectCode}-${Environment}-application-errors"
+      AlarmDescription: "Application Error Rate is above threshold"
+      MetricName: ApplicationErrors
+      Namespace: !Ref CloudWatchMetricNamespace
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-application-errors"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # BYODKIM Verification Status Alarm
+  BYODKIMVerificationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableBYODKIMMonitoringCondition
+    Properties:
+      AlarmName: !Sub "${ProjectCode}-${Environment}-byodkim-verification-failed"
+      AlarmDescription: "BYODKIM verification failed"
+      MetricName: BYODKIMVerificationStatus
+      Namespace: "ses-migration/production/BYODKIM"
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: breaching
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-byodkim-verification-failed"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: DKIMMode
+          Value: "BYODKIM"
+
+  # BYODKIM Key Rotation Alarm
+  BYODKIMKeyRotationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableBYODKIMMonitoringCondition
+    Properties:
+      AlarmName: !Sub "${ProjectCode}-${Environment}-byodkim-key-rotation"
+      AlarmDescription: "BYODKIM key rotation occurred"
+      MetricName: BYODKIMKeyRotation
+      Namespace: "ses-migration/production/BYODKIM"
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref SNSTopicArn
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-byodkim-key-rotation"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: DKIMMode
+          Value: "BYODKIM"
+
+  # KMS Key Generation Failed Alarm
+  KMSKeyGenerationFailedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: EnableBYODKIMMonitoringCondition
+    Properties:
+      AlarmName: !Sub "${ProjectCode}-${Environment}-kms-key-generation-failed"
+      AlarmDescription: "KMS key generation failed for BYODKIM"
+      MetricName: BYODKIMKeyGenerationStatus
+      Namespace: "ses-migration/production/BYODKIM"
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: notBreaching
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-kms-key-generation-failed"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: DKIMMode
+          Value: "BYODKIM"
+
+  # CloudWatch Insights Query for SES Analysis (Admin View - Full Information)
+  SESInsightsQueryAdmin:
+    Type: AWS::Logs::QueryDefinition
+    Condition: EnableInsightsQueriesCondition
+    Properties:
+      Name: !Sub "${ProjectCode}-${Environment}-ses-analysis-admin"
+      LogGroupNames:
+        - !Ref SESLogGroupName
+      QueryString: |
+        fields @timestamp, eventType, destination, bounce.bounceType, complaint.complaintFeedbackType, sourceIp
+        | filter eventType = "bounce" or eventType = "complaint" or eventType = "delivery"
+        | stats count() by eventType, destination, sourceIp
+        | sort @timestamp desc
+        | limit 100
+
+  # CloudWatch Insights Query for SES Analysis (Masked View - Personal Information Protected)
+  SESInsightsQueryMasked:
+    Type: AWS::Logs::QueryDefinition
+    Condition: EnableInsightsQueriesCondition
+    Properties:
+      Name: !Sub "${ProjectCode}-${Environment}-ses-analysis-masked"
+      LogGroupNames:
+        - !Ref SESLogGroupName
+      QueryString: |
+        fields @timestamp, eventType,
+        # Email address masking: Show first character and mask the rest with ***
+        case
+          when isPresent(destination) and destination like "%@%" then concat(substring(destination, 0, 1), "***@***.***")
+          else "***@***.***"
+        end as maskedDestination,
+        bounce.bounceType, complaint.complaintFeedbackType,
+        # IP address masking: Show first octet and mask the rest with .*.*.*
+        case
+          when isPresent(sourceIp) and sourceIp like "%.%.%.%" then concat(substring(sourceIp, 0, indexOf(sourceIp, ".")), ".*.*.*")
+          else "***.*.*.*"
+        end as maskedSourceIp
+        | filter eventType = "bounce" or eventType = "complaint" or eventType = "delivery"
+        | stats count() by eventType, maskedDestination, maskedSourceIp
+        | sort @timestamp desc
+        | limit 100
+
+  # CloudWatch Insights Query for SES Performance Analysis
+  SESInsightsQueryPerformance:
+    Type: AWS::Logs::QueryDefinition
+    Condition: EnableInsightsQueriesCondition
+    Properties:
+      Name: !Sub "${ProjectCode}-${Environment}-ses-performance-analysis"
+      LogGroupNames:
+        - !Ref SESLogGroupName
+      QueryString: |
+        fields @timestamp, eventType, processingTimeMillis
+        | filter eventType = "delivery"
+        | stats
+            avg(processingTimeMillis) as avgProcessingTime,
+            max(processingTimeMillis) as maxProcessingTime,
+            min(processingTimeMillis) as minProcessingTime,
+            count() as totalDeliveries
+        | sort @timestamp desc
+
+  # CloudWatch Insights Query for SES Error Analysis
+  SESInsightsQueryErrors:
+    Type: AWS::Logs::QueryDefinition
+    Condition: EnableInsightsQueriesCondition
+    Properties:
+      Name: !Sub "${ProjectCode}-${Environment}-ses-error-analysis"
+      LogGroupNames:
+        - !Ref SESLogGroupName
+      QueryString: |
+        fields @timestamp, eventType, bounce.bounceType, complaint.complaintFeedbackType, sourceIp
+        | filter eventType = "bounce" or eventType = "complaint" or eventType = "reject"
+        | stats count() by eventType, bounce.bounceType, complaint.complaintFeedbackType
+        | sort count() desc
+
+  # Lambda Function for Data Masking
+  DataMaskingFunction:
+    Type: AWS::Lambda::Function
+    Condition: EnableDataMaskingCondition
+    Properties:
+      FunctionName: !Sub "${ProjectCode}-${Environment}-data-masking"
+      Runtime: !Ref LambdaRuntime
+      Handler: index.lambda_handler
+      Code:
+        ZipFile: |
+          import json
+          import re
+
+          def mask_email(email):
+              if not email or '@' not in email:
+                  return "***@***.***"
+              username, domain = email.split('@', 1)
+              if len(username) > 0:
+                  return f"{username[0]}***@{domain.split('.')[0]}***.***"
+              return "***@***.***"
+
+          def mask_ip(ip):
+              if not ip or '.' not in ip:
+                  return "***.*.*.*"
+              octets = ip.split('.')
+              if len(octets) >= 1:
+                  return f"{octets[0]}.*.*.*"
+              return "***.*.*.*"
+
+          def lambda_handler(event, context):
+              try:
+                  user_groups = event.get('userGroups', [])
+                  log_data = event.get('logData', '')
+
+                  # Admin users can see unmasked data
+                  if any('admin' in group.lower() for group in user_groups):
+                      return {
+                          'statusCode': 200,
+                          'maskedData': log_data,
+                          'isAdmin': True
+                      }
+
+                  # Apply data masking for non-admin users
+                  masked_data = log_data
+
+                  # Mask email addresses in the data
+                  email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+                  masked_data = re.sub(email_pattern, lambda m: mask_email(m.group()), masked_data)
+
+                  # Mask IP addresses in the data
+                  ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+                  masked_data = re.sub(ip_pattern, lambda m: mask_ip(m.group()), masked_data)
+
+                  return {
+                      'statusCode': 200,
+                      'maskedData': masked_data,
+                      'isAdmin': False
+                  }
+
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'error': str(e)
+                  }
+
+      Role: !GetAtt DataMaskingFunctionRole.Arn
+      Timeout: !Ref LambdaTimeout
+      MemorySize: !Ref LambdaMemorySize
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          PROJECT_CODE: !Ref ProjectCode
+          REGION: "ap-northeast-1"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-data-masking"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # IAM Role for Data Masking Lambda
+  DataMaskingFunctionRole:
+    Type: AWS::IAM::Role
+    Condition: EnableDataMaskingCondition
+    Properties:
+      RoleName: !Sub "${ProjectCode}-${Environment}-data-masking-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CloudWatchLogsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-data-masking-role"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # CloudWatch Dashboard for Monitoring
+  MonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Condition: EnableCustomMetricsCondition
+    Properties:
+      DashboardName: !Ref CloudWatchDashboardName
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["${CloudWatchMetricNamespace}", "BounceRate", "Environment", "${Environment}"],
+                  [".", "ComplaintRate", ".", "."],
+                  [".", "SendSuccessRate", ".", "."]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "SES Performance Metrics (Tokyo Region)",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["${CloudWatchMetricNamespace}", "ApplicationErrors", "Environment", "${Environment}"]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Application Errors (Tokyo Region)",
+                "period": 300
+              }
+            },
+            {
+              "type": "log",
+              "x": 0,
+              "y": 6,
+              "width": 24,
+              "height": 6,
+              "properties": {
+                "query": "SOURCE \"${SESLogGroupName}\"\n| fields @timestamp, eventType, destination, sourceIp\n| filter eventType = \"bounce\" or eventType = \"complaint\"\n| sort @timestamp desc\n| limit 20",
+                "region": "${AWS::Region}",
+                "title": "Recent SES Events (Last 20) - Tokyo Region",
+                "view": "table"
+              }
+            }
+          ]
+        }
+
+  # CloudWatch Log Group for Data Masking Function
+  DataMaskingLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: EnableDataMaskingCondition
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ProjectCode}-${Environment}-data-masking"
+      RetentionInDays: !Ref CloudWatchLogRetentionDays
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-data-masking-logs"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+
+  # Japanese compliance monitoring
+  # CloudWatch Log Group for Japanese compliance monitoring
+  JapaneseComplianceMonitoringLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: EnableJapaneseComplianceCondition
+    Properties:
+      LogGroupName: !Sub "/aws/monitoring/compliance/japanese/${ProjectCode}/${Environment}"
+      RetentionInDays: !Ref CloudWatchLogRetentionDays
+      Tags:
+        - Key: Name
+          Value: !Sub "${ProjectCode}-${Environment}-japanese-compliance-monitoring-logs"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectCode
+        - Key: Region
+          Value: "ap-northeast-1"
+        - Key: Compliance
+          Value: "Japanese"
+
+  # Tokyo region monitoring CloudWatch Dashboard
+  TokyoRegionMonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Condition: EnableTokyoRegionFeaturesCondition
+    Properties:
+      DashboardName: !Sub "${ProjectCode}-${Environment}-tokyo-region-monitoring-dashboard"
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 3,
+              "properties": {
+                                 "markdown": "## Tokyo Region Monitoring Dashboard (ap-northeast-1)\n- **Region**: ap-northeast-1 (Tokyo)\n- **Environment**: ${Environment}\n- **Project Code**: ${ProjectCode}\n- **Japanese Monitoring**: ${EnableJapaneseMonitoring}\n- **Japanese Compliance**: ${EnableJapaneseCompliance}"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 3,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["AWS/Region", "Region", "Region", "ap-northeast-1"]
+                ],
+                "view": "singleValue",
+                "region": "ap-northeast-1",
+                "title": "Tokyo Region Status",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 3,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["${CloudWatchMetricNamespace}", "ApplicationErrors", "Environment", "${Environment}"]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "ap-northeast-1",
+                "title": "Application Errors in Tokyo Region",
+                "period": 300
+              }
+            }
+          ]
+        }
+
+  # Japanese monitoring CloudWatch Insights Query
+  JapaneseMonitoringQuery:
+    Type: AWS::Logs::QueryDefinition
+    Condition: EnableJapaneseMonitoringCondition
+    Properties:
+      Name: !Sub "${ProjectCode}-${Environment}-japanese-monitoring-query"
+      LogGroupNames:
+        - !Ref JapaneseComplianceMonitoringLogGroup
+      QueryString: |
+        fields @timestamp, @message, @logStream
+                 | filter @message like /ERROR/ or @message like /WARNING/ or @message like /INFO/ or @message like /DEBUG/
+        | stats count() by @logStream
+        | sort count() desc
+
+Outputs:
+  DataMaskingFunctionName:
+    Condition: EnableDataMaskingCondition
+    Description: Name of the data masking Lambda function
+    Value: !Ref DataMaskingFunction
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-DataMaskingFunctionName"
+
+  DataMaskingFunctionArn:
+    Condition: EnableDataMaskingCondition
+    Description: ARN of the data masking Lambda function
+    Value: !GetAtt DataMaskingFunction.Arn
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-DataMaskingFunctionArn"
+
+  DataMaskingFunctionRoleArn:
+    Condition: EnableDataMaskingCondition
+    Description: ARN of the IAM role for data masking Lambda function
+    Value: !GetAtt DataMaskingFunctionRole.Arn
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-DataMaskingFunctionRoleArn"
+
+  AdminQueryDefinitionName:
+    Condition: EnableInsightsQueriesCondition
+    Description: Name of the admin CloudWatch Insights query
+    Value: !Ref SESInsightsQueryAdmin
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-AdminQueryDefinitionName"
+
+  MaskedQueryDefinitionName:
+    Condition: EnableInsightsQueriesCondition
+    Description: Name of the masked CloudWatch Insights query
+    Value: !Ref SESInsightsQueryMasked
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-MaskedQueryDefinitionName"
+
+  PerformanceQueryDefinitionName:
+    Condition: EnableInsightsQueriesCondition
+    Description: Name of the performance CloudWatch Insights query
+    Value: !Ref SESInsightsQueryPerformance
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-PerformanceQueryDefinitionName"
+
+  ErrorQueryDefinitionName:
+    Condition: EnableInsightsQueriesCondition
+    Description: Name of the error CloudWatch Insights query
+    Value: !Ref SESInsightsQueryErrors
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-ErrorQueryDefinitionName"
+
+  MonitoringDashboardName:
+    Condition: EnableCustomMetricsCondition
+    Description: Name of the CloudWatch monitoring dashboard
+    Value: !Ref MonitoringDashboard
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-MonitoringDashboardName"
+
+  ApplicationLogGroupName:
+    Description: Name of the CloudWatch log group for application logs
+    Value: !Ref ApplicationLogGroup
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-ApplicationLogGroupName"
+
+  JapaneseComplianceMonitoringLogGroupName:
+    Condition: EnableJapaneseComplianceCondition
+    Description: Name of the Japanese compliance CloudWatch log group
+    Value: !Ref JapaneseComplianceMonitoringLogGroup
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-JapaneseComplianceMonitoringLogGroupName"
+
+  TokyoRegionMonitoringDashboardName:
+    Condition: EnableTokyoRegionFeaturesCondition
+    Description: Name of the Tokyo region monitoring CloudWatch dashboard
+    Value: !Ref TokyoRegionMonitoringDashboard
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-TokyoRegionMonitoringDashboardName"
+
+  JapaneseMonitoringQueryName:
+    Condition: EnableJapaneseMonitoringCondition
+    Description: Name of the Japanese monitoring CloudWatch Insights query
+    Value: !Ref JapaneseMonitoringQuery
+    Export:
+      Name: !Sub "${ProjectCode}-${Environment}-JapaneseMonitoringQueryName"

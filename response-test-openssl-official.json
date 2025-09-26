@@ -1,0 +1,1 @@
+{"errorMessage": "Syntax error in module 'index': invalid syntax (index.py, line 754)", "errorType": "Runtime.UserCodeSyntaxError", "requestId": "", "stackTrace": ["  File \"/var/task/index.py\" Line 754\n        except Exception as e:\n"]}

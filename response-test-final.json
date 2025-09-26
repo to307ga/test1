@@ -1,0 +1,1 @@
+{"errorMessage": "Syntax error in module 'index': expected an indented block after 'try' statement on line 698 (index.py, line 700)", "errorType": "Runtime.UserCodeSyntaxError", "requestId": "", "stackTrace": ["  File \"/var/task/index.py\" Line 700\n            import subprocess\n"]}
