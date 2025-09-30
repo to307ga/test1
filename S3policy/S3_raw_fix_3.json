@@ -1,0 +1,87 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowRootUserFullAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::007773581311:root"
+      },
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311",
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
+      ]
+    },
+    {
+      "Sid": "AllowSpecificServices",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": [
+          "firehose.amazonaws.com",
+          "lambda.amazonaws.com",
+          "s3.amazonaws.com"
+        ]
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:DeleteBucketPolicy",
+        "s3:PutBucketPolicy",
+        "s3:GetBucketPolicy"
+      ],
+      "Resource": [
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311",
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:SourceAccount": "007773581311"
+        }
+      }
+    },
+    {
+      "Sid": "DenyInsecureConnections",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311",
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    },
+    {
+      "Sid": "DenyUnauthorizedIPAccess",
+      "Effect": "Deny",
+      "Principal": {
+        "AWS": "*"
+      },
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311",
+        "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
+      ],
+      "Condition": {
+        "NotIpAddress": {
+          "aws:SourceIp": [
+            "10.99.0.0/16",
+            "10.88.80.0/20",
+            "203.0.113.0/24",
+            "198.51.100.0/24",
+            "202.217.0.0/16"
+          ]
+        },
+        "StringEquals": {
+          "aws:PrincipalType": "User"
+        }
+      }
+    }
+  ]
+}

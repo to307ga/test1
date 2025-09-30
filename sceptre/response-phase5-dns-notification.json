@@ -1,1 +1,0 @@
-{"errorMessage": "Unsupported action: phase_manager", "errorType": "ValueError", "requestId": "36bff28d-452d-4259-ae6f-70d987797ab0", "stackTrace": ["  File \"/var/task/index.py\", line 94, in lambda_handler\n    raise ValueError(f\"Unsupported action: {action}\")\n"]}

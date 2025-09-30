@@ -1,1 +1,0 @@
-{"test": "enhanced-kinesis test 26", "timestamp": "2025-09-21T01:23:00Z", "message": "Hello Enhanced Kinesis test 26!", "data": [100, 110, 120, 130, 140], "email": "test26@example.com", "ip": "192.168.1.2600"}

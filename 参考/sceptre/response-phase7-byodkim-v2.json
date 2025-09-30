@@ -1,1 +1,0 @@
-{"statusCode": 200, "body": "{\"message\": \"Success\", \"action\": \"phase_manager\", \"result\": {\"phase\": \"7\", \"current_phase\": \"7\", \"domain\": \"goo.ne.jp\", \"status\": \"phase_completed\", \"timestamp\": \"2025-09-11T04:11:58.587686\"}}"}

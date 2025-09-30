@@ -1,1 +1,0 @@
-{"statusCode": 400, "error": "DNS_TXT_NOT_READY", "message": "DNS TXT record for selector1._domainkey.goo.ne.jp is not yet available. Please wait for DNS propagation."}

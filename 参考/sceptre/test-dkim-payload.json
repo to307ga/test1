@@ -1,5 +1,0 @@
-{
-  "action": "create_dkim_certificate",
-  "domain": "goo.ne.jp",
-  "selector": "gooid-21-pro"
-}

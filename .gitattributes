@@ -1,13 +1,33 @@
-# Sceptre プロジェクト用の改行コード設定
-# YAML, Python, Shell スクリプトは LF で統一
-*.yaml text eol=lf
-*.yml text eol=lf
-*.py text eol=lf
-*.sh text eol=lf
-*.md text eol=lf
-*.json text eol=lf
+# プロジェクト全体でLF・UTF-8に統一（OS環境に関わらず）
+# すべてのテキストファイルをLF改行・UTF-8エンコーディングで統一
+*.yaml text eol=lf encoding=utf-8
+*.yml text eol=lf encoding=utf-8
+*.py text eol=lf encoding=utf-8
+*.sh text eol=lf encoding=utf-8
+*.md text eol=lf encoding=utf-8
+*.json text eol=lf encoding=utf-8
+*.txt text eol=lf encoding=utf-8
+*.toml text eol=lf encoding=utf-8
+*.cfg text eol=lf encoding=utf-8
+*.ini text eol=lf encoding=utf-8
 
 # バイナリファイルはそのまま
 *.png binary
 *.jpg binary
 *.gif binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.pem binary
+*.key binary
+*.p12 binary
+*.pfx binary
+*.crt binary
+*.cer binary
+*.jks binary
+*.keystore binary
+
+# すべてのテキストファイルをLF・UTF-8で統一（明示的に指定されていないファイルも含む）
+* text eol=lf encoding=utf-8

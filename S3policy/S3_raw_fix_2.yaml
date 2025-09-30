@@ -1,0 +1,86 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "DenyHumanAccessFromUnauthorizedIPs",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311",
+                "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
+            ],
+            "Condition": {
+                "NotIpAddress": {
+                    "aws:SourceIp": [
+                        "10.99.0.0/16",
+                        "10.88.80.0/20",
+                        "10.80.11.0/28",
+                        "10.80.0.0/24",
+                        "202.217.0.0/16",
+                        "153.254.171.0/28",
+                        "203.138.153.247/32",
+                        "153.143.181.0/28",
+                        "153.143.181.16/28",
+                        "202.217.75.82/31",
+                        "202.217.75.84/30",
+                        "155.190.0.0/16"
+                    ]
+                },
+                "StringEquals": {
+                    "aws:PrincipalType": "AWS"
+                }
+            }
+        },
+        {
+            "Sid": "DenyNonSSLRequests",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311",
+                "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
+            ],
+            "Condition": {
+                "Bool": {
+                    "aws:SecureTransport": "false"
+                }
+            }
+        },
+        {
+            "Sid": "AllowAWSServicesFromSameAccount",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": [
+                    "firehose.amazonaws.com",
+                    "lambda.amazonaws.com"
+                ]
+            },
+            "Action": [
+                "s3:AbortMultipartUpload",
+                "s3:DeleteObject",
+                "s3:GetBucketLocation",
+                "s3:GetObject",
+                "s3:ListBucket",
+                "s3:ListBucketMultipartUploads",
+                "s3:ListMultipartUploadParts",
+                "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311",
+                "arn:aws:s3:::aws-ses-migration-prod-raw-logs-007773581311/*"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "aws:SourceAccount": "007773581311"
+                },
+                "ArnLike": {
+                    "aws:SourceArn": [
+                        "arn:aws:firehose:ap-northeast-1:007773581311:deliverystream/*",
+                        "arn:aws:lambda:ap-northeast-1:007773581311:function/*"
+                    ]
+                }
+            }
+        }
+    ]
+}

@@ -1,7 +1,0 @@
-{
-  "action": "put_dkim_signing_attributes",
-  "domain": "goo.ne.jp",
-  "environment": "prod",
-  "projectName": "aws-ses-migration",
-  "dkimSeparator": "gooid-21-pro"
-}

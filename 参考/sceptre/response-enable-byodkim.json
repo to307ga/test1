@@ -1,1 +1,0 @@
-{"statusCode": 200, "body": "{\"message\": \"Success\", \"action\": \"enable_dkim\", \"result\": {\"status\": \"dkim_enabled\", \"domain\": \"goo.ne.jp\"}}"}

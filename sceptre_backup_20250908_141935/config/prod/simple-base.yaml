@@ -1,7 +1,0 @@
-template:
-  type: file
-  path: ../../templates/base.yaml
-
-parameters:
-  ProjectCode: ses-migration
-  Environment: production

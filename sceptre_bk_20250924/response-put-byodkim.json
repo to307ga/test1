@@ -1,1 +1,0 @@
-{"errorMessage": "Unknown action: put_dkim_signing_attributes", "errorType": "ValueError", "requestId": "b6271bc1-b083-4693-969b-b665f1cbce13", "stackTrace": ["  File \"/var/task/index.py\", line 52, in lambda_handler\n    raise ValueError(f\"Unknown action: {action}\")\n"]}

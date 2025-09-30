@@ -1,2 +1,0 @@
-Data size: 130000214 bytes
-Large data ready for Firehose

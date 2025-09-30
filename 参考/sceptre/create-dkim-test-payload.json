@@ -1,7 +1,0 @@
-{
-  "action": "create_dkim_certificate",
-  "domain": "goo.ne.jp",
-  "selector": "selector1",
-  "validity_days": 2,
-  "key_size": 2048
-}

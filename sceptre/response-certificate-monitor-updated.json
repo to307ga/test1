@@ -1,1 +1,0 @@
-{"statusCode": 500, "error": "An error occurred (AccessDenied) when calling the PutMetricData operation: User: arn:aws:sts::007773581311:assumed-role/aws-ses-migration-prod-dkim-manager-role/aws-ses-migration-prod-certificate-monitor is not authorized to perform: cloudwatch:PutMetricData because no identity-based policy allows the cloudwatch:PutMetricData action"}

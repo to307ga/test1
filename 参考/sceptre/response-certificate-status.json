@@ -1,1 +1,0 @@
-{"errorMessage": "Unsupported action: get_certificate_status", "errorType": "ValueError", "requestId": "e1dabec5-c747-411e-b8cb-58d0bb2a80c6", "stackTrace": ["  File \"/var/task/index.py\", line 94, in lambda_handler\n    raise ValueError(f\"Unsupported action: {action}\")\n"]}

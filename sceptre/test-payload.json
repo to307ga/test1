@@ -1,7 +1,0 @@
-{
-  "source": "manual_test",
-  "action": "certificate_monitoring",
-  "domain": "goo.ne.jp",
-  "environment": "prod",
-  "project_name": "aws-ses-migration"
-}
