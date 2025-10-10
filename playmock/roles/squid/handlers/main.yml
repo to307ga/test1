@@ -1,0 +1,21 @@
+---
+- name: squidのrestart_msg
+  debug:
+    msg: "{{ commands }}"
+  listen: squid_restart_msg
+  when: inventory_hostname_short is not regex("-000$")
+
+  vars:
+    commands:
+      - "  active=001、standby=002と仮定する"
+      - "  (1) 001で実施"
+      - "  $ sudo pcs cluster standby  "
+      - "  $ sudo pcs status  ← 002に切り替わったことを確認"
+      - "  $ sudo pcs cluster unstanby  "
+      - "  $ sudo pcs status  ← 001,002共にonlineになっていることを確認する"
+      - "  (2)002で実施"
+      - "  $ sudo pcs cluster standby  "
+      - "  $ sudo pcs status  ← 001に切り替わったことを確認"
+      - "  $ sudo pcs cluster unstandby  "
+      - "  $ sudo pcs status  ← 001,002共にonlineになっていることを確認する"
+

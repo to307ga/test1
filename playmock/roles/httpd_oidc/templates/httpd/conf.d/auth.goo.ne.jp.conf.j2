@@ -1,0 +1,22 @@
+<VirtualHost *:80>
+    ServerName auth.goo.ne.jp
+
+    RewriteEngine on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !^https$
+    RewriteCond %{HTTP:Host} ^auth.goo.ne.jp$
+    RewriteRule (.*) https://auth.goo.ne.jp%{REQUEST_URI} [R=301,L]
+
+
+    ProxyRequests off
+    RequestHeader set X-GOOAES-USER-ID "%{USER_ID}e"
+    RequestHeader set X-GOOAES-HASHED-ID "%{USER_ID_FOR_GA}e"
+
+{% filter indent(4,True) %}
+{% include 'roles/kagemusha/templates/kagemusha.conf.j2' %}
+{% endfilter %}
+
+    ProxyPass /server-status !
+    ProxyPass / http://localhost:8080/
+    ProxyPassReverse / http://localhost:8080/
+
+</VirtualHost>

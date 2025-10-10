@@ -1,0 +1,14 @@
+---
+- include_tasks: "{{service_type}}/crontab.yml"
+- include_tasks: "{{service_type}}/set_config.yml"
+
+- include_tasks: "{{service_type}}/db0.yml"
+  # dev環境のとき（＝商用環境でないとき）
+  # or
+  # 商用環境で HAでのActive側のみ
+  # の場合のみ実行。
+  #
+  # 背景：
+  #   開発環境ではActive/Standby型のHAを組んでいないため、無条件に実行する。
+  #   方や商用環境では HA構成。Activeノードに向けるためVIPの場合のみ実行する。
+  when: release_env != 'pro' or inventory_hostname_short is regex("batch-000$")

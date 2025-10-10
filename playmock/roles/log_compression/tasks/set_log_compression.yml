@@ -1,0 +1,44 @@
+---
+- name: logユーザー用のホームディレクトリの作成
+  file: path={{ item }} state=directory owner=log group=log mode=0700
+  with_items:
+  - /home/log/
+
+- name: log圧縮用configの配布先ディレクトリの作成
+  file: path={{ item }} state=directory owner=log group=log mode=0755
+  with_items:
+  - /home/log/bin
+
+- name: log圧縮用cronの配布
+  template:
+    src: templates/cron/log_compression.j2
+    dest: /etc/cron.d/log_compression
+    owner: root
+    group: root
+    mode: 0644
+
+- name: log圧縮用scriptの配布
+  copy:
+    src: files/script/log_compression.sh
+    dest: /home/log/log_compression.sh
+    owner: log
+    group: log
+    mode: 0744
+
+- name: log圧縮用configの配布
+  copy:
+    src: files/config/config_log_{{server_kinds}}
+    dest: /home/log/bin/config_log_{{ inventory_hostname_short }}
+    owner: log
+    group: log
+    mode: 0644
+
+- name: log圧縮用configの配布(nodate)
+  copy:
+    src: files/config/config_log_{{server_kinds}}_nodate
+    dest: /home/log/bin/config_log_{{ inventory_hostname_short }}_nodate
+    owner: log
+    group: log
+    mode: 0644
+
+

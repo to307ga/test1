@@ -1,0 +1,28 @@
+---
+- name: exist awscli v2
+  command: which aws
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+  register: exist_awscli
+  changed_when: false
+  ignore_errors: true
+
+- block:
+  - name: Download awscli
+    get_url:
+      url: "{{ remote_repo_url }}/awscliv2.zip"
+      dest: /tmp
+      use_proxy: yes
+
+  - name: Unarchive awscliv2.zip
+    unarchive:
+      src: /tmp/awscliv2.zip
+      dest: /tmp
+      remote_src: yes
+
+  - name: "install awscli"
+    become: yes
+    # インストール済み状態で2回目以降、エラーなく実行されるには `--update` オプションが必要
+    shell: /tmp/aws/install --install-dir /usr/local/aws-cli --bin-dir /usr/bin --update
+  when:
+    not ansible_check_mode and (exist_awscli.rc != 0)

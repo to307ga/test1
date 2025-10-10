@@ -1,0 +1,21 @@
+---
+- name: /db0の作成
+  file: path={{ item }} state=directory owner=root group=root mode=0755
+  with_items:
+  - /db0/
+
+- name: /db0/logsの作成
+  file: path={{ item }} state=directory owner=idclog group=idclog mode=0755
+  with_items:
+  - /db0/logs
+
+- name: /db0/logsへのシンボリックリンクを作成
+  file:
+    state: link
+    src: /db0/logs
+    dest: /logs
+    owner: root
+    group: root
+    mode: 0777
+    follow: no
+    when: not ansible_check_mode

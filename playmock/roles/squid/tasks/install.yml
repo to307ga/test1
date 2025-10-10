@@ -1,0 +1,6 @@
+---
+# パッケージのインストール
+- name: Install squid
+  yum:
+    name: squid
+    state: latest

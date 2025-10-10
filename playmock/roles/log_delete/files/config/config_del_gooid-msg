@@ -1,0 +1,11 @@
+######################################################################
+#
+# source_log_delete.sh用コンフィグファイル
+# 
+# 書式  source_dir:source_file:pastdate
+#      (元ファイル名(フルパス):元ファイル名:N日前の日付)
+#
+######################################################################
+/var/log/app/idc/:root.log.:30
+/var/log/app/idc/:service.log.:30
+/var/log/app/idc/msg/:idc-msg-broker.log.:30

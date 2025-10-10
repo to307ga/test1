@@ -1,0 +1,11 @@
+- name: 運用監視スクリプトのcron定義ファイルを配布
+  template:
+    src: templates/etc/cron.d/utils-{{ release_env }}.j2
+    dest: /etc/cron.d/utils
+    owner: root
+    group: root
+    mode: 0644
+  vars:
+    octet_3_4: "{{ ansible_default_ipv4.address.split('.')[2] + '.' + ansible_default_ipv4.address.split('.')[3].zfill(3) }}"
+    hour: "{{ ((ansible_default_ipv4.address.split('.')[2] + ansible_default_ipv4.address.split('.')[3].zfill(3)) | int) % 24 }}"
+    minute: "{{ ((ansible_default_ipv4.address.split('.')[2] + ansible_default_ipv4.address.split('.')[3].zfill(3)) | int) % 60 }}"

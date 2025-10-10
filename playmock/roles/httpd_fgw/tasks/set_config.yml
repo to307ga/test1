@@ -1,0 +1,174 @@
+---
+- name: Create directories
+  file: path={{ item }} state=directory owner=root group=root mode=0755
+  loop:
+    - /usr/local/apache
+    - /usr/local/apache/passwd
+
+# ログフォルダの権限変更
+- name: ログフォルダの権限変更
+  file:
+    state: directory
+    path: /var/log/httpd
+    owner: root
+    group: root
+    mode: 0755
+
+# httpd.confの配布
+- name: Copy httpd.conf
+  template:
+    src: templates/httpd/httpd.conf.j2
+    dest: /etc/httpd/conf/httpd.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - httpd_fgw_restart_msg
+
+# magicの配布
+- name: Copy magic
+  template:
+    src: templates/httpd/magic.j2
+    dest: /etc/httpd/conf/magic
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - httpd_fgw_restart_msg
+
+# acl.confの配布
+- name: Copy acl.conf
+  template:
+    src: templates/httpd/acl.conf.j2
+    dest: /etc/httpd/conf.d/acl.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - httpd_fgw_restart_msg
+
+# squid.confの配布
+- name: Copy squid.conf
+  template:
+    src: templates/httpd/squid.conf.j2
+    dest: /etc/httpd/conf.d/squid.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - httpd_fgw_restart_msg
+
+# ssl.confの配布
+- name: Copy ssl.conf
+  template:
+    src: templates/httpd/ssl.conf.j2
+    dest: /etc/httpd/conf.d/ssl.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - httpd_fgw_restart_msg
+
+# COMMON.pwdの配布
+- name: Copy COMMON.pwd
+  template:
+    src: templates/passwd/COMMON.pwd.j2
+    dest: /usr/local/apache/passwd/.COMMON.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# DGP.pwdの配布
+- name: Copy DGP.pwd
+  template:
+    src: templates/passwd/DGP.pwd.j2
+    dest: /usr/local/apache/passwd/.DGP.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# adv.pwdの配布
+- name: Copy adv.pwd
+  template:
+    src: templates/passwd/adv.pwd.j2
+    dest: /usr/local/apache/passwd/.adv.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# chocom.pwdの配布
+- name: Copy chocom.pwd
+  template:
+    src: templates/passwd/chocom.pwd.j2
+    dest: /usr/local/apache/passwd/.chocom.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# gmm.pwdの配布
+- name: Copy gmm.pwd
+  template:
+    src: templates/passwd/gmm.pwd.j2
+    dest: /usr/local/apache/passwd/.gmm.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# idhub.pwdの配布
+- name: Copy idhub.pwd
+  template:
+    src: templates/passwd/idhub.pwd.j2
+    dest: /usr/local/apache/passwd/.idhub.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# oshirase.pwdの配布
+- name: Copy oshirase.pwd
+  template:
+    src: templates/passwd/oshirase.pwd.j2
+    dest: /usr/local/apache/passwd/.oshirase.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# sales.pwdの配布
+- name: Copy sales.pwd
+  template:
+    src: templates/passwd/sales.pwd.j2
+    dest: /usr/local/apache/passwd/.sales.pwd
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# area-a.pwdの配布設定(大手町ゴールドゾーン)
+- name: Copy area-a.pwd
+  template:
+    src: templates/passwd/area-a.pwd.j2
+    dest: /usr/local/apache/passwd/.area-a.pwd
+    backup: yes
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy 00-mpm.conf
+  template:
+    src: templates/httpd/00-mpm.conf.j2
+    dest: /etc/httpd/conf.modules.d/00-mpm.conf
+    backup: yes
+    owner: root
+    group: root
+    mode: 0644

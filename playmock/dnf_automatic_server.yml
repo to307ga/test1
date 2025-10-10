@@ -1,0 +1,9 @@
+---
+# httpd_idc_webを最初に実行する。
+# phpとか他のパッケージが/var/log/httpdを作成する前に、httpd_idc_webで/var/log/httpdをシンボリックリンクにする
+- hosts: all
+  become: yes
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: common, tags: common }
+ 

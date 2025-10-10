@@ -1,0 +1,10 @@
+
+- name: gooscp cron設定
+  template:
+    src: delete_personal_data.j2
+    dest: /etc/cron.d/delete_personal_data
+    owner: root
+    group: root
+    mode: 0644
+  # gooscpユーザのCronは、rootのそれとは異なり、001サーバのみで有効とします。
+  when: inventory_hostname_short is regex("-001$")

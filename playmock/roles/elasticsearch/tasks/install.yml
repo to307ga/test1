@@ -1,0 +1,33 @@
+---
+
+- name: Directory check
+  stat:
+    path: /etc/elasticsearch
+  register: elasticsearch_present
+
+- name: Download elasticsearch
+  ansible.builtin.get_url:
+    url: "{{ elasticsearch_download_url }}"
+    dest: /tmp/elasticsearch-{{ elasticsearch_version }}-x86_64.rpm 
+    mode: 0440
+  when:
+    - not elasticsearch_present.stat.exists
+
+- name: Install elasticsearch with rpm command
+  shell: rpm --install /tmp/elasticsearch-{{ elasticsearch_version }}-x86_64.rpm
+  when:
+    - not elasticsearch_present.stat.exists
+
+- name: delete elasticsearch rpm file
+  file:
+    path: /tmp/elasticsearch-{{ elasticsearch_version }}-x86_64.rpm
+    state: absent
+
+- name: Create certs directory
+  file: 
+    path=/etc/elasticsearch/certs 
+    state=directory 
+    owner=root 
+    group=elasticsearch 
+    mode=0750
+  when: not ansible_check_mode

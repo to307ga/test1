@@ -1,0 +1,14 @@
+[Unit]
+Description = gooID center OpenID connect ID provider web app
+
+[Service]
+Environment="SPRING_PROFILES_ACTIVE={{ spring_profiles_active }}"
+WorkingDirectory = /opt/gooidc-oidc
+ExecStart = /opt/gooidc-oidc/gooidc-oidc-1.0.0.jar
+Restart = always
+Type = simple
+User = tomcat
+Group = tomcat
+
+[Install]
+WantedBy = multi-user.target

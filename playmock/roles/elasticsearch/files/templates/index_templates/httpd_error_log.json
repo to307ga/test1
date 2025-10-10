@@ -1,0 +1,29 @@
+{
+  "index_patterns": ["fluentd.gooid-web_httpd_error_log-*"],
+  "priority": 0,
+  "composed_of": [
+    "index-common-settings"
+  ],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "server": 		  { "type": "keyword" }, 
+        "log-time": 	  { 
+          "type": "date",
+          "format": "E MMM d HH:mm:ss.SSSSSS yyyy"
+        },
+        "level": 		    { "type": "keyword" },       
+        "pid": 		      { 
+          "type":   "text",
+          "fields": {
+            "raw":  {
+              "type": "keyword"
+            }
+          }
+        },
+        "message": 	    { "type": "text" }
+      }
+    }
+  }
+}

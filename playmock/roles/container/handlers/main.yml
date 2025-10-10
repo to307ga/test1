@@ -1,0 +1,15 @@
+---
+
+- name: Restart docker
+  systemd:
+    name: docker.service
+    state: restarted
+    daemon_reload: yes
+  become: yes
+
+- name: Restart NetworkManager
+  systemd:
+    name: NetworkManager.service
+    state: restarted
+    daemon_reload: yes
+  become: yes

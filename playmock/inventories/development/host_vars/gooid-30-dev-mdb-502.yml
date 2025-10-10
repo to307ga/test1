@@ -1,0 +1,17 @@
+# mdb
+
+# galeraクラスタ設定
+galera_cluster_name: GOOID_GALERA_DB
+galera_node_name: gooid_dev_db_2
+galera_func: galera
+galera_addr1: gooid-30-dev-mdb-502
+galera_addr2: gooid-30-dev-mdb-501
+galera_addr3: gooid-30-dev-mdb-503
+galera_addr4: gooid-30-dev-sdb-501
+galera_addr5: gooid-30-dev-sdb-502
+
+# Galera Cluster のLeaderであるか？
+# 実際に動的にステータスは見ずに、静的に定義するのみ
+# これがtrueの場合、Clusterが構築されていると前提をおいた上で、
+# MySQL GRANT定義などを行ったりする。
+# galera_cluster_leader: true

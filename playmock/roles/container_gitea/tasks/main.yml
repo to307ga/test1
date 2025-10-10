@@ -1,0 +1,16 @@
+---
+- name: Gitea 環境設定
+  ansible.builtin.include_tasks:
+    file: settings.yml
+
+- name: Gitea コンテナのビルド
+  ansible.builtin.include_tasks:
+    file: build.yml
+
+- name: Gitea Pod サービス設定
+  ansible.builtin.include_tasks:
+    file: service_settings.yml
+
+- name: Gitea バックアップ設定
+  ansible.builtin.include_tasks:
+    file: backup_settings.yml

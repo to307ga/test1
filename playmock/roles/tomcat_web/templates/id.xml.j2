@@ -1,0 +1,63 @@
+<Context reloadable="false" workDir="/usr/local/tomcat/idc/work/Catalina/localhost/id">
+    <Resource
+        name="SelectDB"
+        auth="Container"
+        type="javax.sql.DataSource"
+        username="{{ mysql_reader_name }}"
+        password="{{ mysql_reader_password }}"
+        driverClassName="org.mariadb.jdbc.Driver"
+        url="jdbc:mariadb://{{mysql_reader_host}}/PDB02?autoReconnect=true"
+        maxTotal="250"
+        maxWaitMillis="10000"
+        maxIdle="250"
+        removeAbandonedOnBorrow="true"
+        removeAbandonedTimeout="300"
+        validationQuery="select 1"
+    />
+    <Resource
+        name="UpdateDB"
+        auth="Container"
+        type="javax.sql.DataSource"
+        username="{{ mysql_writer_name }}"
+        password="{{ mysql_writer_password }}"
+        driverClassName="org.mariadb.jdbc.Driver"
+        url="jdbc:mariadb://{{mysql_writer_host}}/PDB02?autoReconnect=true"
+        maxTotal="250"
+        maxWaitMillis="10000"
+        maxIdle="250"
+        removeAbandonedOnBorrow="true"
+        removeAbandonedTimeout="300"
+        validationQuery="select 1"
+    />
+    <Resource
+        name="SessionDB"
+        auth="Container"
+        type="javax.sql.DataSource"
+        username="{{ mysql_admin_name }}"
+        password="{{ mysql_admin_password }}"
+        driverClassName="org.mariadb.jdbc.Driver"
+        url="jdbc:mariadb://{{mysql_writer_host}}/PDB02?autoReconnect=true"
+        maxTotal="250"
+        maxWaitMillis="10000"
+        maxIdle="250"
+        removeAbandonedOnBorrow="true"
+        removeAbandonedTimeout="300"
+        validationQuery="select 1"
+    />
+    <Resource
+        name="SelectDBforB"
+        auth="Container"
+        type="javax.sql.DataSource"
+        username="{{ mysql_reader_name }}"
+        password="{{ mysql_reader_password }}"
+        driverClassName="org.mariadb.jdbc.Driver"
+        url="jdbc:mariadb://{{mysql_reader_host}}/PDB02?autoReconnect=true"
+        maxTotal="250"
+        maxWaitMillis="10000"
+        maxIdle="250"
+        removeAbandonedOnBorrow="true"
+        removeAbandonedTimeout="300"
+        validationQuery="select 1"
+    />
+</Context>
+

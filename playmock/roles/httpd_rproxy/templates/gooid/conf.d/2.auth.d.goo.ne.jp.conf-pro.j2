@@ -1,0 +1,29 @@
+<VirtualHost *:443>
+    DocumentRoot "/var/www/html/"
+    ServerName auth.d.goo.ne.jp:443
+
+    SSLEngine on
+    SSLProtocol -ALL +TLSv1.2
+    SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256
+    SSLHonorCipherOrder Off
+
+    SSLCertificateFile /etc/httpd/conf/ssl/auth.d.goo.ne.jp.crt
+    SSLCertificateKeyFile /etc/httpd/conf/ssl/auth.d.goo.ne.jp.key
+    SSLCertificateChainFile /etc/httpd/conf/ssl/intermediate_ca.crt
+
+    SSLProxyEngine on
+    ProxyRequests off
+    ProxyPreserveHost on
+    SSLProxyVerify none
+    SSLProxyCheckPeerCN off
+    SSLProxyCheckPeerName off
+    SSLProxyCheckPeerExpire off
+
+    RequestHeader set X-Forwarded-Proto https
+
+    AddOutputFilterByType SUBSTITUTE text/html
+    Substitute "s/<title>/<!-- {{ inventory_hostname_short }} で書き換えてます。 --><title>【影武者】/i"
+
+    ProxyPass / http://172.25.253.222/
+    ProxyPassReverse / http://172.25.253.222/
+</VirtualHost>

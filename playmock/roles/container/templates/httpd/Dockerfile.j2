@@ -1,0 +1,10 @@
+
+FROM "{{httpd_base_image}}"
+
+RUN set -eux; \
+  export http_proxy="{{ proxy_env.http_proxy }}"; \
+  export https_proxy="{{ proxy_env.http_proxy }}"; \
+  apt-get update; \
+  apt upgrade -y; \
+  apt-get install -y curl;
+

@@ -1,0 +1,27 @@
+[engine]
+# デフォルトのランタイムをruncからcrunに変更する場合
+# runtime = "crun"
+
+runtime = "runc"
+
+# cgroupsの設定
+cgroup_manager = "cgroupfs"
+
+# NoCgroupsを無効化 lootlessではcgroup必須なので有効にするべき
+no_cgroups = false
+
+[engine.runtimes]
+# 利用可能なランタイムの定義
+crun = [
+    "/usr/bin/crun",
+]
+runc = [
+    "/usr/bin/runc",
+]
+
+# /opt/containers/jenkins/jenkins_home はカスタムボリュームなので若干問題があった。podman volume create コマンドでデフォルトで作成される~/.local/ 下にしておいた方が良さそう
+[containers]
+volumes = [
+  "/opt/containers/jenkins/jenkins_home/workspace:/var/jenkins_home/workspace:rw,z",
+  # 必要に応じて他のボリュームも追加していく必要がある
+]

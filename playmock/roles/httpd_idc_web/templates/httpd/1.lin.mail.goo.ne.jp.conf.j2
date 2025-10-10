@@ -1,0 +1,92 @@
+<VirtualHost *:40080>
+ServerName {{ httpd_idc_fqdn }}:{{ httpd_idc_port }}
+DocumentRoot "/var/www/html"
+DirectoryIndex index.php
+
+<Directory />
+    AllowOverride none
+    Require all denied
+</Directory>
+
+<Directory "/var/www">
+    AllowOverride None
+    Require all granted
+</Directory>
+
+<Directory "/var/www/html">
+    Options FollowSymLinks
+    AllowOverride None
+    Require all granted
+</Directory>
+
+<Files ".ht*">
+    Require all denied
+</Files>
+
+RewriteEngine on
+RewriteCond %{REQUEST_METHOD} !^(GET|POST|HEAD)$
+RewriteRule .* - [F]
+
+# OpenID2.0 OP
+RewriteRule ^/openid/id/(.*)$ /openid/index.php?userId=$1 [L]
+RewriteRule ^/openid$ /openid/index.php [L]
+
+# SSL
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+RewriteCond %{REMOTE_ADDR} !=127.0.0.1
+RewriteCond %{REMOTE_ADDR} !^172\.1[0-9]\.
+RewriteRule ^/(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+Include conf/rewrite.conf
+
+RequestHeader set X-GOOID-USER_ID_FOR_GA %{USER_ID_FOR_GA}e
+
+<Location /api/>
+    Require all denied
+</Location>
+
+<Location /api/portal/>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</Location>
+
+<Location /api/auth/>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</Location>
+
+<Location /api/user/>
+    Options FollowSymLinks
+    Require all denied
+</Location>
+
+<LocationMatch ^/api/v[0-9_]+/(authn|portal)/>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</LocationMatch>
+
+<Location /id/api/>
+    Require all denied
+</Location>
+
+<Location /id/api/auth/>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</Location>
+
+<Location /id/api/authn/CheckAuthState>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</Location>
+
+{% include 'roles/kagemusha/templates/kagemusha.conf.j2' %}
+
+ProxyPass /api/ ajp://localhost:48009/id/api/
+ProxyPass /id/ ajp://localhost:48009/id/
+
+</VirtualHost>

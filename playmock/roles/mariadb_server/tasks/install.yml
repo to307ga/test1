@@ -1,0 +1,43 @@
+---
+# 検証環境のパッケージのインストール
+- name: Install MariaDB-server, Mariadb-client
+  yum:
+    name: 
+      - MariaDB-server
+      - MariaDB-client
+    state: latest
+    enablerepo: private
+    disablerepo: "*"
+  when: release_env == "dev"
+
+# 商用環境のパッケージのインストール
+- name: Install MariaDB-server, Mariadb-client
+  yum:
+    name: 
+      - MariaDB-server
+      - MariaDB-client
+    state: present
+    enablerepo: private
+    disablerepo: "*"
+  when: release_env == "pro"
+  environment: "{{ proxy_env }}"
+
+# Percona toolkitをインストールしておき、診断に役立てられるようにする
+- name: Install Percona Toolkit
+  yum:
+    name: percona-toolkit
+    state: latest
+    enablerepo: private
+    disable_gpg_check: yes
+    update_cache: true
+  environment: "{{ proxy_env }}"
+
+# Ansible MySQL moduleの利用に必要な、Python2系パッケージ
+# 
+# community.mysql.mysql_user – Adds or removes a user from a MySQL database — Ansible Documentation
+# https://docs.ansible.com/ansible/latest/collections/community/mysql/mysql_user_module.html
+- name: Install python3-PyMySQL
+  yum:
+    name: python3-PyMySQL
+    state: latest
+

@@ -1,0 +1,21 @@
+# メンテナンス用設定
+#RewriteMap allow-host txt:/etc/httpd_gbs/conf/allow-host.txt
+#RewriteCond ${allow-host:%{REMOTE_ADDR}|DENY} !^ALLOW$ [OR]
+#RewriteCond ${allow-host:%{REMOTE_HOST}|DENY} !^ALLOW$
+
+# 全停止
+#RewriteRule ^/(gbs|charge|rif|btw|remote|sso|jgoo|rmtacc)/.*   https://srvc.goo.ne.jp/mente.html? [L]
+
+# 購入・決済情報登録・確認・変更・追加のみ停止(社内LANからのみ許容)
+#RewriteCond expr "! -R '202.217.72.192/27'"
+#RewriteCond expr "! -R '202.217.74.160/28'"
+#RewriteRule ^/gbs/(onlineBilling|settlementInfReg|settlementInf)/.* https://srvc.goo.ne.jp/mente.html? [L]
+
+# 旧BROBA移行機能停止（2013.10goo動画終了に伴う追加）
+RewriteRule ^/gbs/oldBrobaMemberShift/* http://bb.goo.ne.jp/guide/20130508_bb.html? [L]
+
+# 権利照会IFとお客様番号照会IF以外停止
+# "^/gbs/(showRights|gooCustomerNumRef)/"
+#RewriteCond %{REQUEST_URI} !/gbs/showRights
+#RewriteCond %{REQUEST_URI} !/gbs/gooCustomerNumRef
+#RewriteRule /gbs/(.*) https://srvc.goo.ne.jp/mente.html? [L]

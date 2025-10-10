@@ -1,0 +1,189 @@
+---
+- name: /var/log/app/idhub-oidc ディレクトリの作成
+  file:
+    state: directory
+    path: /var/log/app/idhub-oidc
+    owner: gooscp
+    group: gooscp
+    mode: 0755
+
+- name: /var/log/app/idhub ディレクトリの作成
+  file:
+    state: directory
+    path: /var/log/app/idhub
+    owner: tomcat
+    group: tomcat
+    mode: 0755
+
+- name: /usr/local/app/idhub-oidc ディレクトリの作成
+  file:
+    state: directory
+    path: /usr/local/app/idhub-oidc
+    owner: gooscp
+    group: gooscp
+    mode: 0755
+
+- name: /var/www_idhub ディレクトリの作成
+  file:
+    state: directory
+    path: /var/www_idhub
+    owner: root
+    group: root
+    mode: 0755
+
+- name: /var/www_idhub/html ディレクトリの作成
+  file:
+    state: directory
+    path: /var/www_idhub/html
+    owner: apache
+    group: apache
+    mode: 0755
+
+- name: Link /usr/local/app/idhub-oidc/logs -> /var/log/app/idhub-oidc
+  file:
+    state: link
+    src: /var/log/app/idhub-oidc
+    dest: /usr/local/app/idhub-oidc/logs
+  when: not ansible_check_mode
+
+# このファイルはAnsible Playbookの管理下以外の箇所、Jenkinsで変更されることがある。
+# ファイルが存在しない場合のみ、配布する。
+- name: ACTIVE_MODEの存在を確認
+  stat:
+    path: /usr/local/app/idhub-oidc/ACTIVE_MODE
+  register: ACTIVE_MODE
+
+# このファイルはAnsible Playbookの管理下以外の箇所、Jenkinsで変更されることがある。
+# ファイルが存在しない場合のみ、配布する。
+- name: Copy ACTIVE_MODE
+  template:
+    src: templates/ACTIVE_MODE.j2
+    dest: /usr/local/app/idhub-oidc/ACTIVE_MODE
+    owner: gooscp
+    group: gooscp
+    mode: 0644
+  when: not ACTIVE_MODE.stat.exists
+
+- name: Copy idhub-oidc-blue.service
+  template:
+    src: templates/idhub-oidc-blue.service.j2
+    dest: /usr/local/app/idhub-oidc/idhub-oidc-blue.service
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+    mode: 0644
+
+- name: Copy idhub-oidc-green.service
+  template:
+    src: templates/idhub-oidc-green.service.j2
+    dest: /usr/local/app/idhub-oidc/idhub-oidc-green.service
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+    mode: 0644
+
+# このファイルはAnsible Playbookの管理下以外の箇所、Jenkinsで変更されることがある。
+# ファイルが存在しない場合のみ、配布する。
+- name: idhub-oidc.confの存在を確認
+  stat:
+    path: /etc/httpd/conf.d/idhub-oidc.conf
+  register: idhub_oidc
+
+# このファイルはAnsible Playbookの管理下以外の箇所、Jenkinsで変更されることがある。
+# ファイルが存在しない場合のみ、配布する。
+- name: Copy idhub-oidc.conf
+  template:
+    src: templates/idhub-oidc.conf.j2
+    dest: /etc/httpd/conf.d/idhub-oidc.conf 
+    owner: root
+    group: root
+    mode: 0644
+  when: idhub_oidc.stat.exists == false
+
+- name: Link /etc/systemd/system/idhub-oidc-blue.service -> /usr/local/app/idhub-oidc/idhub-oidc-blue.service
+  file:
+    state: link
+    src: /usr/local/app/idhub-oidc/idhub-oidc-blue.service
+    dest: /etc/systemd/system/idhub-oidc-blue.service
+  when: not ansible_check_mode
+
+- name: Link /etc/systemd/system/idhub-oidc-green.service -> /usr/local/app/idhub-oidc/idhub-oidc-green.service
+  file:
+    state: link
+    src: /usr/local/app/idhub-oidc/idhub-oidc-green.service
+    dest: /etc/systemd/system/idhub-oidc-green.service
+  when: not ansible_check_mode
+
+- name: Copy oidc-blue.conf
+  template:
+    src: templates/oidc-blue.conf.j2
+    dest: /usr/local/app/idhub-oidc/oidc-blue.conf
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+    mode: 0644
+
+- name: Copy oidc-green.conf
+  template:
+    src: templates/oidc-green.conf.j2
+    dest: /usr/local/app/idhub-oidc/oidc-green.conf
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+    mode: 0644
+
+- name: Copy authman
+  template:
+    src: templates/authman.j2
+    dest: /usr/local/app/idhub-oidc/authman
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+    mode: 0755
+
+- name: Copy start.sh
+  template:
+    src: templates/start.sh.j2
+    dest: /usr/local/app/idhub-oidc/start.sh
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+    mode: 0755
+
+- name: Copy gbs_sudoers
+  template:
+    src: templates/gbs_sudoers.j2
+    dest: /etc/sudoers.d/gbs_sudoers
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0440
+
+# 開発環境向け自働起動設定
+- name: Copy is-enabled-idhub-oidc-blue-or-green.service
+  template:
+    src: templates/is-enabled-idhub-oidc-blue-or-green.service.j2
+    dest: /etc/systemd/system/is-enabled-idhub-oidc-blue-or-green.service
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  when: release_env == "dev"
+
+# 開発環境向け自働起動設定
+- name: Copy gbs.sh
+  template:
+    src: templates/is-enabled-idhub-oidc-blue-or-green.sh.j2
+    dest: /usr/local/app/idhub-oidc/is-enabled-idhub-oidc-blue-or-green.sh
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0755
+  when: release_env == "dev"
+
+- name: is-enabled-idhub-oidc-blue-or-green.serviceの開発環境自動起動設定
+  systemd:
+    name: is-enabled-idhub-oidc-blue-or-green.service
+    enabled: yes
+    daemon_reload: no
+  when: (release_env == "dev") and (not ansible_check_mode)

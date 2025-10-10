@@ -1,0 +1,81 @@
+---
+
+# 必要ディレクトリの作成
+- name: Make directory
+  file: path={{ item }} state=directory owner=root group=root
+  with_items:
+  - /opt/bin
+  - /opt/bin/rbash_user
+
+# rbash(bashへのリンク)作成
+- name: Link /opt/bin/rbash -> /bin/bash
+  file:
+    state: link
+    src: /bin/bash
+    dest: /opt/bin/rbash
+    follow: no
+
+# rbashユーザーが全サーバーで実行可能なコマンドをホワイトリスト形式で定義
+# 許可コマンドは、[files/allowed-commands-for-all.txt]に定義すること
+# 書式：リンク元 リンク先
+# backlogチケット:https://bklg.docomo-common.com/backlog/view/GOOID-931
+
+- name: Create symbolic links for Allowed Commands
+  file:
+    state: link
+    src: "{{ item[0] }}"
+    dest: "{{ item[1] }}"
+    follow: no
+  loop: >-
+    {%- set pairs = [] -%}
+    {%- for line in lookup('file', 'files/allowed-commands-for-all.txt').splitlines() -%}
+      {%- set parts = line.split(' ') -%}
+      {%- if parts | length == 2 -%}
+        {%- set _ = pairs.append([parts[0], parts[1]]) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ pairs }}
+  # source fileが存在しなくてもSymbolic Link作成時のエラーを許容し、続行させます。
+  # （DBRDやPCSなどの一部特殊なパッケージがインストールされているサーバ、されていないサーバが存在するため、その差分を吸収）
+  register: link_result
+  failed_when:
+    - link_result.failed
+    - "'src file does not exist' not in link_result.msg"
+
+# rbashユーザーがbastionのみで実行可能なコマンドをホワイトリスト形式で定義
+# 許可コマンドは、[files/allowed-commands-for-bastion.txt]に定義すること
+# 書式：リンク元 リンク先
+# メモ：
+# rbashユーザーは必ずmaxscaleを経由してDBにアクセスさせるため
+# mysqlコマンドの実行はbastionサーバーからのみ可能とし
+# さらにbastionサーバーでアウトバウンド3306ポートを制限しました
+
+- name: Create symbolic links for Allowed Commands
+  file:
+    state: link
+    src: "{{ item[0] }}"
+    dest: "{{ item[1] }}"
+    follow: no
+  loop: >-
+    {%- set pairs = [] -%}
+    {%- for line in lookup('file', 'files/allowed-commands-for-bastion.txt').splitlines() -%}
+      {%- set parts = line.split(' ') -%}
+      {%- if parts | length == 2 -%}
+        {%- set _ = pairs.append([parts[0], parts[1]]) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ pairs }}
+  # source fileが存在しなくてもSymbolic Link作成時のエラーを許容し、続行させます。
+  register: link_result_for_bastion
+  failed_when:
+    - link_result_for_bastion.failed
+    - "'src file does not exist' not in link_result_for_bastion.msg"
+  when: server_role == "bastion"
+
+#rbashユーザー用のsudoerファイルの配布
+
+- name: Add sudoers.d files
+  copy:
+    src:  files/sudoers_g-gooid_rbash
+    dest: /etc/sudoers.d/g-gooid_rbash
+    mode: 0440

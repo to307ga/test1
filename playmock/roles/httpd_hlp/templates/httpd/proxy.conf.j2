@@ -1,0 +1,8 @@
+<Location /log>
+  AuthType Basic
+  AuthName "Kibana BASIC auth, Please enter your ID and PASSWORD. Registration -> contact to yamaguci@nttr.co.jp"
+  AuthUserFile /etc/httpd/conf.d/.kibana.pwd
+  Require valid-user
+  ProxyPass http://localhost:5601
+  ProxyPassReverse http://localhost:5601
+</Location>

@@ -1,0 +1,53 @@
+{
+  "index_patterns": ["fluentd.gooid-web_app_idc_openid_log-*"],
+  "priority": 0,
+  "composed_of": [
+    "index-common-settings"
+  ],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":       { "type": "date" },
+        "server":		        { "type": "keyword" },
+        "logger": 	        { 
+                              "type":   "text",
+                              "fields": {
+                                "raw":  {
+                                  "type": "keyword"
+                                }
+                              }
+                            },
+        "log-time": 	      { 
+                              "type": "date",
+                              "format": "yyyy/MM/dd HH:mm:ss.SSS"
+                            },
+        "thread": 		      { "type": "text" },       
+        "file": 		        { "type": "text" },
+        "method": 		      { "type": "keyword" },
+        "line": 	          { "type": "text" },
+        "level": 		        { "type": "keyword" },
+        "IP":               { "type": "keyword" },
+        "message_code":     { "type": "keyword" },
+        "status_code":      { "type": "keyword" },
+        "loginid": 		      { "type": "keyword" },
+        "site": 		        { "type": "keyword" },
+        "authnid": 		      { "type": "keyword" },
+        "loginflg": 		    { "type": "keyword" },
+        "lastlogindate":		{ 
+                              "type": "date",
+                              "format": "yyyy/MM/dd HH:mm:ss"
+                            },
+        "userid": 		      { "type": "keyword" },
+        "providerid": 		  { "type": "keyword" },
+        "Success": 		      { "type": "keyword" },
+        "identity": 		    { "type": "keyword" },
+        "mode": 		        { "type": "keyword" },
+        "proc": 		        { "type": "keyword" },
+        "gooid": 		        { "type": "keyword" },
+        "provider": 		    { "type": "keyword" },
+        "device": 		      { "type": "keyword" },
+        "msg":              { "type": "text" }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# mdb
+
+db_hostname: idhub-21-dev-mdb-304
+
+# galeraクラスタ設定
+galera_cluster_name: IDHUB_GALERA_DB
+galera_node_name: idhub_dev_db_4
+galera_func: replication

@@ -1,0 +1,31 @@
+server.host:                                    0.0.0.0
+server.shutdownTimeout:                         5s
+# elasticsearch.hosts はElasticsearchで作成したkibana登録用のトークンから取得するのでダミー
+elasticsearch.hosts:                            [ "http://elasticsearch:9200" ]
+monitoring.ui.container.elasticsearch.enabled:  true
+server.ssl.enabled:                             true
+server.ssl.certificate:                         /usr/share/kibana/.certs/{{kibana_crt_name}}.crt
+server.ssl.key:                                 /usr/share/kibana/.certs/private.key
+xpack.security.secureCookies:                   true
+xpack.security.sameSiteCookies:                 None
+# xpack等kibanaから外部アクセス用proxy設定
+xpack.fleet.registryProxyUrl:                   "{{ proxy_env.http_proxy }}"
+
+# 今回はbasePathを変更しない為以下不要
+# server.rewriteBasePath:                         true
+# server.basePath:                                {{server_basePath}}
+
+
+# 匿名ログインの設定
+xpack.security.authc.http.schemes:              ['apikey', 'bearer']
+xpack.security.authc.providers:
+  basic.basic1:
+    order: 0
+  anonymous.anonymous1:
+    order: 1
+    credentials:
+      username: "anonymous_user"
+      password: "anonymous_password"
+
+# ここまでが初期設定 起動後Elasticsearchとの接続設定等が書き込まれていく
+# これ以降はブラウザからのアクセス確認後に行う

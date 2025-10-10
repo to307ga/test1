@@ -1,0 +1,97 @@
+version: '3'
+services:
+    kibana:
+        image: docker.elastic.co/kibana/kibana:{{ kibana_version }}
+        hostname:           "{{ kibana_hostname }}"
+        container_name:     "{{ kibana_hostname }}"
+        environment:
+            SERVER_NAME:    "{{ kibana_hostname }}"
+            http_proxy:     "{{ proxy_env.http_proxy }}"
+            https_proxy:    "{{ proxy_env.http_proxy }}"
+            no_proxy:       "{{ kibana_no_proxy }}"
+            ELASTICSEARCH_REQUESTTIMEOUT: "60000"
+        # 自動起動の有効化
+        restart: always
+        deploy:
+            resources:
+                limits:
+                    cpus:   "{{ kibana_cpu_limit }}"
+                    memory: "{{ kibana_mem_limit }}"
+                reservations:
+                    cpus:   "{{ kibana_cpu_reservation }}"
+                    memory: "{{ kibana_mem_reservation }}"
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "curl -s -k -I https://localhost:5601/ | grep -q 'HTTP/1.1'",
+                    # "curl -s --casert /tath/to/ca.crt -I https://localhost:5601 | grep -q 'HTTP/1.1 302 Found'",
+                ]
+            start_period: "100s"
+            interval: "30s"
+            timeout: "5s"
+            retries: 3
+        volumes:
+            - ./kibana.yml:/usr/share/kibana/config/kibana.yml
+            - /etc/resolv.conf:/etc/resolv.conf
+            - .certs/{{kibana_crt_name}}.crt:/usr/share/kibana/.certs/{{kibana_crt_name}}.crt
+            - .certs/private.key:/usr/share/kibana/.certs/private.key
+            # - kibanadata:/usr/share/kibana/data 
+        networks: 
+            - "elastic"
+        ports:
+            - "5601:5601/tcp"
+        # mem_limit: "{{ kibana_mem_limit }}"
+        extra_hosts:
+            - "{{ elastic_host1 }}"
+            - "{{ elastic_host2 }}"
+            - "{{ elastic_host3 }}"
+    httpd-001:
+        # image:              httpd:2.4.58-bookworm
+        build:
+            context:        build_context/httpd
+            dockerfile:     Dockerfile
+        hostname:           "{{ httpd_hostname }}"
+        container_name:     "{{ httpd_hostname }}"
+        environment:
+            SERVER_NAME:    "{{ httpd_hostname }}"
+            http_proxy:     "{{ proxy_env.http_proxy }}"
+            https_proxy:    "{{ proxy_env.http_proxy }}"
+            no_proxy:       "{{ kibana_no_proxy }}"
+        # 自動起動の有効化
+        restart: always
+        deploy:
+            resources:
+                limits:
+                    cpus:   "1"
+                    memory: "1g"
+                reservations:
+                    cpus:   "1"
+                    memory: "0.5g"
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "curl -s -I http://localhost/ | grep -q 'HTTP/1.1'",
+                ]
+            start_period: "100s"
+            interval: "30s"
+            timeout: "5s"
+            retries: 3
+        volumes:
+            - ./httpd/html:/usr/local/apache2/htdocs
+            - ./httpd/conf/httpd.conf:/usr/local/apache2/conf/httpd.conf
+        networks: 
+            - "elastic"
+        ports:
+            - "80:80/tcp"
+networks:
+    elastic:
+        driver: bridge
+    #host:
+        #driver: host 
+volumes:
+  certs:
+    driver: local
+  kibanadata:
+    driver: local

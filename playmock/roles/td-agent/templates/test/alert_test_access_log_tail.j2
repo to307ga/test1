@@ -1,0 +1,54 @@
+<worker {{td_agent_worker1}}>
+  ##### ここからZabbix監視
+    <source>
+    @type tail
+    # path /db0/tdlogs/merged/idhub-30-dev-web/var.log.httpd/alert_test_access_log.%Y-%m-%d.log
+    path /db0/tdlogs/merged/idhub-21-dev-web/var.log.httpd/alert_test_access_log.%Y-%m-%d.log
+    pos_file /var/log/td-agent/alert_test_access_log_count.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag alert_test_access_log
+    <parse>
+      @type regexp
+      time_format           %d/%b/%Y:%H:%M:%S %z
+      # マージログはホスト名がついたりしているのでパース用のexpressionはそのまま使えないので修正が必要
+      expression            /(?<server>[^ ]*) (?<parsed_log>(?<host>[^\s]*)\s(?<remotelog>[^\s]*)\s(?<user>[^\s]*)\s\[(?<log-time>[^\]]*)\]\s(?<size>[^\s]*)\s"(?<method>\S+)(?: +(?<path>(?:[^\"]|\\.)*?)(?: +\S*)?)?"\s(?<status>[^\s]*)\s(?<size2>[^\s]*)\s"(?<referer>(?:[^\"]|\\.)*)"\s"(?<user-agent>[^"]*)"\s"(?<goo_id>[^"]*)")/
+      keep_time_key true
+    </parse>
+  </source>
+
+  <match alert_test_access_log.**>
+    @type datacounter
+    count_interval 5m 
+    aggregate all
+    count_key status
+    # patternX: X(1-20)
+    pattern1 to_zabbix.error.idhub.web.httpd.alert_test_access_log.5xx ^5\d\d$
+    # pattern3 to_zabbix.alert ^3\d\d$ 
+    # pattern4 4xx ^4\d\d$
+    tag count.httpd.alert_test_access_log.status.*
+  </match>
+
+  <match count.httpd.alert_test_access_log.status.*>
+    @type               forest
+    subtype             copy
+    <template>	
+  {% for val in zabbix_servers %}
+      <store> 
+        @type           zabbix 
+        zabbix_server   {{val.server}}
+        port            {{val.port}}
+  {% if inventory_hostname == 'idhub-30-dev-els-101' %}
+        host            gooid-30-dev-fgw-601.rc1.internal
+  {% endif %}
+        name_keys       to_zabbix.error.idhub.web.httpd.alert_test_access_log.5xx_count
+      </store> 
+  {% endfor %}
+      # デバッグ用
+      <store>
+        @type stdout
+      </store>
+    </template>
+  </match>
+  
+</worker>

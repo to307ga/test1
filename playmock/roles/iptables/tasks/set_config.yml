@@ -1,0 +1,27 @@
+---
+# 本タスクはiptableモジュールを使用する
+# 参考サイト：https://runebook.dev/ja/docs/ansible/collections/ansible/builtin/iptables_module
+
+# maxscaleユーザーのみ3306へのアウトバウンドを許可する
+- name: Allow maxscale user to access port 3306
+  iptables:
+    chain: OUTPUT
+    protocol: tcp
+    destination_port: 3306
+    uid_owner: maxscale
+    jump: ACCEPT
+    state: present
+
+# maxscale以外のユーザーは3306へのアウトバウンドを許可しない
+- name: Reject all other users from accessing port 3306
+  iptables:
+    chain: OUTPUT
+    protocol: tcp
+    destination_port: 3306
+    jump: REJECT
+    state: present
+
+# iptablesを再起動しても設定が変わらないよう保存する
+- name: Save iptables rules
+  command: /usr/bin/sh -c '/usr/sbin/iptables-save > /etc/sysconfig/iptables'
+  become: true

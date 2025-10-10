@@ -1,0 +1,108 @@
+---
+# Using 'mountpoint_jenkins_home' variable from create_volume.yml
+# ユーザー名前空間によるマッピングによりコンテナ内でのjenkins UID,GIDは
+# ホスト上で次のようにマッピングされる。 (subuid, subgid 参照)
+#    UID 1000:100999
+#    GID 1000:100999
+# 参考：1つずれているように見えるのはコンテナの UID 1 がホストの 100000 にマップされるため
+- name: SSH ディレクトリの準備
+  ansible.builtin.file:
+    path: "{{ mountpoint_jenkins_home }}/.ssh"
+    owner: "100999"
+    group: "100999"
+    mode: "0700"
+    state: directory
+  when: mountpoint_jenkins_home is defined
+
+- name: SSH 関連ファイルの配置
+  block:
+    - name: SSH config の配置
+      ansible.builtin.copy:
+        src: "files/ssh/{{ playbook_execution_environment }}/config"
+        dest: "{{ mountpoint_jenkins_home}}/.ssh/config"
+        owner: "100999"
+        group: "100999"
+        mode: "0400"
+    - name: SSH gooscp ユーザーの秘密鍵の配置
+      ansible.builtin.copy:
+        src: "files/ssh/{{ playbook_execution_environment }}/certs/id_rsa_gooscp"
+        dest: "{{ mountpoint_jenkins_home}}/.ssh/id_rsa_gooscp"
+        owner: "100999"
+        group: "100999"
+        mode: "0400"
+    - name: SSH g-gooid_ansible ユーザーの秘密鍵の配置
+      ansible.builtin.copy:
+        src: "files/ssh/{{ playbook_execution_environment }}/certs/id_rsa_g-gooid_ansible"
+        dest: "{{ mountpoint_jenkins_home}}/.ssh/id_rsa_g-gooid_ansible"
+        owner: "100999"
+        group: "100999"
+        mode: "0400"
+  when: mountpoint_jenkins_home is defined
+
+- name: Jenkins ユーザーが使用するディレクトリの作成
+  block:
+    - name: Share ディレクトリの作成
+      ansible.builtin.file:
+        path: "{{ mountpoint_jenkins_home }}/.local/share/containers"
+        owner: "100999"
+        group: "100999"
+        mode: "0755"
+        state: directory
+    - name: Config ディレクトリの作成
+      ansible.builtin.file:
+        path: "{{ mountpoint_jenkins_home }}/.config/containers"
+        owner: "100999"
+        group: "100999"
+        mode: "0755"
+        state: directory
+  when: mountpoint_jenkins_home is defined
+
+- name: gbs-spring で使用するスクリプトの配置
+  block:
+    - name: fabric ディレクトリの作成
+      ansible.builtin.file:
+        path: "{{ mountpoint_jenkins_home }}/fabric"
+        owner: "100999"
+        group: "100999"
+        mode: "0755"
+        state: directory
+    - name: gbs-spring リリース用スクリプトの配置
+      ansible.builtin.copy:
+        src: "files/fabric/fabfile-webapps-release.py"
+        dest: "{{ mountpoint_jenkins_home}}/fabric/fabfile-webapps-release.py"
+        owner: "100999"
+        group: "100999"
+        mode: "0755"
+    - name: gbs-spring チェンジ用スクリプトの配置
+      ansible.builtin.copy:
+        src: "files/fabric/fabfile-webapps-change.py"
+        dest: "{{ mountpoint_jenkins_home}}/fabric/fabfile-webapps-change.py"
+        owner: "100999"
+        group: "100999"
+        mode: "0755"
+    - name: gbs-spring ストップ用スクリプトの配置
+      ansible.builtin.copy:
+        src: "files/fabric/fabfile-webapps-stop.py"
+        dest: "{{ mountpoint_jenkins_home}}/fabric/fabfile-webapps-stop.py"
+        owner: "100999"
+        group: "100999"
+        mode: "0755"
+  when: mountpoint_jenkins_home is defined
+
+- name: Ansible 設定ファイルを配置
+  ansible.builtin.copy:
+    src: "files/ansible.cfg"
+    dest: "{{ mountpoint_jenkins_home}}/ansible.cfg"
+    owner: "100999"
+    group: "100999"
+    mode: "0644"
+  when: mountpoint_jenkins_home is defined
+
+- name: Ansible で使用する vault-password の配置
+  ansible.builtin.copy:
+    src: "files/vault-password"
+    dest: "{{ mountpoint_jenkins_home}}/.vault-password"
+    owner: "100999"
+    group: "100999"
+    mode: "0600"
+  when: mountpoint_jenkins_home is defined

@@ -1,0 +1,37 @@
+{
+  "index_patterns": ["fluentd.idhub-web_httpd_idhub_access_log-*"],
+  "priority": 0,
+  "composed_of": [
+    "index-common-settings"
+  ],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "goo_id":		    { 
+          "type":   "text",
+          "fields": {
+            "raw":  {
+              "type": "keyword"
+            }
+          }
+        },
+        "host": 		    { "type": "ip" },
+        "log-time": 	  { 
+          "type": "date",
+          "format": "dd/MMM/yyyy:HH:mm:ss Z"
+        },
+        "method": 		  { "type": "Keyword" },
+        "path": 		    { "type": "text" },
+        "referer": 		  { "type": "text" },
+        "remotelog": 	  { "type": "text" },
+        "server": 		  { "type": "keyword" },
+        "size": 		    { "type": "text" },
+        "size2": 		    { "type": "text" },
+        "status": 		  { "type": "Keyword" },
+        "user": 		    { "type": "keyword" },
+        "user-agent":	  { "type": "Keyword" }
+      }
+    }
+  }
+}

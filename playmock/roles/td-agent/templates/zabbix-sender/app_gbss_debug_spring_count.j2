@@ -1,0 +1,82 @@
+<worker {{td_agent_worker3}}>
+  <source>
+    @type tail
+    path /db0/tdlogs/merged/gooid-{{ project_id_number_env }}-web/var.log.app.gbss/debug-spring-blue.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{project_id_number_env}}-web/var.log.app.gbss/debug-spring-green.%Y-%m-%d.log
+    pos_file /var/log/td-agent/app_gbss_debug_spring_count.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag gooid-web_app_gbss_debug_spring_log
+    <parse>
+      @type regexp
+      time_format %Y/%m/%d %H:%M:%S.%L
+      # expression /(?<server>[^ ]*) (?<parsed_log>(?<log-time>[0-9]{4}/[0-9]{1,2}/[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}.[0-9]{3})\tpriority:(?<priority>[^\\t]*)\tsourceip:(?<sourceip>[^\\t]*)\tsessionid:(?<sessionid>[^\\t]*)\tuserid:(?<userid>[^\\t]*)\tmessage:(?<message>.+))/
+      # expression /(?<server>[^ ]*) (?<parsed_log>(?<log-time>[0-9]{4}/[0-9]{1,2}/[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}.[0-9]{3}).*priority:(?<priority>[^ ]*).*sourceip:(?<sourceip>[^ ]*).*sessionid:(?<sessionid>[^ ]*).*userid:(?<userid>[^ ]*).*message:(?<message>.+))/
+      # expression /(?<server>[^ ]*)\S(?<parsed_log>.date:(?<log-time>[0-9]{4}/[0-9]{1,2}/[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}.[0-9]{3}).*priority:(?<priority>[^ ]*).*sourceip:(?<sourceip>[^ ]*).*sessionid:(?<sessionid>[^ ]*).*userid:(?<userid>[^ ]*).*message:(?<message>.+))/
+      # parsed_log を削除
+      expression /(?<server>[^ ]*)\S.date:(?<log-time>[0-9]{4}/[0-9]{1,2}/[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}.[0-9]{3}).*priority:(?<priority>[^ ]*).*sourceip:(?<sourceip>[^ ]*).*sessionid:(?<sessionid>[^ ]*).*userid:(?<userid>[^ ]*).*message:(?<message>.+)/
+      # keep_time_key true
+    </parse>
+  </source>
+  
+  <match gooid-web_app_gbss_debug_spring_log.**>
+    @type                   copy
+    <store>
+      # @type               file
+      @type         datacounter         
+      count_interval 5m 
+      aggregate all
+      count_key priority
+      # patternX: X(1-20)
+      pattern1 to_zabbix.error.gooid.web.gbss.debug_spring ^FATAL|^ERROR
+      tag count.gooid-web_app_gbss_debug_spring_log.priority.*
+    </store>
+    <store>
+      # @type               elasticsearch_dynamic
+      @type 	              elasticsearch
+      scheme	              https
+      ssl_version           {{ elasticsearch.ssl_version }}
+      # Copy from /etc/elasticsearch/certs/http_ca.crt on the els server
+      ca_file               {{ elasticsearch.ca_file }}
+      # host 	                {{ elasticsearch.hostname }}
+      # hosts https://customhost.com:443/path,https://username:password@host-failover.com:443
+      # port 9200
+      hosts                 {{ elasticsearch.hosts }}
+      user                  {{ elasticsearch.user }}
+      password              {{ elasticsearch.pwd }}
+      # Does not work with elasticsearch_dynamic
+      # index_name            fluentd.${tag}-%Y%m%d
+      logstash_format       true
+      include_timestamp     true
+      logstash_prefix       fluentd.${tag}
+      logstash_dateformat   %Y%m%d
+      time_key_format %Y-%m-%dT%H:%M:%S.%N%z
+      # include_tag_key       true
+      pipeline              sourceip-geoip
+      with_transporter_log  true
+      @log_level             {{ plugin_log_level.elasticsearch }}
+      # utc_index             false
+      # time_key created_at
+      # time_key_format %a %b %d %H:%M:%S %z %Y
+      <buffer tag,time>
+        timekey         1d
+        # flush_interval  1m
+      </buffer>
+      flush_interval  1m
+    </store>  	
+  </match>
+
+  <match count.gooid-web_app_gbss_debug_spring_log.priority.*>
+    @type               file
+    append              true
+    # The filename of the path should be the same as the filename of this file.
+    path /db0/tdlogs/zabbix-sender-count/app_gbss_degub_spring_count
+    time_slice_format   %Y-%m-%d
+    <buffer time>
+      @type memory
+      timekey             1d
+      timekey_wait        0s
+      flush_mode          immediate
+      flush_at_shutdown   true
+    </buffer>
+  </match>
+</worker>

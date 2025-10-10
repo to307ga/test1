@@ -1,0 +1,9 @@
+---
+- import_tasks: install.yml
+- import_tasks: settings.yml
+- import_tasks: distribute_roles_conf.yml
+- import_tasks: crontab.yml
+- import_tasks: monitoring_settings.yml
+
+# elasticsearch 接続に使用する証明書（elasticsearch側で更新した際にのみ実施）
+- import_tasks: update_https_cert.yml

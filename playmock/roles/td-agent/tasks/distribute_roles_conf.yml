@@ -1,0 +1,37 @@
+---
+
+- name: debug ansible_hostname
+  debug:
+    msg: "{{ansible_hostname}}"
+
+- name: create directories for each role
+  file:
+    path:   /etc/td-agent/config.d/{{item.file_dir}}
+    state:  directory
+    owner:  root
+    group:  root
+    mode:   0755
+  loop: "{{td_agent_config_files}}"
+
+- name: distribute td-agent config
+  template:
+    src:        templates/td-agent.j2
+    dest:       /etc/td-agent/td-agent.conf
+    owner:      root
+    group:      root
+    mode:       0644
+  notify: Restart td-agent
+
+
+- name: distribute roles config
+  template:
+    src:        templates/{{item.0.file_dir}}/{{item.1}}.j2
+    dest:       /etc/td-agent/config.d/{{item.0.file_dir}}/{{item.1}}.conf
+    owner:      root
+    group:      root
+    mode:       0644
+  with_subelements:
+    - "{{td_agent_config_files}}"
+    - file_name
+  notify: Restart td-agent
+

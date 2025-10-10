@@ -1,0 +1,5 @@
+---
+- name: Install php-mcrypt
+  yum:
+    name: php-mcrypt
+    state: latest

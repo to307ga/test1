@@ -1,0 +1,18 @@
+#<Location /gbs_proto>
+#    RequestHeader set X-Forwarded-Proto 'https'
+#    ProxyPreserveHost On
+#    ProxyPass http://localhost:{{ gbs_spring_port }}/gbs
+#    ProxyPassReverse https://srvc.goo.ne.jp/gbs_proto
+#</Location>
+
+<Location /gbs>
+    RequestHeader set X-Forwarded-Proto 'https'
+    ProxyPreserveHost On
+    ProxyPass http://localhost:{{ gbs_spring_port }}/gbs
+    ProxyPassReverse http://localhost:{{ gbs_spring_port }}/gbs
+</Location>
+
+<Location /gbs-healthcheck/healthcheck>
+    ProxyPass http://localhost:{{ gbs_spring_port }}/gbs/healthCheck
+    ProxyPassReverse http://localhost:{{ gbs_spring_port }}/gbs/healthCheck
+</Location>

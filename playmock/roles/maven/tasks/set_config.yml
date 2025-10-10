@@ -1,0 +1,8 @@
+---
+#/optの展開ファイルへのリンク作成
+- name: Link /usr/local/bin/mvn -> /usr/bin/mvn
+  file:
+    state: link
+    src: /usr/bin/mvn
+    dest: /usr/local/bin/mvn
+  when: not ansible_check_mode

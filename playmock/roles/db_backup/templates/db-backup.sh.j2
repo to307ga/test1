@@ -1,0 +1,185 @@
+#!/bin/sh
+#####################################
+# DBバックアップスクリプト
+# mysqldumpを用いてバックアップを取得する。
+# ※2025/03/03 データディレクトリのバックアップを取得していたが、復旧の際はmysqldumpデータを利用するため不要と判断。廃止する。
+#   処理の流れは以下の通り
+#     1. MySQLのレプリケーションを停止する。
+#     2. mysqldumpを実行する。
+#     3. レプリケーションを再開する。
+#####################################
+
+HOSTNAME_SHORT="$(hostname -s)"
+
+BACKUP_DIR="/db0/backup"
+
+MYSQL_USER="{{ mysql_maintainer_name }}"
+MYSQL_PASSWORD="{{ mysql_maintainer_password }}"
+
+DUMP_FILE_PREFIX="${HOSTNAME_SHORT}.dump.sql"
+
+REPLICATION_FILE_PREFIX="${HOSTNAME_SHORT}.replication_status"
+
+MYNAME=$(basename "$0" .sh)
+LOG_FILE_PREFIX="/var/log/$MYNAME/$MYNAME.log"
+
+DUMP_FILE="*.dump.sql.*"
+REPLICATION_STATUS="*.replication_status.*"
+
+# 3日分のバックアップを保持する。HDD容量次第で、下記、調整。
+DAYS=3
+
+mkdir -p "$(dirname "$LOG_FILE_PREFIX")"
+
+# 本Shell script内では /etc/my.cnf.d/*.cnf 内に定義された、
+# 各種 mysql CLIユーティリティーのデフォルト設定値を無効にします。
+# 本Shell scriptでは、TCPソケットファイル接続を意図としていますが、
+#デフォルト値がそれを勝ってしまうため。
+#
+# シェルスクリプト内でaliasを設定する - Qiita
+# https://qiita.com/narumi_/items/77002a12d62585da1fbe
+shopt -s expand_aliases
+alias mysql='mysql --no-defaults'
+alias mysqladmin='mysqladmin --no-defaults'
+alias mysqldump='mysqldump --no-defaults'
+
+write_log()
+{
+    log_file=${LOG_FILE_PREFIX}-$(date +'%Y%m%d')
+    NOW=$(date +'%Y-%m-%d %H:%M:%S')
+    ## 行頭にTimestampなどのログ項目を挿入
+    echo "$1" | sed "s|^|${NOW}\t[$$]\t[${HOSTNAME_SHORT}]\t|g" >> "$log_file"
+}
+
+is_running_mysql()
+{
+    mysqladmin ping > /dev/null 2>&1
+    return $?
+}
+
+stop_replication()
+{
+    write_log "[INFO] レプリケーション停止。"
+
+    # IO_THREADの停止
+    mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "STOP SLAVE IO_THREAD;"
+
+    # Slave が Master に追いつこうとしている場合も考慮し、Sleep
+    sleep 10
+
+    # SQL_THREADの停止
+    mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "STOP SLAVE SQL_THREAD;"
+
+    # ログ位置取得
+    REPLICATION_STATUS_FILE=${BACKUP_DIR}/${REPLICATION_FILE_PREFIX}.$(date +'%Y%m%d')
+    mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "SHOW SLAVE STATUS \G" > "$REPLICATION_STATUS_FILE"
+}
+
+start_replication()
+{
+    write_log "[INFO] レプリケーション再開。"
+    mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "START SLAVE;"
+}
+
+confirm_replication()
+{
+    ## すぐに Slave_IO_Runnning を検証しようとすると、最初は 'Preparing' のステータスなので、しばらくSleep
+    sleep 10
+    RESULT=$(mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "SHOW SLAVE STATUS \G")
+    write_log "[INFO] SLAVE STATUS"
+    write_log "$RESULT"
+
+    ## SHOW SLAVE STATUS の出力が1行もなければ、Slaveではない（Master）とみなし復帰
+    LINES=$(echo "$RESULT" | wc -l)
+    if [ "$LINES" -le 0 ]; then
+        return 0
+    fi
+
+    ## Slave_IO_RunningがYesじゃなかったら2を返却
+    echo "$RESULT" | grep -P "\bSlave_IO_Running\s*:\s*Yes\b" > /dev/null || return 2
+
+    ## Slave_SQL_Running の結果。（上記 Slave＿IO_Running も0=正常ならば、ここも合わせて全て 0=正常、となる）
+    echo "$RESULT" | grep -P "\bSlave_SQL_Running\s*:\s*Yes\b" > /dev/null
+}
+
+exec_mysqldump()
+{
+    # mysqldump実行
+    DUMP_FILE_NAME=${BACKUP_DIR}/${DUMP_FILE_PREFIX}.$(date +'%Y%m%d')
+    write_log "[INFO] mysqldump取得開始。 $DUMP_FILE_NAME.gz"
+    mysqldump -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" --triggers --routines --events --lock-all-tables --all-databases | gzip -9 -c > "$DUMP_FILE_NAME".gz
+    # PIPESTATUS[0]=mysqldumpの終了ステータス
+    # PIPESTATUS[1]=gzipの終了ステータス
+    # いずれかの実行が失敗した場合ERROR判定とする
+    # 参考文献　https://www.bioerrorlog.work/entry/handle-pipe-exit-status
+    if [ ${PIPESTATUS[0]} -ne 0 -o ${PIPESTATUS[1]} -ne 0 ];
+    then
+        return 1
+    fi
+
+    # ファイル生成確認
+    [ -s "${DUMP_FILE_NAME}.gz" ]
+    return $?
+}
+
+is_slave()
+{
+    # スレーブ機かどうかを判断
+    SLAVE_STATUS=$(mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "SHOW SLAVE STATUS\G" 2>/dev/null)
+    if [[ -z $SLAVE_STATUS ]]; then
+       return 1
+    else
+       return 0
+    fi
+}
+
+rm_db_backup()
+{
+    for delete_file in "$DUMP_FILE" "$REPLICATION_STATUS"; do
+        find $BACKUP_DIR -type f -name "$delete_file" -ctime +${DAYS} -delete
+    done
+}
+
+####### メイン処理開始 #######
+
+# 古いバックアップデータを削除
+rm_db_backup
+
+# 処理時間計測
+STARTED=$(date +'%s')
+
+write_log "[INFO] DB バックアップ開始。 '$0 $HOSTNAME_SHORT'"
+
+if ! is_running_mysql; then
+    write_log "[ERROR] MySQLが起動していません。"
+    exit 1
+fi
+
+if is_slave = 0; then
+    stop_replication
+else
+    write_log "[INFO] マスター機であるためレプリケーション停止はスキップします"
+fi
+
+if ! exec_mysqldump ; then
+    write_log "[ERROR] mysqldumpの実行に失敗。"
+    exit 1
+fi
+
+if is_slave = 0; then
+    start_replication
+else
+    write_log "[INFO] マスター機であるためレプリケーション開始はスキップします"
+fi
+
+if is_slave = 0; then
+    if ! confirm_replication; then
+        write_log "[ERROR] レプリケーション開始失敗。"
+        exit 1
+    fi
+else
+    write_log "[INFO] マスター機であるためレプリケーション検証はスキップします"
+fi
+
+ENDED=$(date +'%s')
+write_log "[INFO] DBバックアップスクリプト正常終了。実行時間：$((ENDED - STARTED))秒。"

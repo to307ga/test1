@@ -1,0 +1,15 @@
+#!/bin/bash
+
+HOSTNAME=$(hostname)
+JAVA_OPTS=""
+LOGFILEPATH=/var/log/app/idhub-oidc
+
+if [ ! -d "$LOGFILEPATH" ]; then
+    sudo mkdir $LOGFILEPATH
+    sudo chown -R gooscp:gooscp $LOGFILEPATH
+fi
+
+/usr/java/default/bin/java -jar $JAVA_OPTS $SPRING_OIDC_APP_PATH
+
+
+

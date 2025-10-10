@@ -1,0 +1,20 @@
+{
+  "index_patterns": ["fluentd.idhub-web_proxysql_log-*"],
+  "priority": 0,
+  "composed_of": [
+    "index-common-settings"
+  ],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "host":		      { "type": "keyword" },
+        "log-time": 	  { 
+          "type": "date",
+          "format": "yyyy-MM-dd HH:mm:ss"
+        },   
+        "msg":          { "type": "text" }
+      }
+    }
+  }
+}

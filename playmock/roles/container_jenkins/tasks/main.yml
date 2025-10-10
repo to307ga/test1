@@ -1,0 +1,24 @@
+---
+- name: Jenkins コンテナイメージのビルド環境設定
+  ansible.builtin.include_tasks:
+    file: image_settings.yml
+
+- name: Jenkins コンテナイメージのビルド
+  ansible.builtin.include_tasks:
+    file: image_build.yml
+
+- name: Jenkins ボリュームの作成
+  ansible.builtin.include_tasks:
+    file: create_volume.yml
+
+- name: Jenkins ボリュームに対する設定
+  ansible.builtin.include_tasks:
+    file: volume_settings.yml
+
+- name: Jenkins サービスの設定
+  ansible.builtin.include_tasks:
+    file: service_settings.yml
+
+- name: Jenkins バックアップの設定
+  ansible.builtin.include_tasks:
+    file: backup_settings.yml

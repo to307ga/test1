@@ -1,0 +1,27 @@
+---
+- name: Ensure curl is installed
+  ansible.builtin.dnf:
+    name: curl
+    state: present
+
+- name: Download docker-compose binary
+  ansible.builtin.get_url:
+    url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}"
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+
+- name: Verify docker-compose installation
+  ansible.builtin.command: /usr/local/bin/docker-compose --version
+  register: result
+  changed_when: false
+
+- name: Check docker-compose version
+  ansible.builtin.assert:
+    that:
+      - "'{{ docker_compose_version }}' in result.stdout"
+    fail_msg: "Expected docker-compose version {{ docker_compose_version }} but got {{ result.stdout }}"
+    success_msg: "docker-compose version {{ docker_compose_version }} installed successfully"
+
+- name: Display docker-compose version
+  ansible.builtin.debug:
+    msg: "{{ result.stdout }}"

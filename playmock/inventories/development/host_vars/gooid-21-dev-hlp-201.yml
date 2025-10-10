@@ -1,0 +1,10 @@
+# hlp
+hlp_httpd_fqdn: gooid.wbo201.goo.ne.jp
+hlp_httpd_port: 80
+proxy_pass: gooid-21-dev-hlp-201:8081
+hlp_proxysql:
+  nodes:
+    - gooid-21-dev-mdb-201
+mysql_writer_host: 127.0.0.1:6034
+mysql_reader_host: 127.0.0.1:6033
+gbs_mule_host: gooid-21-dev-web-201:50080

@@ -1,0 +1,9 @@
+PATH=$PATH:/usr/local/bin:/bin:/usr/bin
+
+# 00 12 15-21 * 1 の様に日と曜日を同時指定してしまうとAND条件ではなくOR条件となってしまうため注意
+# Galera Cluster はシャットダウン・起動の順番を都度制御する必要があるので開発環境も自動再起動はおこなわない方が良いかも
+# rpmのダウンロードを行う前にキャッシュされたrpmを削除する
+00 06 8-14 * * root [ $(date "+\%w") -eq 2 ] && /usr/bin/dnf clean metadata; >> /var/tmp/dnf-clean-metadata-$(date '+\%Y\%m\%d').log 2>&1
+20 06 8-14 * * root [ $(date "+\%w") -eq 2 ] && /usr/bin/dnf clean packages; >> /var/tmp/dnf-clean-packages-$(date '+\%Y\%m\%d').log 2>&1
+00 12 8-14 * * root [ $(date "+\%w") -eq 2 ] && /usr/local/bin/dnf-auto-shutdown.sh; >> /var/tmp/dnf-auto-shutdown-$(date '+\%Y\%m\%d').log 2>&1
+

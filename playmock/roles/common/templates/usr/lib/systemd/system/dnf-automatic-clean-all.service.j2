@@ -1,0 +1,10 @@
+[Unit]
+Description=dnf clean all service
+
+[Service]
+#User=root (デフォルトのままなので省略)
+Type=oneshot
+ExecStart=/usr/local/bin/dnf-auto-rpm-clean-all.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+---
+- hosts: idhub_batch
+  become: yes
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: common, tags: common }
+    - { role: perl, tags: perl }
+    - { role: batch, tags: batch }
+    - { role: proxysql, tags: proxysql }
+    - { role: jdk, tags: jdk }
+    - { role: ha_resources, tags: ha_resources }
+    - { role: mariadb_client, tags: mariadb_client }
+    - { role: gcs, tags: gcs }
+    - { role: ssh, tags: ssh }
+    - { role: rbash, tags: rbash }
+    - { role: extend-acl, tags: extend-acl}

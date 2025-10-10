@@ -1,0 +1,50 @@
+<worker {{td_agent_worker3}}>
+  <source>
+    @type tail   
+    path /db0/tdlogs/merged/idhub-{{ project_id_number_env }}-web/var.log.app.idhub/alert_test_user.%Y-%m-%d.log
+    pos_file /var/log/td-agent/alert_test_user_count.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag alert_test_user_log
+    <parse>
+      @type regexp
+      time_format %Y/%m/%d %H:%M:%S.%L
+      # マージログはホスト名がついたりしているのでパース用のexpressionはそのまま使えないので修正が必要 (?<server>[^ ]*)  を先頭に付ければOK
+      expression /(?<server>[^ ]*) (?<logger>[A-Za-z_-]{2,30}),(?<log-time>\d{4}/\d{1,2}/\d{1,2} \d{1,2}:\d{1,2}:\d{1,2}.\d{3}),(?<thread>\[.*.\]),(?<file>.*.java):(?<method>[a-zA-Z0-9_]{1,300}):(?<line>[0-9]{1,10000}),(?<level>[A-Z]{1,20}),(?<msg>.+)/
+      keep_time_key true
+    </parse>
+  </source>
+
+  <match alert_test_user_log.**>
+    @type         datacounter         
+    count_interval 5m 
+    aggregate all
+    count_key msg
+    # patternX: X(1-20)
+    pattern1 to_zabbix.error.idhub.web.idhub.alert_test_user.dconnect .*IDCAUE0000[2-5],.\[\[E\]\].*
+    pattern2 to_zabbix.error.idhub.web.idhub.alert_test_user .*\[\[E\]\].*
+    tag count.alert_test_user_log.msg.*
+  </match>  
+
+  <match count.alert_test_user_log.msg.*>
+    @type               forest
+    subtype             copy
+    <template>
+  {% for val in zabbix_servers %}
+      <store> 
+        @type           zabbix 
+        zabbix_server   {{val.server}}
+        port            {{val.port}}
+  {% if inventory_hostname == 'idhub-30-dev-els-101' %}
+        host            gooid-30-dev-fgw-601.rc1.internal
+  {% endif %}
+        name_keys       to_zabbix.error.idhub.web.idhub.alert_test_user.dconnect_count,to_zabbix.error.idhub.web.idhub.alert_test_user_count
+      </store> 
+  {% endfor %}
+      # デバッグ用
+      <store>
+        @type stdout
+      </store>
+    </template>
+  </match>
+</worker>

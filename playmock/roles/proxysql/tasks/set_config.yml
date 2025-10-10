@@ -1,0 +1,11 @@
+---
+- name: Copy proxysql.cnf
+  template:
+    src: templates/{{ server_role }}/proxysql.cnf.j2
+    dest: /etc/proxysql.cnf
+    backup: yes 
+    owner: root
+    group: proxysql
+    mode: 0640
+  notify: proxysqlcnf changed
+

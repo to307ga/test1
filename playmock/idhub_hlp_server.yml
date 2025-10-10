@@ -1,0 +1,42 @@
+---
+- hosts: idhub_hlp
+  become: yes
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: common, tags: common }
+    - { role: perl, tags: perl }
+    - { role: mod_ssl, tags: mod_ssl }
+    - { role: proxysql, tags: proxysql }
+    - { role: jdk, tags: jdk }
+    - { role: mariadb_client, tags: mariadb_client }
+    - { role: httpd_hlp, tags: httpd_hlp }
+    - { role: tomcat_hlp, tags: tomcat_hlp }
+    - { role: rbash, tags: rbash }
+    - { role: extend-acl, tags: extend-acl}
+
+# tomcatの設定を修正する前にtomcatを停止。起動中に設定ファイルを配布するとtomcatがエラーを発生して停止する可能性がある。
+  pre_tasks:
+    - name: tomcatの停止
+      block:
+        - systemd:
+            name: tomcat
+            state: stopped
+      rescue:
+        - debug:
+            msg: "tomcatの停止に失敗しました。tomcat停止処理をスキップします。"
+      tags:
+        - tomcat_hlp
+
+  post_tasks:
+    - name: tomcat起動コマンドの表示
+      debug:
+        msg: "{{ commands }}"
+      tags:
+        - tomcat_hlp
+
+  vars:
+    commands:
+      - "  注意：tomcatは停止しています。手動で起動してください。 "
+      - "  sudo systemctl restart tomcat  "
+      - "  sudo systemctl status tomcat   "
+

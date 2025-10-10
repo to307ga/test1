@@ -1,0 +1,11 @@
+production:
+  email_delivery:
+    delivery_method: :smtp
+    smtp_settings:
+      # addressについて： https://ticket.pf.goo.ne.jp/redmine/projects/r-wiki/wiki/SMTP%E3%83%AA%E3%83%AC%E3%83%BC
+      address: 172.17.255.238
+      port: 25
+      domain: {{ inventory_hostname_short }}
+      authentication: :login
+      user_name:
+      password:

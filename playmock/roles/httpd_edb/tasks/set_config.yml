@@ -1,0 +1,41 @@
+---
+# フォルダの権限変更
+- name: ログフォルダの権限変更
+  file:
+    state: directory
+    path: /var/log/httpd
+    owner: root
+    group: root
+    mode: 0755
+
+# httpd.confの配布
+- name: Copy httpd.conf
+  template:
+    src: templates/httpd/httpd.conf.j2
+    dest: /etc/httpd/conf/httpd.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+      - httpd_edb_restart_msg
+
+- name: Copy http.conf
+  template:
+    src: templates/httpd/http.conf.j2
+    dest: /etc/httpd/conf.d/http.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+      - httpd_edb_restart_msg
+
+- name: Copy 00-mpm.conf
+  template:
+    src: templates/httpd/00-mpm.conf.j2
+    dest: /etc/httpd/conf.modules.d/00-mpm.conf
+    backup: yes
+    owner: root
+    group: root
+    mode: 0644

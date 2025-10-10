@@ -1,0 +1,19 @@
+---
+
+- name: Update CA
+  copy:
+    src: "{{ es_local_certs_dir }}/{{ es_ca_filename }}"
+    dest: "{{ es_certs_dir }}/{{ es_ca_filename }}"
+    owner: "{{ es_user }}"
+    group: "{{ es_group }}"
+    mode: 0644
+  notify: Restart elasticsearch
+
+- name: Update cert
+  copy:
+    src: "{{ es_local_certs_dir }}/{{ es_cert_filename }}"
+    dest: "{{ es_certs_dir }}/{{ es_cert_filename }}"
+    owner: "{{ es_user }}"
+    group: "{{ es_group }}"
+    mode: 0640
+  notify: Restart elasticsearch

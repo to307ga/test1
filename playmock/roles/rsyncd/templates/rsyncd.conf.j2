@@ -1,0 +1,39 @@
+# /etc/rsyncd: configuration file for rsync daemon mode
+
+# See rsyncd.conf man page for more options.
+
+# configuration example:
+
+# uid = nobody
+# gid = nobody
+# use chroot = yes
+# max connections = 4
+# pid file = /var/run/rsyncd.pid
+# exclude = lost+found/
+# transfer logging = yes
+# timeout = 900
+# ignore nonreadable = yes
+# dont compress   = *.gz *.tgz *.zip *.z *.Z *.rpm *.deb *.bz2
+
+# [ftp]
+#        path = /home/ftp
+#        comment = ftp export area
+
+#---------------
+# Global options
+#---------------
+log file      = /var/log/rsync.log
+pid file      = /var/run/rsyncd.pid
+lock file     = /var/run/rsync.lock
+uid           = root
+gid           = root
+use chroot    = true
+read only     = false
+dont compress = *.gz *.tgz *.zip *.pdf *.sit *.sitx *.lzh *.bz2 *.jpg *.gif *.png
+
+#---------------
+# Module options
+#---------------
+[db0]
+path          = /db0
+hosts allow   = {{ rsync_allowed_hosts }}

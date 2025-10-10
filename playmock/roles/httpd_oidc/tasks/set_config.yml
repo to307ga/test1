@@ -1,0 +1,64 @@
+---
+#   #ログフォルダの権限変更
+- name: ログフォルダの権限変更
+  file:
+    state: directory
+    path: /var/log/httpd
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Copy conf/httpd.conf
+  template:
+    src: templates/httpd/conf/httpd.conf.j2
+    dest: /etc/httpd/conf/httpd.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+      - httpd_oidc_restart_msg
+
+- name: Copy conf.d/auth.goo.ne.jp.conf
+  # roles/katemusha/templates に値を設定します。
+  vars:
+    kagemusha_port: "80"
+  template:
+    src: templates/httpd/conf.d/auth.goo.ne.jp.conf.j2
+    dest: /etc/httpd/conf.d/auth.goo.ne.jp.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+      - httpd_oidc_restart_msg
+
+- name: Copy conf.d/gooaes.conf
+  template:
+    src: templates/httpd/conf.d/gooaes.conf.j2
+    dest: /etc/httpd/conf.d/gooaes.conf
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+      - httpd_oidc_restart_msg
+
+- name: Copy 00-mpm.conf
+  template:
+    src: templates/httpd/00-mpm.conf.j2
+    dest: /etc/httpd/conf.modules.d/00-mpm.conf
+    backup: yes
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy httpd.service
+  template:
+    src: templates/httpd/httpd.service.j2
+    dest: /etc/systemd/system/httpd.service
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  when: release_env == "dev"

@@ -1,0 +1,4 @@
+# 実行コマンド制限ユーザ（＝rbashユーザ）が、root権限で実行できるコマンドをここに列挙します。
+# ファイルの中身を閲覧できるようなコマンド（例： "cat"）をここに列挙してはなりません。
+# 個人情報を含むファイルをroot権限で閲覧できるようになってしまうためです。
+%g-gooid_rbash  ALL=(ALL) NOPASSWD: /opt/bin/rbash_user/systemctl,/opt/bin/rbash_user/mv,/opt/bin/rbash_user/du,/opt/bin/rbash_user/df,/opt/bin/rbash_user/ionice,/opt/bin/rbash_user/iostat,/opt/bin/rbash_user/nice,/opt/bin/rbash_user/netstat,/opt/bin/rbash_user/touch,/opt/bin/rbash_user/drbdadm,/opt/bin/rbash_user/drbdmeta,/opt/bin/rbash_user/drbdmon,/opt/bin/rbash_user/drbdsetup,/opt/bin/rbash_user/pcs

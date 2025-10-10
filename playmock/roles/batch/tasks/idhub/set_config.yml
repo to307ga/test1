@@ -1,0 +1,22 @@
+---
+# /var/log, /usr/local
+- name: idhub batch に必要な /usr/local,/var/log 配下のディレクトリを作成します。
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: gooscp
+    group: gooscp
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /var/log/app, mode: '0755'}
+    - { path: /var/log/app/idhub, mode: '0755'}
+    - { path: /usr/local/app, mode: '0755'}
+    - { path: /usr/local/app/idhub, mode: '0755'}
+
+- name: Link /home/batch_file -> /db0/app/goo/batch_file
+  file:
+    state: link
+    src: /db0/app/goo/batch_file
+    dest: /home/batch_file
+    force: yes
+  when: not ansible_check_mode

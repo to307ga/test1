@@ -1,0 +1,42 @@
+<worker {{td_agent_worker3}}>
+  <source>
+    @type tail
+    path /db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/make_common_reject_list.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/oshiete_member.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/update_ip2country.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/DeleteAuthenticationSession.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/make_active_gooid_list.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/make_denied_privacy_list.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/make_hospitality_list.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/DeleteRegisterSession.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/DeleteReSettingPasswordInfo.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/DeleteAuthTelephoneHistory.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/ExportLoginHistory.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/DeleteAccessRiskHistory.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/ServiceReport.%Y-%m-%d.log,/db0/tdlogs/merged/gooid-{{ project_id_number_env }}-batch/var.log.app.idc/CheckShopifyCustomerRegistrationStatus.%Y-%m-%d.log
+    pos_file /var/log/td-agent/gooid-batch_idc_counts.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag gooid-batch_idc_counts
+    <parse>
+      @type regexp
+      time_format %Y/%m/%d %H:%M:%S,%L
+      # マージログはホスト名がついたりしているのでパース用のexpressionはそのまま使えないので修正が必要 (?<server>[^ ]*)  を先頭に付ければOK
+      expression /(?<server>[^ ]*) (?<message>.+)/
+      # keep_time_key true
+    </parse>
+  </source>
+
+  <match gooid-batch_idc_counts>
+    @type         datacounter         
+    count_interval 5m 
+    aggregate all
+    count_key message
+    # patternX: X(1-20)
+    pattern1 to_zabbix.error.gooid.batch.idc .*\[\[E\]\].*
+    tag count.gooid-batch_idc.message
+  </match>  
+
+  <match count.gooid-batch_idc.message>
+    @type               file
+    append              true
+    # The filename of the path should be the same as the filename of this file.
+    path /db0/tdlogs/zabbix-sender-count/idc_counts
+    time_slice_format   %Y-%m-%d
+    <buffer time>
+      @type memory
+      timekey             1d
+      timekey_wait        0s
+      flush_mode          immediate
+      flush_at_shutdown   true
+    </buffer>
+  </match>
+</worker>

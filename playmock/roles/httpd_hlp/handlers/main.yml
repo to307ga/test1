@@ -1,0 +1,12 @@
+---
+- name: httpd_hlpのrestart_msg
+  debug:
+    msg: "{{ commands }}"
+  listen: httpd_hlp_restart_msg
+
+  vars:
+    commands:
+      - "  注意：configが書き換わりました。httpdを手動で再起動してください。 "
+      - "  sudo systemctl restart httpd  "
+      - "  sudo systemctl status httpd   "
+

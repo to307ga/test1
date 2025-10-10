@@ -1,0 +1,105 @@
+---
+- name: Make /db0/log/tomcat
+  file: path={{ item }} state=directory owner=tomcat group=tomcat
+  with_items:
+  - /db0/log/tomcat
+
+# ディレクトリを作成する
+- name: Make directory
+  file: path={{ item }} state=directory owner=tomcat group=tomcat
+  with_items:
+  - /db0/log/tomcat/idc
+  - /var/log/app
+  - /var/log/app/idc
+  - /var/log/tomcat/idc
+  - /usr/local/tomcat
+  - /usr/local/tomcat/idc
+  - /usr/local/tomcat/idc/lib
+  - /usr/local/tomcat/idc/temp
+  - /usr/local/tomcat/idc/webapps
+  - /usr/local/tomcat/idc/work
+  - /usr/local/tomcat/idc/conf/Catalina
+  - /usr/local/tomcat/idc/conf/Catalina/localhost
+
+- name: Copy setenv.sh
+  template:
+    src: ../templates/setenv.sh.j2
+    dest: /usr/local/tomcat/idc/bin/setenv.sh
+    backup: yes 
+    owner: tomcat
+    group: tomcat
+    mode: 0755
+
+- name: Copy context.xml
+  template:
+    src: ../templates/context.xml.j2
+    dest: /usr/local/tomcat/idc/conf/context.xml
+    backup: yes 
+    owner: tomcat
+    group: tomcat
+    mode: 0600
+  notify:
+    - tomcat_web_restart_msg
+
+- name: Copy tomcat_idc.service
+  template:
+    src: ../templates/tomcat_idc.service.j2
+    dest: /etc/systemd/system/tomcat_idc.service
+    backup: yes 
+    owner: tomcat
+    group: tomcat
+    mode: 0644
+
+- name: Copy server.xml 
+  template:
+    src: templates/server.xml.j2
+    dest: /usr/local/tomcat/idc/conf/server.xml
+    backup: yes
+    owner: tomcat
+    group: tomcat
+    mode: 0644
+  notify:
+    - tomcat_web_restart_msg
+
+- name: Copy tomcat-users.xml
+  template:
+    src: templates/tomcat-users.xml.j2
+    dest: /usr/local/tomcat/idc/conf/tomcat-users.xml
+    backup: yes
+    owner: tomcat
+    group: tomcat
+    mode: 0600
+  notify:
+    - tomcat_web_restart_msg
+
+- name: Copy tomcat-users.xsd
+  template:
+    src: templates/tomcat-users.xsd.j2
+    dest: /usr/local/tomcat/idc/conf/tomcat-users.xsd
+    backup: yes
+    owner: tomcat
+    group: tomcat
+    mode: 0600
+  notify:
+    - tomcat_web_restart_msg
+
+- name: Copy id.xmlまたはidhub.xml
+  template:
+    src: templates/{{ tomcat_web_id_xml }}.j2
+    dest: /usr/local/tomcat/idc/conf/Catalina/localhost/{{ tomcat_web_id_xml }}
+    backup: yes
+    owner: tomcat
+    group: tomcat
+    mode: 0644
+  notify:
+    - tomcat_web_restart_msg
+
+- name: Copy web.xml
+  template:
+    src: templates/web.xml.j2
+    dest: /usr/local/tomcat/idc/conf/web.xml
+    owner: tomcat
+    group: tomcat
+    mode: 0644
+  notify:
+    - tomcat_web_restart_msg

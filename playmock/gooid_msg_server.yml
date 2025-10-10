@@ -1,0 +1,32 @@
+---
+- hosts: gooid_msg
+  become: yes
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: common, tags: common }
+    - { role: perl, tags: perl }
+    - { role: mod_ssl, tags: mod_ssl }
+    - { role: ha_resources, tags: ha_resources }
+    - { role: proxysql, tags: proxysql }
+    - { role: jdk, tags: jdk }
+    - { role: httpd_msg, tags: httpd_msg }
+    - { role: tomcat_msg, tags: tomcat_msg }
+    - { role: msg_broker, tags: msg_broker }
+    - { role: mariadb_client, tags: mariadb_client }
+    - { role: msg, tags: msg }
+    - { role: rbash, tags: rbash }
+    - { role: extend-acl, tags: extend-acl}
+
+# tomcatの設定を修正する前にtomcatを停止。起動中に設定ファイルを配布するとtomcatがエラーを発生して停止する可能性がある。
+  pre_tasks:
+    - name: tomcatの停止
+      block:
+        - systemd:
+            name: tomcat
+            state: stopped
+      rescue:
+        - debug:
+            msg: "tomcatの停止に失敗しました。tomcat停止処理をスキップします。"
+      tags:
+        - tomcat_msg
+

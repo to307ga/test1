@@ -1,0 +1,3 @@
+---
+- import_tasks: set_config.yml
+- import_tasks: goldzone_settings.yml

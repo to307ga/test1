@@ -1,0 +1,13 @@
+# mdb
+
+db_hostname: idhub-21-pro-mdb-004
+
+# galeraクラスタ設定
+galera_cluster_name: IDHUB_GALERA_DB
+galera_node_name: idhub_pro_db_4
+galera_func: replication
+galera_addr1: 10.23.105.69
+galera_addr2: 10.23.105.66
+galera_addr3: 10.23.105.67
+galera_addr4: 10.23.105.76
+galera_addr5: 10.23.105.77

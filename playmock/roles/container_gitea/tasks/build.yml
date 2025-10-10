@@ -1,0 +1,120 @@
+---
+- name: Gitea コンテナイメージのビルド
+  become: true
+  become_user: container_user
+  block:
+    - name: Gitea イメージビルドの更新を検知するため現在のハッシュ値を取得
+      containers.podman.podman_image_info:
+        name: gitea-podman:1.24.3
+      register: prev_image_info
+      ignore_errors: true
+    - name: Hash値を取得
+      ansible.builtin.set_fact:
+        prev_image_hash_gitea: "{{ prev_image_info.images[0].Id if prev_image_info.images else '' }}"
+    - name: Gitea イメージのビルド
+      containers.podman.podman_image:
+        name: gitea-podman:1.24.3
+        build:
+          file: Containerfile
+        path: /opt/containers/gitea/
+        state: present
+    - name: Image updated or not
+      containers.podman.podman_image_info:
+        name: gitea-podman:1.24.3
+      register: post_image_info
+      changed_when: post_image_info.images[0].Id != prev_image_hash_gitea
+    - name: Store whether Gitea iamge was updated
+      ansible.builtin.set_fact:
+        gitea_image_updated: "{{ post_image_info.images[0].Id != prev_image_hash_gitea }}"
+
+- name: Gitea DBコンテナイメージのビルド
+  become: true
+  become_user: container_user
+  block:
+    - name: Gitea イメージビルドの更新を検知するため現在のハッシュ値を取得
+      containers.podman.podman_image_info:
+        name: gitea_db-podman:1.8.4
+      register: prev_image_info
+      ignore_errors: true
+    - name: Hash値を取得
+      ansible.builtin.set_fact:
+        prev_image_hash_gitea_db: "{{ prev_image_info.images[0].Id if prev_image_info.images else '' }}"
+    - name: Gitea DB (MySQL) イメージのビルド
+      containers.podman.podman_image:
+        name: gitea_db-podman:1.8.4
+        build:
+          file: Containerfile
+        path: /opt/containers/gitea/mysql
+        state: present
+    - name: Image updated or not
+      containers.podman.podman_image_info:
+        name: gitea_db-podman:1.8.4
+      register: post_image_info
+      changed_when: post_image_info.images[0].Id != prev_image_hash_gitea_db
+    - name: Store whether Gitea DB iamge was updated
+      ansible.builtin.set_fact:
+        db_image_updated: "{{ post_image_info.images[0].Id != prev_image_hash_gitea_db }}"
+
+- name: Gitea サービス用ボリュームの準備
+  become: true
+  become_user: container_user
+  block:
+    - name: Gitea データボリュームの作成
+      containers.podman.podman_volume:
+        name: gitea_data
+        driver: local
+        state: present
+    - name: Gitea バックアップボリュームの作成
+      containers.podman.podman_volume:
+        name: gitea_backup
+        driver: local
+        state: present
+    - name: Gitea DB ボリュームの作成
+      containers.podman.podman_volume:
+        name: gitea_db_data
+        driver: local
+        state: present
+
+- name: ボリューム gitea_data のマウントポイント(ローカルパス)を取得 -> mountpoint_gitea_data
+  become: true
+  become_user: container_user
+  block:
+    - name: ボリューム情報取得
+      ansible.builtin.command: podman volume inspect gitea_data
+      register: volume_inspect_result
+      changed_when: false
+    - name: ボリューム情報から Mountpoint を抽出
+      ansible.builtin.set_fact:
+        mountpoint_gitea_data: "{{ volume_inspect_result.stdout | from_json | json_query('[0].Mountpoint') }}"
+      when: not ansible_check_mode
+    - name: ディレクトリが確かに存在すること
+      ansible.builtin.stat:
+        path: "{{ mountpoint_gitea_data }}"
+      register: dir_info
+      when: not ansible_check_mode
+    - name: ボリュームのディレクトリが無ければエラー
+      ansible.builtin.fail:
+        msg: "The directory {{ mountpoint_gitea_data }} does not exist."
+      when: not ansible_check_mode and not dir_info.stat.exists
+
+- name: ボリューム gitea_backup のマウントポイント(ローカルパス)を取得 -> mountpoint_gitea_backup
+  become: true
+  become_user: container_user
+  block:
+    - name: ボリューム情報取得
+      ansible.builtin.command: podman volume inspect gitea_backup
+      register: volume_inspect_result
+      changed_when: false
+    - name: ボリューム情報から Mountpoint を抽出
+      ansible.builtin.set_fact:
+        mountpoint_gitea_backup: "{{ volume_inspect_result.stdout | from_json | json_query('[0].Mountpoint') }}"
+      when: not ansible_check_mode
+    - name: ディレクトリが確かに存在すること
+      ansible.builtin.stat:
+        path: "{{ mountpoint_gitea_backup }}"
+      register: dir_info
+      when: not ansible_check_mode
+    - name: ボリュームのディレクトリが無ければエラー
+      ansible.builtin.fail:
+        msg: "The directory {{ mountpoint_gitea_backup }} does not exist."
+      when: not ansible_check_mode and not dir_info.stat.exists

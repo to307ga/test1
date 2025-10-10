@@ -1,0 +1,6 @@
+---
+- hosts: ansible-gooid-21-pro-fgw
+  become: yes
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: goldzone }

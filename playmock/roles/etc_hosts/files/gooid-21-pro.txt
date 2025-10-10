@@ -1,0 +1,94 @@
+#
+#
+#   gooid-21
+#
+#
+
+# フロント系表NW
+# ※ 表NICだが、Puppetの都合上、 `-b` を付けている。 (2022-03-02 基盤 山下くん談)
+172.25.69.84    gooid-21-pro-web-001-b.mt.internal      gooid-21-pro-web-001-b
+172.25.69.85    gooid-21-pro-web-002-b.mt.internal      gooid-21-pro-web-002-b
+172.25.69.86    gooid-21-pro-web-003-b.mt.internal      gooid-21-pro-web-003-b
+172.25.69.87    gooid-21-pro-web-004-b.mt.internal      gooid-21-pro-web-004-b
+172.25.69.90    gooid-21-pro-rproxy-001-b.mt.internal   gooid-21-pro-rproxy-001-b
+172.25.69.91    gooid-21-pro-rproxy-002-b.mt.internal   gooid-21-pro-rproxy-002-b
+172.25.69.68    gooid-21-pro-hlp-001-b.mt.internal      gooid-21-pro-hlp-001-b
+172.25.69.69    gooid-21-pro-hlp-002-b.mt.internal      gooid-21-pro-hlp-002-b
+172.25.69.76    gooid-21-pro-msg-002-b.mt.internal      gooid-21-pro-msg-002-b
+172.25.69.92    gooid-21-pro-msg-003-b.mt.internal      gooid-21-pro-msg-003-b
+172.25.69.80    gooid-21-pro-msg-000-b.mt.internal      gooid-21-pro-msg-000-b
+172.25.69.64    gooid-21-pro-fgw-001-b.mt.internal      gooid-21-pro-fgw-001-b
+172.25.69.67    gooid-21-pro-fgw-003-b.mt.internal      gooid-21-pro-fgw-003-b
+172.25.69.66    gooid-21-pro-fgw-000-b.mt.internal      gooid-21-pro-fgw-000-b
+172.25.69.200   gooid-21-pro-pm-001-b.mt.internal       gooid-21-pro-pm-001-b
+172.25.69.77    gooid-21-pro-oidc-001-b.mt.internal     gooid-21-pro-oidc-001-b
+172.25.69.78    gooid-21-pro-oidc-002-b.mt.internal     gooid-21-pro-oidc-002-b
+172.25.69.79    gooid-21-pro-oidc-003-b.mt.internal     gooid-21-pro-oidc-003-b
+
+# フロント系裏NW
+10.23.100.16    gooid-21-pro-host-001.mt.internal       gooid-21-pro-host-001
+10.23.100.17    gooid-21-pro-host-002.mt.internal       gooid-21-pro-host-002
+10.23.100.18    gooid-21-pro-host-003.mt.internal       gooid-21-pro-host-003
+10.23.100.19    gooid-21-pro-host-004.mt.internal       gooid-21-pro-host-004
+10.23.100.84    gooid-21-pro-web-001.mt.internal        gooid-21-pro-web-001
+10.23.100.85    gooid-21-pro-web-002.mt.internal        gooid-21-pro-web-002
+10.23.100.86    gooid-21-pro-web-003.mt.internal        gooid-21-pro-web-003
+10.23.100.87    gooid-21-pro-web-004.mt.internal        gooid-21-pro-web-004
+10.23.100.90    gooid-21-pro-rproxy-001.mt.internal     gooid-21-pro-rproxy-001
+10.23.100.91    gooid-21-pro-rproxy-002.mt.internal     gooid-21-pro-rproxy-002
+10.23.100.68    gooid-21-pro-hlp-001.mt.internal        gooid-21-pro-hlp-001
+10.23.100.69    gooid-21-pro-hlp-002.mt.internal        gooid-21-pro-hlp-002
+10.23.100.76    gooid-21-pro-msg-002.mt.internal        gooid-21-pro-msg-002
+10.23.100.92    gooid-21-pro-msg-003.mt.internal        gooid-21-pro-msg-003
+10.23.100.80    gooid-21-pro-msg-000.mt.internal        gooid-21-pro-msg-000
+10.23.100.64    gooid-21-pro-fgw-001.mt.internal        gooid-21-pro-fgw-001
+10.23.100.67    gooid-21-pro-fgw-003.mt.internal        gooid-21-pro-fgw-003
+10.23.100.66    gooid-21-pro-fgw-000.mt.internal        gooid-21-pro-fgw-000
+10.23.100.77    gooid-21-pro-oidc-001.mt.internal       gooid-21-pro-oidc-001
+10.23.100.78    gooid-21-pro-oidc-002.mt.internal       gooid-21-pro-oidc-002
+10.23.100.79    gooid-21-pro-oidc-003.mt.internal       gooid-21-pro-oidc-003
+
+# データベースNW
+10.23.101.20    gooid-21-pro-host-101.mt.internal       gooid-21-pro-host-101
+10.23.101.21    gooid-21-pro-host-102.mt.internal       gooid-21-pro-host-102
+10.23.101.22    gooid-21-pro-host-103.mt.internal       gooid-21-pro-host-103
+10.23.101.23    gooid-21-pro-host-104.mt.internal       gooid-21-pro-host-104
+10.23.101.26    gooid-21-pro-host-201.mt.internal       gooid-21-pro-host-201
+10.23.101.27    gooid-21-pro-host-202.mt.internal       gooid-21-pro-host-202
+10.23.101.100   gooid-21-pro-mdb-001.mt.internal        gooid-21-pro-mdb-001
+10.23.101.101   gooid-21-pro-mdb-002.mt.internal        gooid-21-pro-mdb-002
+10.23.101.102   gooid-21-pro-mdb-003.mt.internal        gooid-21-pro-mdb-003
+10.23.101.103   gooid-21-pro-mdb-004.mt.internal        gooid-21-pro-mdb-004
+10.23.101.80    gooid-21-pro-sdb-001.mt.internal        gooid-21-pro-sdb-001
+10.23.101.81    gooid-21-pro-sdb-002.mt.internal        gooid-21-pro-sdb-002
+10.23.101.66    gooid-21-pro-batch-001.mt.internal      gooid-21-pro-batch-001
+10.23.101.67    gooid-21-pro-batch-002.mt.internal      gooid-21-pro-batch-002
+10.23.101.69    gooid-21-pro-batch-003.mt.internal      gooid-21-pro-batch-003
+10.23.101.68    gooid-21-pro-batch-000.mt.internal      gooid-21-pro-batch-000
+10.23.101.70    gooid-21-pro-log-001.mt.internal        gooid-21-pro-log-001
+10.23.101.71    gooid-21-pro-log-002.mt.internal        gooid-21-pro-log-002
+10.23.101.96    gooid-21-pro-edb-001.mt.internal        gooid-21-pro-edb-001
+10.23.101.97    gooid-21-pro-edb-002.mt.internal        gooid-21-pro-edb-002
+10.23.100.200   gooid-21-pro-pm-001.mt.internal         gooid-21-pro-pm-001
+
+# DBレプリケーションNW
+10.23.102.20    gooid-21-pro-host-101-b.mt.internal     gooid-21-pro-host-101-b
+10.23.102.21    gooid-21-pro-host-102-b.mt.internal     gooid-21-pro-host-102-b
+10.23.102.22    gooid-21-pro-host-103-b.mt.internal     gooid-21-pro-host-103-b
+10.23.102.23    gooid-21-pro-host-104-b.mt.internal     gooid-21-pro-host-104-b
+10.23.102.26    gooid-21-pro-host-201-b.mt.internal     gooid-21-pro-host-201-b
+10.23.102.27    gooid-21-pro-host-202-b.mt.internal     gooid-21-pro-host-202-b
+10.23.102.100   gooid-21-pro-mdb-001-b.mt.internal      gooid-21-pro-mdb-001-b
+10.23.102.101   gooid-21-pro-mdb-002-b.mt.internal      gooid-21-pro-mdb-002-b
+10.23.102.102   gooid-21-pro-mdb-003-b.mt.internal      gooid-21-pro-mdb-003-b
+10.23.102.103   gooid-21-pro-mdb-004-b.mt.internal      gooid-21-pro-mdb-004-b
+10.23.102.66    gooid-21-pro-batch-001-b.mt.internal    gooid-21-pro-batch-001-b
+10.23.102.67    gooid-21-pro-batch-002-b.mt.internal    gooid-21-pro-batch-002-b
+10.23.102.69    gooid-21-pro-batch-003-b.mt.internal    gooid-21-pro-batch-003-b
+10.23.102.68    gooid-21-pro-batch-000-b.mt.internal    gooid-21-pro-batch-000-b
+10.23.102.80    gooid-21-pro-sdb-001-b.mt.internal      gooid-21-pro-sdb-001-b
+10.23.102.81    gooid-21-pro-sdb-002-b.mt.internal      gooid-21-pro-sdb-002-b
+10.23.102.70    gooid-21-pro-log-001-b.mt.internal      gooid-21-pro-log-001-b
+10.23.102.71    gooid-21-pro-log-002-b.mt.internal      gooid-21-pro-log-002-b
+10.23.102.96    gooid-21-pro-edb-001-b.mt.internal      gooid-21-pro-edb-001-b
+10.23.102.97    gooid-21-pro-edb-002-b.mt.internal      gooid-21-pro-edb-002-b

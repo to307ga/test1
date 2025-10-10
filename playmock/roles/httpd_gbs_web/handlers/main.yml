@@ -1,0 +1,12 @@
+---
+- name: httpd_gbs_webのrestart_msg
+  debug:
+    msg: "{{ commands }}"
+  listen: httpd_gbs_web_restart_msg
+
+  vars:
+    commands:
+      - "  注意：configが書き換わりました。httpd_gbsを手動で再起動してください。 "
+      - "  sudo systemctl restart httpd_gbs  "
+      - "  sudo systemctl status httpd_gbs   "
+

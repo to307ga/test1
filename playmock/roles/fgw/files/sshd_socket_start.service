@@ -1,0 +1,12 @@
+[Unit]
+Description = Stop sshd.service and start sshd.socket.
+After=drbd.service
+ConditionPathExists=/usr/local/app/script/sshd_socket_start
+
+[Service]
+ExecStart=/usr/local/app/script/sshd_socket_start/sshd_socket_start.sh
+Restart=no
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

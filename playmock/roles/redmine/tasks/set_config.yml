@@ -1,0 +1,66 @@
+---
+- name: Make directories for root
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /db0
+    - /db0/redmine
+    - /db0/redmine/config
+    - /db0/redmine/plugins
+    - /usr/local/redmine
+
+- name: Make directories for user in container
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "999"
+    group: "999"
+    mode: "0755"
+  loop:
+    - /db0/redmine_files
+    - /var/redmine_files
+    - /db0/db/mysql
+
+- name: Deploy database.yml
+  ansible.builtin.template:
+    src: templates/database.yml.j2
+    dest: /db0/redmine/config/database.yml
+    owner: "999"
+    group: "999"
+    mode: "0644"
+
+- name: Dploy docker-compose.yml
+  ansible.builtin.template:
+    src: templates/docker-compose.yml.j2
+    dest: /usr/local/redmine/docker-compose.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy redmine_backup.sh
+  ansible.builtin.template:
+    src: files/redmine_backup.sh
+    dest: /usr/local/redmine/redmine_backup.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy crontab
+  ansible.builtin.copy:
+    src: files/redmine
+    dest: /etc/cron.d/redmine
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy configuration.yml
+  ansible.builtin.template:
+    src: templates/configuration.yml.j2
+    dest: /db0/redmine/config/configuration.yml
+    owner: "999"
+    group: "999"
+    mode: "0644"

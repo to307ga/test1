@@ -1,0 +1,61 @@
+---
+
+- name: Remove the Docker package
+  yum:
+    name:   "{{ item }}"
+    state:  absent
+  loop:
+    - docker
+    - docker-client
+    - docker-common
+    - docker-latest
+    - docker-latest-logrotate
+    - docker-logrotate
+    - docker-selinux
+    - docker-engine
+
+- name: yum Upgrade all packages
+  yum:
+    name: '*'
+    state: latest
+  when: not ansible_check_mode
+
+- name: Add Docker repo
+  copy:
+    src:  files/docker_container/yum.repos.d/docker.repo
+    dest: /etc/yum.repos.d/docker.repo
+    mode: 0644
+
+- name: Advance preparation
+  yum:
+    name:   "{{ item }}"
+    state:  present
+  loop:
+    - device-mapper-persistent-data 
+    - lvm2
+  when: not ansible_check_mode
+
+- name: Install Docker
+  yum:
+    name:   "{{ item }}"
+    state:  present
+  loop: 
+    - docker-ce    
+    - docker-ce-cli
+    - containerd.io
+    - docker-compose-plugin
+  when: not ansible_check_mode
+
+- name: ensure docker start
+  systemd:
+    state:          started
+    enabled:        yes
+    name:           docker.service
+    daemon_reload:  yes
+  when: not ansible_check_mode
+
+- name: Preparation for dood  
+  file:
+    path: /var/run/docker.sock
+    owner: root
+    group: docker

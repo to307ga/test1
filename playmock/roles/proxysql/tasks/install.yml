@@ -1,0 +1,5 @@
+---
+- name: Install proxysql
+  yum:
+    name: proxysql
+    state: latest

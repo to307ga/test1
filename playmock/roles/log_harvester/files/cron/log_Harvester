@@ -1,0 +1,1 @@
+0 5 * * * idclog /home/idclog/log_Harvester.sh 1

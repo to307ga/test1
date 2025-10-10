@@ -1,0 +1,47 @@
+---
+
+# Groups and users are currently created in puppet.
+#- name: Create group 'g-gooid_ansible'
+  # group:
+      # name: g-gooid_ansible
+      # gid:  50142
+
+# - name: Add user 'g-gooid_ansible'
+  # ansible.builtin.user:
+    # name:   g-gooid_ansible
+    # uid:    50142
+    # shell:  /bin/bash
+    # groups: g-gooid_ansible
+
+- name: Add authorized_key
+  authorized_key:
+    user:   g-gooid_ansible
+    state:  present
+    key:    "{{ lookup('file', '{{ playbook_execution_environment }}/certs/authorized_keys_g-gooid_ansible') }}"
+  when: not ansible_check_mode
+
+- name: Add sudoers.d files
+  copy:
+    src:  files/{{ playbook_execution_environment }}/sudoers.d/g-gooid_ansible
+    dest: /etc/sudoers.d/g-gooid_ansible
+    mode: 0440
+
+# Add new rule pam_nologin.so after existing rule pam_nologin.so
+- name: Settings pam
+  pamd:
+    name:             sshd
+    type:             account
+    control:          required
+    module_path:      pam_nologin.so
+    new_type:         account
+    new_control:      required
+    new_module_path:  pam_access.so
+    state:            after
+
+- name: Add access.conf file
+  template:
+    src:    templates/security/access.j2
+    dest:   /etc/security/access.conf
+    mode:   0644
+    owner:  root
+    group:  root

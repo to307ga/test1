@@ -1,0 +1,17 @@
+---
+
+- name: Restart td-agent
+  systemd:
+    name: td-agent.service
+    state: restarted
+    daemon_reload: yes
+  become: yes
+  when: not ansible_check_mode
+
+- name: Restart zabbix_agentd
+  systemd:
+    name: zabbix_agent.service
+    state: restarted
+    daemon_reload: yes
+  become: yes
+  when: not ansible_check_mode

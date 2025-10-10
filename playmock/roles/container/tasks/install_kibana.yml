@@ -1,0 +1,49 @@
+---
+
+- name: kibanaマウントポイント用フォルダ作成
+  file:
+    path:     "/opt/docker_container/kibana/{{ item }}"
+    state:    directory
+    owner:    "1000"
+    group:    "1000"
+    mode:     0644
+    recurse:  yes
+  loop:
+    # - kibanadata
+    - .certs
+    - build_context/httpd
+    - httpd/conf
+    - httpd/html
+
+- name: Prepare docker-compose.yml
+  template:
+    src:    templates/kibana/{{ item }}.j2
+    dest:   /opt/docker_container/kibana/{{ item }}.yml
+    owner:  "1000"
+    group:  "1000"
+    mode:   0644
+  loop:
+    - docker-compose
+    - kibana
+
+- name: Prepare httpd Dockerfile
+  template:
+    src:  templates/httpd/Dockerfile.j2
+    dest: /opt/docker_container/kibana/build_context/httpd/Dockerfile
+    owner:  "1000"
+    group:  "1000"
+    mode:   0644
+
+- name: Prepare httpd.conf
+  copy:
+    src:  files/httpd/conf/httpd.conf
+    dest: /opt/docker_container/kibana/httpd/conf/httpd.conf
+    owner:  "1000"
+    group:  "1000"
+    mode:   0644
+
+# Docker Compose requires Python 3.6 or later.
+# - name: コンテナ起動
+  # docker_compose:
+    # project_src: /opt/docker_container/kibana/
+    # state: present

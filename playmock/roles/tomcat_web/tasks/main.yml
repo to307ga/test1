@@ -1,0 +1,14 @@
+---
+# tomcatのインストール
+- import_role: 
+    name: tomcat
+
+# configを設定
+- import_tasks: set_config.yml
+
+# tomcat9に合わせた設定
+- import_role: 
+    name: tomcat9_fix
+
+# サービスの起動
+- import_tasks: service.yml

@@ -1,0 +1,132 @@
+<Directory "/db0/www/COMMON">
+   Options FollowSymLinks
+   AllowOverride None
+</Directory>
+
+Alias /COMMON /db0/www/COMMON
+<Directory "/db0/www/COMMON">
+   AuthType Basic
+   AuthName "Please Enter your password"
+   AuthUserFile /usr/local/apache/passwd/.COMMON.pwd
+   Require valid-user
+</Directory>
+
+Alias /DGP /db0/www/DGP
+<Directory "/db0/www/DGP">
+   AuthType Basic
+   AuthName "Please Enter your password"
+   AuthUserFile /usr/local/apache/passwd/.DGP.pwd
+   Require valid-user
+</Directory>
+
+Alias /oshirase /db0/www/oshirase
+<Directory "/db0/www/oshirase">
+   AuthType Basic
+   AuthName "Please Enter your password"
+   AuthUserFile /usr/local/apache/passwd/.oshirase.pwd
+   Require valid-user
+</Directory>
+
+Alias /chocom /db0/www/chocom
+<Directory "/db0/www/chocom">
+   AuthType Basic
+   AuthName "Chocom Point Service"
+   AuthUserFile /usr/local/apache/passwd/.chocom.pwd
+   Require valid-user
+</Directory>
+
+Alias /sales /db0/www/sales
+<Directory "/db0/www/sales">
+   <RequireAll>
+      <RequireAny>
+         Require ip 202.229.44.96/27
+         Require ip 202.217.72.192/27
+         Require ip 202.217.74.160/28
+      </RequireAny>
+      <Limit GET POST>
+         AuthType Basic
+         AuthName "Sales News Flash"
+         AuthUserFile /usr/local/apache/passwd/.sales.pwd
+         Require valid-user
+      </Limit>
+   </RequireAll>
+</Directory>
+
+Alias /adv /db0/www/adv
+<Directory "/db0/www/adv">
+   <RequireAll>
+      <RequireAny>
+         Require ip 202.229.44.96/27
+         # VDI
+         Require ip 202.217.74.160/28
+         # Tamachi GP
+         Require ip 202.217.72.192/27
+         # blog @ R, stg, pro
+         Require ip 114.179.184.62/32 114.179.184.64/32
+      </RequireAny>
+      <Limit GET POST>
+         AuthType Basic
+         AuthName "Advance Info"
+         AuthUserFile /usr/local/apache/passwd/.adv.pwd
+         Require valid-user
+      </Limit>
+   </RequireAll>
+</Directory>
+
+Alias /gmm /db0/www/gmm
+<Directory "/db0/www/gmm">
+   AuthType Basic
+   AuthName "Please Enter your password"
+   AuthUserFile /usr/local/apache/passwd/.gmm.pwd
+   Require valid-user
+</Directory>
+
+Alias /advout /db0/www/advout
+<Directory "/db0/www/advout">
+   AuthType Basic
+   AuthName "Please Enter your password"
+   AuthUserFile /usr/local/apache/passwd/.gmm.pwd
+   Require valid-user
+</Directory>
+
+Alias /idhub /db0/www/idhub
+<Directory "/db0/www/idhub">
+    AuthType Basic
+    AuthName "Please Enter your password"
+    AuthUserFile /usr/local/apache/passwd/.idhub.pwd
+    Require valid-user
+</Directory>
+
+Alias /area-a /db0/area-a
+<Directory "/db0/area-a">
+   <RequireAll>
+      <RequireAny>
+         #大手町オフィスエリアA（旧ゴールドゾーン）
+         Require ip 202.217.74.167/32
+      </RequireAny>
+      <Limit GET POST>
+         AuthType Basic
+         AuthName "Please Enter your password"
+         AuthUserFile /usr/local/apache/passwd/.area-a.pwd
+         Require valid-user
+      </Limit>
+   </RequireAll>
+</Directory>
+
+# 売上速報ファイル生成月次・日次ジョブネット (JobNetSet15) で生成されるデータ格納場所。
+# 担当者がこの素材データをDownloadし、整形されたEXCELフォーマットの「月次ファイル」を作成。
+#  その用途や読み手は以下の通り。
+#     - 各サービス毎の売り上げと費用（手数料・ポイント原資等）を利用状況から算出している
+#     - 各サービスは管理会計投入の元データとして利用・会計担当が実績として売上
+#     - 費用を処理、入金額の消込み等会計処理に利用。
+Alias /m_pf /db0/sec/m_pf/snd
+<Directory "/db0/sec/m_pf/snd">
+   # ファイル一覧表示させ、Downloadしやすくします。
+   Options +Indexes
+   <RequireAny>
+      # VDI (SplashTop) 
+      Require ip 202.217.74.160/28
+      # ZeroSpace端末-仮想デスクトップ
+      Require ip 202.19.227.74/32 202.19.228.74/32 210.148.141.1/27 210.148.200.1/27 114.160.196.245/32 114.160.237.193/32
+   </RequireAny>
+</Directory>

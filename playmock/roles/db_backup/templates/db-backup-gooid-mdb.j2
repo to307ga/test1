@@ -1,0 +1,9 @@
+# DBバックアップのためのcron設定
+# DBバックアップは以下のサーバーにて実施しています
+# 退避DBバックアップ -> gooid-21-pro-edb-001/002
+# gooid-DBバックアップ-> gooid-21-pro-mdb-004
+# idhub-DBバックアップ-> idhub-21-pro-mdb-004
+
+
+# DB daily backup - gooid
+3 3 * * * root /usr/local/bin/db-backup.sh > /dev/null 2>&1

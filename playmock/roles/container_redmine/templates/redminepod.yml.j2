@@ -1,0 +1,97 @@
+# Save the output of this file and use kubectl create -f to import
+# it into Kubernetes.
+#
+# Created with podman-4.0.2
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2025-05-23T06:47:25Z"
+  labels:
+    app: redminepod
+  name: redminepod
+spec:
+  containers:
+  - args:
+    - mysqld
+    env:
+    - name: no_proxy
+      value: localhost,127.0.0.1
+    - name: MYSQL_USER
+      value: user_redmine
+    - name: HTTPS_PROXY
+      value: {{ proxy_env.http_proxy }}
+    - name: HTTP_PROXY
+      value: {{ proxy_env.http_proxy }}
+    - name: http_proxy
+      value: {{ proxy_env.http_proxy }}
+    - name: MYSQL_DATABASE
+      value: db_redmine
+    - name: https_proxy
+      value: {{ proxy_env.http_proxy }}
+    - name: MYSQL_ROOT_PASSWORD
+      value: {{ redmine.dbroot_password }}
+    - name: MYSQL_PASSWORD
+      value: {{ redmine.dbuser_password }}
+    image: localhost/redmine_db-podman:1.0.0
+    name: redminedb
+    ports:
+    - containerPort: 3000
+      hostPort: 3000
+    resources: {}
+    securityContext:
+      capabilities:
+        drop:
+        - CAP_MKNOD
+        - CAP_AUDIT_WRITE
+    volumeMounts:
+    - mountPath: /var/lib/mysql
+      name: redmine_db_data-pvc
+  - args:
+    - rails
+    - server
+    - -b
+    - 0.0.0.0
+    env:
+    - name: REDMINE_DB_PASSWORD
+      value: {{ redmine.dbuser_password }}
+    - name: REDMINE_DB_DATABASE
+      value: db_redmine
+    - name: REDMINE_DB_ENCODING
+      value: utf8mb4
+    - name: REDMINE_DB_USERNAME
+      value: user_redmine
+    - name: TZ
+      value: Aisa/Tokyo
+    - name: REDMINE_DB_MYSQL
+      value: 127.0.0.1
+    - name: REDMINE_RELATIVE_URL_ROOT
+      value: /ticket
+    - name: RAILS_RELATIVE_URL_ROOT
+      value: /ticket
+    image: localhost/redmine-podman:1.0.0
+    name: redmine
+    resources: {}
+    securityContext:
+      capabilities:
+        drop:
+        - CAP_MKNOD
+        - CAP_AUDIT_WRITE
+    volumeMounts:
+    - mountPath: /usr/src/redmine/files
+      name: redmine_files-pvc
+    # プラグインはイメージビルド時にインストールするためvolumeの外部共有不要
+    # - mountPath: /usr/src/redmine/plugins
+    #   name: redmine_plugins-pvc
+  restartPolicy: Never
+  volumes:
+  - name: redmine_db_data-pvc
+    persistentVolumeClaim:
+      claimName: redmine_db_data
+  - name: redmine_files-pvc
+    persistentVolumeClaim:
+      claimName: redmine_files
+  # プラグインはイメージビルド時にインストールするためvolumeの外部共有不要
+  # - name: redmine_plugins-pvc
+  #   persistentVolumeClaim:
+  #     claimName: redmine_plugins
+status: {}

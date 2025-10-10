@@ -1,0 +1,25 @@
+---
+# ディレクトリを作成する(openjdk1.8.0用）
+- name: Make /usr/java
+  file:
+    state: directory
+    path: /usr/java
+    owner: root
+    group: root
+    mode: 0755
+    
+# リンクを設定する(openjdk1.8.0用）
+- name: Link /usr/java/latest  -> /etc/alternatives/java_sdk_openjdk
+  file:
+    state: link
+    src: /etc/alternatives/java_sdk_openjdk
+    dest: /usr/java/latest
+  when: not ansible_check_mode
+
+# リンクを設定する(openjdk1.8.0用）
+- name: Link /usr/java/default -> /usr/java/latest
+  file:
+    state: link
+    src: /usr/java/latest
+    dest: /usr/java/default
+  when: not ansible_check_mode

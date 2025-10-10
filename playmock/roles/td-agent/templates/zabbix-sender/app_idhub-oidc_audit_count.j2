@@ -1,0 +1,76 @@
+<worker {{td_agent_worker3}}>
+  <source>
+    @type tail   
+    path /db0/tdlogs/merged/idhub-{{ project_id_number_env }}-web/var.log.app.idhub-oidc/oidc_audit.%Y-%m-%d.log
+    pos_file /var/log/td-agent/app_idhub-oidc_oidc_audit_count.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag idhub-web_app_idhub_oidc_audit_log
+    <parse>
+      @type regexp
+      time_format %Y-%m-%dT%H:%M:%S.%L
+      # マージログはホスト名がついたりしているのでパース用のexpressionはそのまま使えないので修正が必要 (?<server>[^ ]*)  を先頭に付ければOK
+      expression /(?<server>[^ ]*) (?<log-time>[^ ]*).*JST.*ses: (?<sessionId>[^|]*).*\|.*req: (?<requestId>[^]]*)\]*(?<level>[^||]*).*\|\|(?<message>.*+)$/
+      # keep_time_key true
+    </parse>
+  </source>
+
+  <match idhub-web_app_idhub_oidc_audit_log.**>
+    @type copy
+    <store>
+      @type         datacounter         
+      count_interval 5m 
+      aggregate all
+      count_key level
+      # patternX: X(1-20)
+      pattern1 to_zabbix.error.idhub.web.idhub-oidc.oidc_audit .*ERROR.*
+      tag count.idhub-web_app_idhub_oidc_audit_log.level.*
+    </store>
+    <store>
+      @type 	              elasticsearch
+      scheme	              https
+      ssl_version           {{ elasticsearch.ssl_version }}
+      # Copy from /etc/elasticsearch/certs/http_ca.crt on the els server
+      ca_file               {{ elasticsearch.ca_file }}
+      # host 	                {{ elasticsearch.hostname }}
+      # hosts https://customhost.com:443/path,https://username:password@host-failover.com:443
+      # port 9200
+      hosts                 {{ elasticsearch.hosts }}
+      user                  {{ elasticsearch.user }}
+      password              {{ elasticsearch.pwd }}
+      # Does not work with elasticsearch_dynamic
+      # index_name            fluentd.${tag}-%Y%m%d
+      logstash_format       true
+      include_timestamp     true
+      logstash_prefix       fluentd.${tag}
+      logstash_dateformat   %Y%m%d
+      time_key_format %Y-%m-%dT%H:%M:%S.%N%z
+      # include_tag_key       true
+      with_transporter_log  true
+      @log_level             {{ plugin_log_level.elasticsearch }}
+      # utc_index             false
+      # time_key created_at
+      # time_key_format %a %b %d %H:%M:%S %z %Y
+      <buffer tag,time>
+        timekey         1d
+        # flush_interval  1m
+      </buffer>
+      flush_interval  1m
+    </store> 
+  </match>  
+
+  <match count.idhub-web_app_idhub_oidc_audit_log.level.*>
+    @type               file
+    append              true
+    # The filename of the path should be the same as the filename of this file.
+    path /db0/tdlogs/zabbix-sender-count/app_idhub-oidc_audit_count
+    time_slice_format   %Y-%m-%d
+    <buffer time>
+      @type memory
+      timekey             1d
+      timekey_wait        0s
+      flush_mode          immediate
+      flush_at_shutdown   true
+    </buffer>
+  </match>
+</worker>

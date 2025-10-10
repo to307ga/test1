@@ -1,0 +1,27 @@
+#########################################
+# HOSTLIST
+#
+# (の後ろと)の前は必ずスペースを空けてください 
+#########################################
+hostlist=( gooid-21-pro-host-001 gooid-21-pro-host-002 gooid-21-pro-host-003 gooid-21-pro-host-004 gooid-21-pro-host-101 gooid-21-pro-host-102 gooid-21-pro-host-103 gooid-21-pro-host-104 )
+#
+#########################################
+# LOGLIST
+# 
+# $PASTDATE1 = yyyymmdd
+# $PASTDATE2 = yyyy-mm-dd
+# $HOSTNAME  = $host (ホスト名に置換されます)
+#
+# 書式
+# LogList:転送元ディレクトリ名:転送ファイル名:転送先ディレクトリ名
+#                        OR
+# NOERROR_LogList:転送元ディレクトリ名:転送ファイル名:転送先ディレクトリ名
+# (コロン区切りのため、コンフィグ内にコロンを使うことはできません)
+# (転送先ディレクトリ名のプレフィクスは、実行ファイル内に記述します。)
+# (NOERRORの場合はエラー報告メールが飛びません)
+# (NOERRORの場合のみ、ファイル名の指定に*が使用できます。)
+#
+#########################################
+NOERROR_LogList:/home/log/tmp/var/log/:messages-$PASTDATE2.gz:/$HOSTNAME/var/log/
+NOERROR_LogList:/home/log/tmp/var/log/sa/:sa.$PASTDATE2.gz:/$HOSTNAME/var/log/sa/
+NOERROR_LogList:/home/log/tmp/var/log/:secure-$PASTDATE2.gz:/$HOSTNAME/var/log/

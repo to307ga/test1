@@ -1,0 +1,26 @@
+---
+# これらの右辺の値は、Ansible-Vaultで暗号化され、ファイル vault.yml に定義されています
+# vault.ymlに定義した変数は、左辺の変数で参照して直接参照しないのが目的です。
+mysql_admin_name: "{{ mysql.admin.name }}"
+mysql_admin_password: "{{ mysql.admin.password }}"
+mysql_admin_hosts: "{{ mysql.admin.hosts }}"
+
+mysql_maintainer_name: "{{ mysql.users.maintainer.name }}"
+mysql_maintainer_password: "{{ mysql.users.maintainer.password }}"
+
+mysql_gbs_batch_name: "{{ mysql.users.gbs_batch.name }}"
+mysql_gbs_batch_password: "{{ mysql.users.gbs_batch.password }}"
+
+mysql_reader_name: "{{ mysql.users.reader.name }}"
+mysql_reader_password: "{{ mysql.users.reader.password }}"
+
+mysql_writer_name: "{{ mysql.users.writer.name }}"
+mysql_writer_password: "{{ mysql.users.writer.password }}"
+
+mysql_monitor_name: "{{ mysql.users.monitor.name }}"
+mysql_monitor_password: "{{ mysql.users.monitor.password }}"
+
+mysql_zabbix_name: "{{ mysql.users.zabbix.name }}"
+mysql_zabbix_password: "{{ mysql.users.zabbix.password }}"
+
+mysql_mariadb_server_enc_key: "{{ mariadb_server.encryption_key }}"

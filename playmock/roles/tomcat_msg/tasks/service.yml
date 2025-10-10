@@ -1,0 +1,14 @@
+---
+- name: tomcat.serviceの設定
+  systemd:
+    name: tomcat.service
+    enabled: no
+    daemon_reload: no
+
+# pcsdで管理しているなら不要
+- name: tomcat.serviceの開発環境自動起動設定
+  systemd:
+    name: tomcat.service
+    enabled: yes
+    daemon_reload: no
+  when: release_env == "dev"

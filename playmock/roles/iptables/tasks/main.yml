@@ -1,0 +1,7 @@
+---
+- import_tasks: install.yml
+- import_tasks: set_config.yml
+# 誤って他の踏み台以外のサーバーに適用すると
+# 障害になりかねないため制限をかけておく
+  when: server_role == "bastion"
+- import_tasks: service.yml

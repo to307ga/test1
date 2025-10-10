@@ -1,0 +1,2 @@
+---
+- import_tasks: set_log_compression.yml

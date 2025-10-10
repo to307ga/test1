@@ -1,0 +1,7 @@
+---
+- name: httpd.serviceの設定
+  systemd:
+    name: httpd.service
+    enabled: no
+    daemon_reload: no
+

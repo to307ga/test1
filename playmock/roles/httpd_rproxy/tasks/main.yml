@@ -1,0 +1,9 @@
+---
+- import_tasks: install.yml
+- import_tasks: set_config.yml
+
+- import_tasks: gooid_set_config.yml
+  when: service_type == "gooid"
+- import_tasks: idhub_set_config.yml
+  when: service_type == "idhub"
+- import_tasks: service.yml

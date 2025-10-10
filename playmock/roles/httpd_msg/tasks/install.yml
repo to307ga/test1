@@ -1,0 +1,4 @@
+---
+# パッケージをループでインストール
+- import_role:
+    name: httpd

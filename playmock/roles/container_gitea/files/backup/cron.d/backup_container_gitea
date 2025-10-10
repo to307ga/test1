@@ -1,0 +1,2 @@
+# container_gitea backup schedule
+05 03 * * * root /opt/containers/backup/gitea_backup.sh >/dev/null 2>&1

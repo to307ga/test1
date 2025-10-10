@@ -1,0 +1,75 @@
+---
+
+elasticsearch_download_url: "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-8.15.0-x86_64.rpm"
+
+elasticsearch_csum: "87d75c89641e7c644f7b59ce19e0e1462dc86abcfb37094401e1ff4793ae212eae64d5c3750356a0ac78b181d75a8fe9f209cfeb8ffe67f5d60fd8ba346f8577  elasticsearch-8.15.0-x86_64.rpm"
+elasticsearch_version: "8.15.0"
+
+# discovery_seed_hosts1: "idhub-30-dev-els-001"
+# discovery_seed_hosts2: "idhub-30-dev-els-002"
+# discovery_seed_hosts3: "idhub-30-dev-els-003"
+
+# Elasticsearchパスワード   
+elasticsearch:
+  hostname:     "idhub-30-dev-els-002"
+  user:         "elastic"
+  pwd:          "{{ vault_elasticsearch_password }}"
+  ssl_version:  "TLSv1_2"
+  # ca_file:      "/etc/td-agent/certs/ca/http_ca.crt"
+
+es_LCM_templates_fileglob: 			  "files/templates/LCM_templates/*.json"
+es_component_templates_fileglob: 	"files/templates/component_templates/*.json"
+es_index_templates_fileglob: 		  "files/templates/index_templates/*.json"
+es_ingest_templates_fileglob:     "files/templates/ingest_templates/*.json"
+es_conf_dir: 						          "/etc/elasticsearch"
+es_api_uri: 						          "https://localhost:9200"
+es_api_basic_auth_username:			  "{{ elasticsearch.user }}"
+# es_api_basic_auth_username:			  "elastic"
+es_api_basic_auth_password:       "{{ elasticsearch.pwd }}"
+# es_api_basic_auth_password:       "elasticpassword"
+es_validate_certs:                no 
+es_start_service:                 true
+
+# es_https_access_hostname1: idhub-30-dev-els-001
+# es_https_access_hostname2: idhub-30-dev-els-002
+# es_https_access_hostname3: idhub-30-dev-els-003
+# es_https_access_ip_address1: 172.17.178.64
+# es_https_access_ip_address2: 172.17.178.75
+# es_https_access_ip_address3: 172.17.178.65
+
+es_user: root
+es_group: elasticsearch
+es_data_dir: /var/lib/elasticsearch
+es_log_dir: /var/log/elasticsearch
+es_pid_dir: /var/run/elasticsearch
+es_certs_dir: /etc/elasticsearch/certs
+es_local_certs_dir: ~/very_secure_dir
+es_ca_filename: ca.key
+es_cert_filename: elastic.crt
+
+# 証明書関連のUpdate時以外は no にしておくこと
+ca_and_cert_update_enabled: no
+
+es_ca_effective_days: 3650
+es_cluster_name: idhub-30-dev-els-cluster
+# es_jvm_proxy_server: 10.23.110.100  # 商用
+# es_jvm_proxy_port: 10000
+es_jvm_proxy_server: 172.17.255.232
+es_jvm_proxy_port: 8080
+es_master_is_also_data_node: yes
+es_default_node_roles: 
+  - master
+  - ingest
+  - ml
+  - remote_cluster_client
+  - transform
+
+ulimit_settings:
+  - domain: root
+    limit_type: soft
+  - domain: root
+    limit_type: hard
+  - domain: "*"
+    limit_type: soft
+  - domain: "*"
+    limit_type: hard

@@ -1,0 +1,9 @@
+---
+#fgw用監視cron設定
+- name: fgw用監視cron設定の配布
+  copy:
+    src: files/cron/monitor_fgw
+    dest: /etc/cron.d/monitor_fgw
+    owner: root
+    group: root
+    mode: 0644

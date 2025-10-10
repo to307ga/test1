@@ -1,0 +1,13 @@
+######################################################################
+#
+# source_log_delete.sh用コンフィグファイル
+# 
+# 書式  source_dir:source_file:pastdate
+#      (元ファイル名(フルパス):元ファイル名:N日前の日付)
+#
+######################################################################
+#gooid-oidcはログの出力方式をソース側で変更する必要あり
+#/var/log/app/oidc_audit.log.:30
+#/var/log/app/oidc_request.log.:30
+/var/log/httpd/:access_log.:30
+/var/log/httpd/:error_log.:30

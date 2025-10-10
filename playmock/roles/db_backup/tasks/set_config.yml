@@ -1,0 +1,37 @@
+- name: mkdir /usr/local/bin, /user/local/app/*
+  file:
+    path: "{{ item.path }}"                                                                                  
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /usr/local/bin, mode: '0755', owner: root, group: root }
+    # playbook では、/usr/local/app/{goo,gbs} までのDIRを作成、それ以降の深さのDIRはアプリケーションのデプロイに委譲します。
+    - { path: /usr/local/app, mode: '0755', owner: gooscp, group: gooscp }
+    # 下記は、 「退会済みユーザーの個人情報削除バッチ ～ delete_personal_data.pl ～」で必要となるDIR
+    - { path: /usr/local/app/goo, mode: '0755', owner: gooscp, group: gooscp }
+    - { path: /usr/local/app/goo/edb, mode: '0755', owner: gooscp, group: gooscp }
+    - { path: /usr/local/app/goo/edb/batch, mode: '0755', owner: gooscp, group: gooscp }
+    - { path: /usr/local/app/goo/edb/batch/delete_personal_data, mode: '0755', owner: gooscp, group: gooscp }
+    - { path: /var/log/app/idc, mode: '0755', owner: gooscp, group: gooscp }
+
+    - { path: /usr/local/app/gbs, mode: '0755', owner: gooscp, group: gooscp }
+    # バックでアップで必要となるディレクトリの作成
+    - { path: /db0/backup, mode: '0755', owner: gooscp, group: gooscp }
+- name: Copy db-backup.sh to /usr/local/bin
+  template:
+    src: templates/db-backup.sh.j2
+    dest: /usr/local/bin/db-backup.sh
+    mode: 0755
+    owner: root
+    group: root
+
+# 「退会済みユーザーの個人情報削除バッチ ～ delete_personal_data.pl ～」で gooscpユーザが書き込みできるようにしてやる必要がある。
+- name: Touch log file /var/log/app/idc/delete_personal_data.log for delete_personal_data.pl
+  file:
+    path: /var/log/app/idc/delete_personal_data.log
+    state: touch
+    mode: "u=rw,g=r,o=r"
+    owner: gooscp
+    group: gooscp

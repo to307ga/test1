@@ -1,0 +1,11 @@
+# mdb
+
+# galeraクラスタ設定
+galera_cluster_name: IDHUB_GALERA_DB
+galera_node_name: idhub_dev_db_5
+galera_func: galera
+galera_addr1: idhub-21-dev-sdb-602
+galera_addr2: idhub-21-dev-mdb-602
+galera_addr3: idhub-21-dev-mdb-603
+galera_addr4: idhub-21-dev-sdb-601
+galera_addr5: idhub-21-dev-mdb-601

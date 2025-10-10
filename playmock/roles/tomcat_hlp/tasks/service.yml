@@ -1,0 +1,17 @@
+---
+- name: tomcat.serviceの設定
+  systemd:
+    name: tomcat.service
+    enabled: no
+    daemon_reload: no
+  # 一度もansible-playbookしていない場合は serviceが存在しないため、
+  # dryrunの場合はSkip
+  when: not ansible_check_mode
+  
+- name: tomcat.serviceの開発環境自動起動設定
+  systemd:
+    name: tomcat.service
+    state: started
+    enabled: yes
+    daemon_reload: no
+  when: (release_env == "dev") and (not ansible_check_mode)

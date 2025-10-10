@@ -1,0 +1,101 @@
+---
+# {{ item ~ ".j2" }}で2つの文字列を連結
+- name: /etc/httpd/conf配下の設定ファイルを配布
+  template:
+    src: templates/idhub/conf/{{ item }}-{{ release_env }}.j2
+    dest: /etc/httpd/conf/{{ item }}
+    owner: root
+    group: root
+    mode: 0644
+  loop:
+    - httpd.conf
+  notify:
+    - httpd_rproxy_restart_msg
+
+# {{ item ~ ".j2" }}で2つの文字列を連結
+- name: /etc/httpd/conf配下の設定ファイルを配布(商用のみ)
+  template:
+    src: templates/gooid/conf/{{ item }}-{{ release_env }}.j2
+    dest: /etc/httpd/conf/{{ item }}
+    owner: root
+    group: root
+    mode: 0644
+  loop:
+    - acl-no-otp-servers.conf
+  notify:
+    - httpd_rproxy_restart_msg
+  when: release_env == "pro"
+
+# {{ item ~ ".j2" }}で2つの文字列を連結
+- name: /etc/httpd/conf.d配下の設定ファイルを配布
+  template:
+    src: templates/idhub/conf.d/{{ item }}-{{ release_env }}.j2
+    dest: /etc/httpd/conf.d/{{ item }}
+    owner: root
+    group: root
+    mode: 0644
+  loop:
+    - httpd.conf
+    - idhub.wbo110.goo.ne.jp.conf
+    - ssl.conf
+  notify:
+    - httpd_rproxy_restart_msg
+
+# {{ item ~ ".j2" }}2でつの文字列を連結
+- name: /etc/httpd/conf.modules.d配下の設定ファイルを配布
+  template:
+    src: templates/idhub/conf.modules.d/{{ item }}-{{ release_env }}.j2
+    dest: /etc/httpd/conf.modules.d/{{ item }}
+    owner: root
+    group: root
+    mode: 0644
+  loop:
+    - 00-base.conf
+    - 00-lua.conf
+    - 00-mpm.conf
+    - 00-proxy.conf
+    - 00-ssl.conf
+    - 00-systemd.conf
+    - 01-cgi.conf
+  notify:
+    - httpd_rproxy_restart_msg
+
+- name: フォルダ(/etc/httpd/otp)を作成する
+  file:
+    path: /etc/httpd/otp
+    state: directory
+    owner: apache
+    group: apache
+    mode: 0755
+    recurse: true
+
+# OTP認証用の設定ファイルを配布する
+- name: /etc/httpd/otp配下の設定ファイルを配布
+  copy:
+    src: files/otp/{{ item }}
+    dest: /etc/httpd/otp/{{ item }}
+    owner: apache
+    group: apache
+    mode: 0600
+  loop:
+    - users.pin
+    - users.token
+  tags: otp
+
+- name: add_otpuser.sh ユーティリティを配布
+  copy:
+    src: files/otp/add_otpuser.sh
+    dest: /etc/httpd/otp/add_otpuser.sh
+    owner: root
+    group: root
+    mode: "u=rwx,g=rx,o=rx"
+  tags: otp
+
+- name: README.md配置
+  copy:
+    src: files/otp/README.md
+    dest: /etc/httpd/otp/README.md
+    owner: root
+    group: root
+    mode: "u=rw,g=r,o=r"
+  tags: otp

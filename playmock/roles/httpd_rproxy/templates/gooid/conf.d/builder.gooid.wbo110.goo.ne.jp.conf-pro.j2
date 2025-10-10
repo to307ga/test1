@@ -1,0 +1,34 @@
+<VirtualHost *:443>
+    DocumentRoot "/var/www/html/"
+    ServerName builder.gooid.wbo110.goo.ne.jp:443
+
+    SSLEngine on
+    SSLProtocol -ALL +TLSv1.2
+    SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256
+    SSLHonorCipherOrder Off
+
+    SSLCertificateFile /etc/letsencrypt/live/builder.gooid.wbo110.goo.ne.jp/cert.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/builder.gooid.wbo110.goo.ne.jp/privkey.pem
+
+    SSLProxyEngine on
+    ProxyRequests off
+    ProxyPreserveHost on
+    SSLProxyVerify none
+    SSLProxyCheckPeerCN off
+    SSLProxyCheckPeerName off
+    SSLProxyCheckPeerExpire off
+
+    RequestHeader set X-Forwarded-Proto https
+
+    <Location />
+        Require all granted
+    </Location>
+
+    AllowEncodedSlashes NoDecode
+    <Location /jenkins>
+       ProxyPass http://gooid-21-pro-log-002:8081/jenkins nocanon
+       ProxyPassReverse http://gooid-21-pro-log-002:8081/jenkins
+    </Location>
+    Header edit Location ^http://gooid-21-pro-log-002/jenkins/ https://gooid-21-pro-log-002/jenkins/
+
+</VirtualHost>

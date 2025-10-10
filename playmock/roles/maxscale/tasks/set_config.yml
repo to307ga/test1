@@ -1,0 +1,20 @@
+---
+- name: Copy maxscale.cnf
+  template:
+    src: templates/maxscale.cnf.j2
+    dest: /etc/maxscale.cnf
+    backup: yes 
+    owner: maxscale
+    group: maxscale
+    mode: 0640
+  notify: maxscalecnf changed
+
+
+- name: Copy masking_rules.json
+  copy:
+    src: files/masking_rules.json
+    dest: /etc/maxscale.cnf.d/masking_rules.json
+    owner: maxscale
+    group: maxscale
+    mode: 0640
+  notify: maxscalecnf changed

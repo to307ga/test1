@@ -1,0 +1,110 @@
+---
+# コンテナイメージのビルドに containers.podman モジュールを使っています。
+# playbook 実行環境に次のコマンドでインストールすることができます。
+# インストールコマンド例：
+# export HTTP_PROXY=http://172.17.255.232:8080
+# export HTTPS_PROXY=http://172.17.255.232:8080
+# ansible-galaxy collection install containers.podman
+#
+- name: Redmine コンテナイメージのハッシュ値を取得
+  become: true
+  become_user: container_user
+  block:
+    - name: Redmine イメージビルドの更新を検知するため現在のハッシュ値を取得
+      containers.podman.podman_image_info:
+        name: redmine-podman:1.0.0
+      register: prev_image_info
+      ignore_errors: true
+    - name: Hash値を取得
+      ansible.builtin.set_fact:
+        prev_image_hash_redmine: "{{ prev_image_info.images[0].Id if prev_image_info.images else '' }}"
+
+- name: Redmine コンテナイメージのビルド
+  # redmine_image_updated set to True when redmine image is updated.
+  become: true
+  become_user: container_user
+  block:
+    - name: Build image
+      ansible.builtin.command: podman build -t redmine-podman:1.0.0 -f Containerfile /opt/containers/redmine/
+      changed_when: false
+    - name: Image updated or not
+      containers.podman.podman_image_info:
+        name: redmine-podman:1.0.0
+      register: post_image_info
+      changed_when: post_image_info.images[0].Id != prev_image_hash_redmine
+    - name: Store whether Redmine iamge was updated
+      ansible.builtin.set_fact:
+        redmine_image_updated: "{{ post_image_info.images[0].Id != prev_image_hash_redmine }}"
+
+- name: Redmine DBコンテナイメージのハッシュ値を取得
+  become: true
+  become_user: container_user
+  block:
+    - name: Redmine イメージビルドの更新を検知するため現在のハッシュ値を取得
+      containers.podman.podman_image_info:
+        name: redmine_db-podman:1.0.0
+      register: prev_image_info
+      ignore_errors: true
+    - name: Hash値を取得
+      ansible.builtin.set_fact:
+        prev_image_hash_redmine_db: "{{ prev_image_info.images[0].Id if prev_image_info.images else '' }}"
+
+- name: Redmine DBコンテナイメージのビルド
+  # db_image_updated set to True when redmine DB image is updated.
+  become: true
+  become_user: container_user
+  block:
+    - name: Build DB image
+      ansible.builtin.command: podman build -t redmine_db-podman:1.0.0 -f Containerfile /opt/containers/redmine/mysql
+      changed_when: false
+    - name: Image updated or not
+      containers.podman.podman_image_info:
+        name: redmine_db-podman:1.0.0
+      register: post_image_info
+      changed_when: post_image_info.images[0].Id != prev_image_hash_redmine_db
+    - name: Store whether DB iamge was updated
+      ansible.builtin.set_fact:
+        db_image_updated: "{{ post_image_info.images[0].Id != prev_image_hash_redmine_db }}"
+
+- name: Redmine サービス用ボリュームの準備
+  # command モジュールで podman コマンドを叩くのではなく
+  # Containers.Podman モジュールを使いたい
+  become: true
+  become_user: container_user
+  block:
+    - name: Redmine添付ファイル用ボリュームが存在したら作成しない
+      ansible.builtin.command: podman volume inspect redmine_files
+      register: result_volume_inspect_redmine_files
+      failed_when: result_volume_inspect_redmine_files.rc != 0
+      ignore_errors: true
+      changed_when: false
+    - name: Redmine添付ファイル用ボリュームの作成
+      ansible.builtin.command: podman volume create redmine_files
+      register: result_volume_create_redmine_files
+      when: not ansible_check_mode and result_volume_inspect_redmine_files.rc != 0
+      changed_when: false # 本当はボリュームを作ったら changed ステータスにしたい
+
+    # プラグインはイメージビルド時にインストールするためvolumeの外部共有不要
+    # - name: Redmineプラグイン用ボリュームが存在したら作成しない
+    #   ansible.builtin.command: podman volume inspect redmine_plugins
+    #   register: result_volume_inspect_redmine_plugins
+    #   failed_when: result_volume_inspect_redmine_plugins.rc != 0
+    #   ignore_errors: true
+    #   changed_when: false
+    # - name: Redmineプラグイン用ボリュームの作成
+    #   ansible.builtin.command: podman volume create redmine_plugins
+    #   register: result_volume_create_redmine_plugins
+    #   when: not ansible_check_mode and result_volume_inspect_redmine_plugins.rc != 0
+    #   changed_when: false # 本当はボリュームが正常に作られたら changed ステータスにしたい
+
+    - name: Redmine DB用ボリュームが存在したら作成しない
+      ansible.builtin.command: podman volume inspect redmine_db_data
+      register: result_volume_inspect_redmine_db_data
+      failed_when: result_volume_inspect_redmine_db_data.rc != 0
+      ignore_errors: true
+      changed_when: false
+    - name: Redmine DB用ボリュームの作成
+      ansible.builtin.command: podman volume create redmine_db_data
+      register: result_volume_create_redmine_db_data
+      when: not ansible_check_mode and result_volume_inspect_redmine_db_data.rc != 0
+      changed_when: false # 本当はボリュームが正常に作られたら changed ステータスにしたい

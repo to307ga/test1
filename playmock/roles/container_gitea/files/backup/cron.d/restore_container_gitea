@@ -1,0 +1,3 @@
+# container_gitea backup restoreing schedule
+# Note: Replace BACKUP_SOURCE_HOSTNAME with actual container hostname before deploying this file to /etc/cron.d/
+45 03 * * * root /opt/containers/backup/gitea_restore.sh BACKUP_SOURCE_HOSTNAME -y >/dev/null 2>&1

@@ -1,0 +1,10 @@
+---
+
+- name: deny ssh
+  copy:
+    src:    files/hosts.deny
+    dest:   /etc/hosts.deny
+    mode:   0644
+    owner:  root
+    group:  root
+  tags: deny

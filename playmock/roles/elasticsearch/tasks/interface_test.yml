@@ -1,0 +1,62 @@
+---
+
+# IPが一つしか設定されてないならこっちの方が確実
+# - name: "dump variables hostvars"
+  # debug: var=hostvars[inventory_hostname]['ansible_default_ipv4']['address']
+
+ # eth とか使ってない場合があるので事前に確認が必要 （複数のIFを持っていてどちらかを明示的に使いたい場合）
+# - name: "dump variables hostvars"
+  # debug: var=ansible_facts.eth1.ipv4.address
+
+- name: set_fact elastic_ip_address
+  set_fact:
+    elastic_ip_address: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+  when: release_env == "dev"
+
+- name: set_fact elastic_ip_address
+  set_fact:
+    elastic_ip_address: "{{ ansible_facts.eth1.ipv4.address }}"
+  when: release_env == "pro"
+
+- debug: var=elastic_ip_address
+
+# - name: set_fact elastic_iface
+  # set_fact:
+    # elastic_iface: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['interface'] }}"
+
+# - debug: var=elastic_iface
+
+- name: set_fact hostname and ip (dev)
+  set_fact:
+    es_host:
+      hostname: "{{ item }}"
+      ip: "{{ hostvars[item]['elastic_ip_address'] }}"
+  with_items: "{{ groups['idhub_els'] }}" 
+  register: es_hosts
+  when: release_env == "dev"
+
+- name: set_fact hostname and ip (pro)
+  set_fact:
+    es_host:
+      hostname: "{{ item }}"
+      ip: "{{ hostvars[item]['elastic_ip_address'] }}"
+  with_items: "{{ groups['gooid_search'] }}" 
+  register: es_hosts
+  when: release_env == "pro"
+
+- debug: var=es_hosts
+
+- name: set_fact es_hosts
+  set_fact:
+    es_hosts: "{{ es_hosts.results | map(attribute='ansible_facts.es_host') | list }}"
+
+- debug: var=es_hosts
+
+- name: Add Elasticsearch cluster entries to /etc/hosts
+  lineinfile:
+    path: "/etc/hosts"
+    regexp: ".*\\s+{{ item.hostname }}"
+    line: "{{ item.ip }}\t{{ item.hostname }}"
+    state: present
+    backup: yes
+  with_items: "{{ es_hosts }}"

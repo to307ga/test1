@@ -1,0 +1,10 @@
+#!/bin/sh
+
+TOMCAT_INSTANCE=idc
+JAVA_HOME=/usr/java/default
+CATALINA_HOME=/opt/tomcat
+CATALINA_BASE=/usr/local/tomcat/$TOMCAT_INSTANCE
+JAVA_OPTS="-server"
+#CATALINA_OPTS="-Xms1024m -Xmx1024m -XX:+PrintGCDetails -Xloggc:/var/log/tomcat/idc/gc.`date '+%Y-%m-%d-%H%M%S'`.log"
+CATALINA_OPTS="-Xms1024m -Xmx1024m"
+

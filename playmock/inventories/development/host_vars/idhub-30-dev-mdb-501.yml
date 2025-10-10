@@ -1,0 +1,18 @@
+# mdb
+
+# galeraクラスタ設定
+galera_cluster_name: IDHUB_GALERA_DB
+galera_node_name: idhub_dev_db_1
+# クラスタを構成していた他のすべてのサーバが削除されているので不要
+# galera_func: galera
+galera_addr1: idhub-30-dev-mdb-501
+galera_addr2: idhub-30-dev-mdb-502
+galera_addr3: idhub-30-dev-mdb-503
+galera_addr4: idhub-30-dev-sdb-501
+galera_addr5: idhub-30-dev-sdb-502
+
+# Galera Cluster のLeaderであるか？
+# 実際に動的にステータスは見ずに、静的に定義するのみ
+# これがtrueの場合、Clusterが構築されていると前提をおいた上で、
+# MySQL GRANT定義などを行ったりする。
+galera_cluster_leader: true

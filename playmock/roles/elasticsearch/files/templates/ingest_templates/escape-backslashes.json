@@ -1,0 +1,12 @@
+{
+  "description": "Adding escape characters.",
+  "processors": [
+    {
+      "gsub" : {
+        "field" : "message",
+        "pattern": "/\\/",
+        "replacement": "\\\\"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+---
+- hosts: gooid_oidc
+  become: yes
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: common, tags: common }
+    - { role: jdk, tags: jdk }
+    - { role: gooid_oidc, tags: gooid_oidc }
+    - { role: proxysql, tags: proxysql }
+    - { role: httpd_oidc, tags: httpd_oidc }
+    - { role: mariadb_client, tags: mariadb_client }
+    - { role: rbash, tags: rbash }
+    - { role: extend-acl, tags: extend-acl}

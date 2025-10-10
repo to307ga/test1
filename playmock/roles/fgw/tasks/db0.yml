@@ -1,0 +1,26 @@
+---
+- name: /db0/wwwを作成
+  file:
+    path: "{{ item.path }}"                                                                                  
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /db0, mode: '0755' }
+    - { path: /db0/www, mode: '0755' }
+
+- name: /db/www配下のディレクトリを作成
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: gooscp
+    group: gooscp
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /db0/www/idhub, mode: '0755' }
+    - { path: /db0/www/COMMON, mode: '0755' }
+    - { path: /db0/www/idhub/report, mode: '0755' }
+    - { path: /db0/www/COMMON/report, mode: '0755' }
+    - { path: /db0/www/COMMON/point, mode: '0755' }
+    - { path: /db0/shopify-backup-202504, mode: '0755' } # Shopify 取引データ保管場所

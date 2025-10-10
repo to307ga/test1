@@ -1,0 +1,42 @@
+<worker {{td_agent_worker3}}>
+  <source>
+    @type tail
+    path /db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_reject_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/delete_temporary_register_account.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/delete_authn_session.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/delete_expired_history.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_active_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_goo_active_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_register_error_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_add_uid_error_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_ocn_disconnect_error_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_ocn_dpointcard_error_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_goo_register_error_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_goo_disconnect_error_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_goo_dpointcard_error_account_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_goo_active_account_monthly_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/make_docomo_link_info_list.%Y-%m-%d.log,/db0/tdlogs/merged/idhub-{{ project_id_number_env }}-batch/var.log.app.idhub/delete_personal_data.%Y-%m-%d.log
+    pos_file /var/log/td-agent/gooid-batch_app_idhub_counts.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag gooid-batch_app_idhub_counts
+    <parse>
+      @type regexp
+      time_format %Y/%m/%d %H:%M:%S,%L
+      # マージログはホスト名がついたりしているのでパース用のexpressionはそのまま使えないので修正が必要 (?<server>[^ ]*)  を先頭に付ければOK
+      expression /(?<server>[^ ]*) (?<message>.+)/
+      # keep_time_key true
+    </parse>
+  </source>
+
+  <match gooid-batch_app_idhub_counts>
+    @type         datacounter         
+    count_interval 5m 
+    aggregate all
+    count_key message
+    # patternX: X(1-20)
+    pattern1 to_zabbix.error.gooid.app_idhub .*\[\[E\]\].*
+    tag count.gooid-batch_app_idhub.message
+  </match>  
+
+  <match count.gooid-batch_app_idhub.message>
+    @type               file
+    append              true
+    # The filename of the path should be the same as the filename of this file.
+    path /db0/tdlogs/zabbix-sender-count/app_idhub_counts
+    time_slice_format   %Y-%m-%d
+    <buffer time>
+      @type memory
+      timekey             1d
+      timekey_wait        0s
+      flush_mode          immediate
+      flush_at_shutdown   true
+    </buffer>
+  </match>
+</worker>

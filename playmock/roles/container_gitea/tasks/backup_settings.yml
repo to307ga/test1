@@ -1,0 +1,93 @@
+---
+# 運用管理：バックアップ用ディレクトリ作成
+- name: Create directory for backup
+  block:
+    - name: Create base backup directory
+      ansible.builtin.file:
+        path: /db0
+        owner: gooscp
+        group: gooscp
+        mode: "0755"
+        state: directory
+    - name: Create base backup directory part 2
+      ansible.builtin.file:
+        path: /db0/backups
+        owner: gooscp
+        group: gooscp
+        mode: "0755"
+        state: directory
+    - name: Create backup directory for Gitea service
+      ansible.builtin.file:
+        path: /db0/backups/gitea
+        owner: gooscp
+        group: gooscp
+        mode: "0755"
+        state: directory
+
+# 運用管理：バックアップボリュームへコンテナ内から読み書きできる様にオーナーを調整する
+- name: Ensure correct owner for backup volume access from inside container
+  become: true
+  ansible.builtin.file:
+    path: "{{ mountpoint_gitea_backup }}"
+    owner: "101000"
+    group: "101000"
+    mode: "0755"
+    state: directory
+
+# 運用管理：バックアップスクリプトの配置
+# container ロールで backpu/lib ファイルが配置されている必要がある
+- name: Create backup directory
+  ansible.builtin.file:
+    path: /opt/containers/backup
+    owner: container_user
+    group: container_user
+    mode: "0755"
+    state: directory
+- name: Deploy backup script
+  ansible.builtin.copy:
+    src: files/backup/gitea_backup.sh
+    dest: /opt/containers/backup/gitea_backup.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+- name: Deploy restore script
+  ansible.builtin.copy:
+    src: files/backup/gitea_restore.sh
+    dest: /opt/containers/backup/gitea_restore.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+# 運用管理：cron ファイルのコピー
+- name: Create cron file directory
+  ansible.builtin.file:
+    path: /opt/containers/backup/cron.d
+    state: directory
+    owner: container_user
+    group: container_user
+    mode: "0755"
+- name: Copy backup cron file
+  ansible.builtin.copy:
+    src: files/backup/cron.d/backup_container_gitea
+    dest: /opt/containers/backup/cron.d/backup_container_gitea
+    owner: container_user
+    group: container_user
+    mode: "0644"
+- name: Copy restore cron file
+  ansible.builtin.copy:
+    src: files/backup/cron.d/restore_container_gitea
+    dest: /opt/containers/backup/cron.d/restore_container_gitea
+    owner: container_user
+    group: container_user
+    mode: "0644"
+
+- name: 実運用時の cron 設置方法
+  ansible.builtin.debug:
+    msg:
+      - "バックアップをスケジュール実行する場合は cron ファイルを /etc/cron.d/ にコピーしてください。"
+      - "通常ユーザーで次のコマンドを実行します。"
+      - "$ sudo cp /opt/containers/backup/cron.d/backup_container_gitea /etc/cron.d/"
+      - "バックアップファイルの同期とリストアを実行する場合はスタンバイホストの cron ファイルを適切に編集した後"
+      - "/etc/cron.d に配置してください。"
+      - "$ sudo vi /opt/containers/backup/cron.d/restore_container_gitea"
+      - "※BACKUP_SOURCE_HOSTNAME を同期元であるコンテナ稼働ホスト名に書き換えます。"

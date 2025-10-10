@@ -1,0 +1,90 @@
+---
+# 運用管理：ユーティリティスクリプトの配置
+- name: Create utils directory
+  ansible.builtin.file:
+    path: /opt/containers/utils
+    state: directory
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+- name: Create utils/lib directory
+  ansible.builtin.file:
+    path: /opt/containers/utils/lib
+    state: directory
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+- name: Deploy backup lib file - container_utils.sh
+  ansible.builtin.copy:
+    src: files/utils/lib/container_utils.sh
+    dest: /opt/containers/utils/lib/container_utils.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+- name: Deploy backup lib file - journal.sh
+  ansible.builtin.copy:
+    src: files/utils/lib/journal.sh
+    dest: /opt/containers/utils/lib/journal.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+- name: Deploy backup lib file - rotate_files.sh
+  ansible.builtin.copy:
+    src: files/utils/lib/rotate_files.sh
+    dest: /opt/containers/utils/lib/rotate_files.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+- name: Deploy backup lib file - sync_files.sh
+  ansible.builtin.copy:
+    src: files/utils/lib/sync_files.sh
+    dest: /opt/containers/utils/lib/sync_files.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+- name: Deploy utility script - service_utils.sh
+  ansible.builtin.copy:
+    src: files/utils/lib/service_utils.sh
+    dest: /opt/containers/utils/lib/service_utils.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+# 運用管理：ユーティリティスクリプトの配置
+- name: Deploy utility script - container_cleanup.sh
+  ansible.builtin.copy:
+    src: files/utils/container_cleanup.sh
+    dest: /opt/containers/utils/container_cleanup.sh
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+# 運用管理：cron スケジュールの配置
+- name: Create utils/cron.d directory
+  ansible.builtin.file:
+    path: /opt/containers/utils/cron.d
+    state: directory
+    owner: container_user
+    group: container_user
+    mode: "0755"
+
+- name: Deploy utility cron
+  ansible.builtin.copy:
+    src: files/utils/cron.d/container_utils
+    dest: /opt/containers/utils/cron.d/container_utils
+    owner: container_user
+    group: container_user
+    mode: "0644"
+
+- name: 実運用時の cron 設置方法
+  ansible.builtin.debug:
+    msg:
+      - "コンテナユーティリティをスケジュール実行する場合は cron ファイルを /etc/cron.d/ にコピーしてください。"
+      - "通常ユーザーで次のコマンドを実行します。"
+      - "$ sudo cp /opt/containers/utils/cron.d/container_utils /etc/cron.d/"

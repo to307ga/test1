@@ -1,0 +1,21 @@
+---
+# 他のロールでのタスクをrefactorしてここで一括管理する
+- name: httpd packageがインストールする余計なファイルを削除する
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/httpd/conf.d/autoindex.conf
+    - /etc/httpd/conf.d/userdir.conf
+    - /etc/httpd/conf.d/welcome.conf
+  
+# localhostからのブラウザのみに対してステータスの報告を使用可能にする設定ファイルを配布
+- name: server-status.confを配布
+  template:
+    src: templates/server-status.conf.j2
+    dest: /etc/httpd/conf.d/server-status.conf
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - httpd_restart_msg

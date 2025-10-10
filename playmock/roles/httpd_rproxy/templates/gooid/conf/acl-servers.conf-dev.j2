@@ -1,0 +1,1266 @@
+{#
+2023/3/1までacl-confを以下のサーバーで許可IPを管理していたが、管理コスト削減のため一か所にマージする
+gooid-30-dev-rproxy-xxx
+    acl-servers.conf
+    d-acl-servers.conf
+gooid-30-dev-web-xxx,idhub-30-dev-web-xxx
+    acl-servers.conf
+メディア技術担当主管リバプロ
+   acl-servers.conf
+※元々それぞれのサーバーでどのIPを管理していたか分かるようにするため
+※一旦重複削除は行わない
+#}
+
+{# gooid-30-dev-rproxy-xxx acl-servers.conf #}
+
+# Private IP (RFC 1597 https://www.rfc-editor.org/rfc/rfc1597)
+Require ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+
+#gooid独自定義IP
+Require ip 110.50.68.35/32
+Require ip 218.42.154.66/32
+Require ip 110.50.68.35/32
+Require ip 116.58.168.241/32
+Require ip 218.42.154.66/32
+Require ip 1.55.242.188/32
+Require ip 103.37.29.230/32
+Require ip 113.41.126.222/32
+Require ip 113.43.222.64/29
+Require ip 113.43.73.18/32
+Require ip 114.160.234.19/32
+Require ip 114.160.244.6/32
+Require ip 114.179.11.16/32
+Require ip 114.179.69.147/32
+Require ip 116.58.168.241/32
+Require ip 116.97.243.74/32
+Require ip 118.238.222.11/32
+Require ip 121.101.95.128/32
+Require ip 122.1.110.225/32
+Require ip 122.1.119.65/32
+Require ip 122.208.204.114/32
+Require ip 122.216.73.64/29
+Require ip 122.217.100.122/32
+Require ip 122.220.121.72/29
+Require ip 124.37.248.56/29
+Require ip 133.232.117.130/32
+Require ip 133.232.117.131/32
+Require ip 133.242.186.151/32
+Require ip 133.242.235.202/32
+Require ip 14.160.25.214/32
+Require ip 152.165.116.183/32
+Require ip 152.165.122.73/32
+Require ip 153.127.197.88/32
+Require ip 153.156.43.25/32
+Require ip 153.156.71.88/32
+Require ip 157.14.138.155/32
+Require ip 157.14.138.177/32
+Require ip 157.14.138.196/32
+Require ip 157.14.144.188/32
+Require ip 175.41.240.48/32
+Require ip 175.41.252.31/32
+Require ip 176.32.85.48/32
+Require ip 18.176.94.67/32
+Require ip 18.177.201.218/32
+Require ip 18.177.240.114/32
+Require ip 18.178.48.123/32
+Require ip 180.43.32.103/32
+Require ip 180.43.8.247/32
+Require ip 183.91.158.133/32
+Require ip 183.91.158.136/32
+Require ip 210.166.157.154/32
+Require ip 210.225.116.10/32
+Require ip 210.225.95.128/25
+Require ip 219.114.164.0/26
+Require ip 219.117.198.241/32
+Require ip 220.248.27.226/32
+Require ip 221.189.4.232/29
+Require ip 3.113.26.97/32
+Require ip 35.222.208.56/32
+Require ip 35.225.5.236/32
+Require ip 36.2.107.205/32
+Require ip 39.110.204.178/32
+Require ip 39.110.211.44/32
+Require ip 39.110.224.48/29
+Require ip 42.112.114.236/32
+Require ip 42.116.7.14/32
+Require ip 52.196.18.139/32
+Require ip 52.69.116.54/32
+Require ip 54.238.52.161/32
+Require ip 54.238.53.134/32
+Require ip 54.248.218.250/32
+Require ip 54.248.221.11/32
+Require ip 54.248.87.154/32
+Require ip 54.249.193.102/32
+Require ip 54.249.253.251/32
+Require ip 61.112.83.183/32
+Require ip 61.117.133.194/32
+Require ip 61.126.190.213/32
+Require ip 61.126.191.240/32
+Require ip 153.254.146.0/23
+Require ip 153.254.148.0/23
+Require ip 104.154.209.71/32
+Require ip 104.197.235.183/32
+Require ip 34.67.202.42/32
+Require ip 34.67.53.217/32
+Require ip 34.68.67.126/32
+Require ip 34.69.247.233/32
+Require ip 34.70.171.212/32
+Require ip 35.194.18.229/32
+Require ip 35.202.128.248/32
+Require ip 35.222.249.48/32
+Require ip 35.223.189.13/32
+Require ip 35.224.7.225/32
+Require ip 35.226.236.156/32
+Require ip 35.226.82.165/32
+Require ip 35.238.250.202/32
+Require ip 54.65.252.193/32
+Require ip 153.125.131.198/32
+Require ip 153.254.146.0/23
+Require ip 153.254.148.0/23
+Require ip 153.156.71.88/32
+Require ip 219.114.164.0/26
+Require ip 153.254.146.0/23
+Require ip 153.254.148.0/23
+Require ip 153.156.71.88/32
+Require ip 113.43.222.64/29
+Require ip 114.179.69.147/32
+Require ip 122.1.110.225/32
+Require ip 122.217.100.122/32
+Require ip 124.37.248.56/29
+Require ip 133.242.235.202/32
+Require ip 152.165.122.73/32
+Require ip 153.127.197.88/32
+Require ip 35.222.208.56/32
+Require ip 39.110.211.44/32
+Require ip 52.196.18.139/32
+Require ip 54.249.253.251/32
+Require ip 104.154.209.71/32
+Require ip 104.197.235.183/32
+Require ip 34.67.202.42/32
+Require ip 34.67.53.217/32
+Require ip 34.68.67.126/32
+Require ip 34.69.247.233/32
+Require ip 34.70.171.212/32
+Require ip 35.194.18.229/32
+Require ip 35.202.128.248/32
+Require ip 35.222.249.48/32
+Require ip 35.223.189.13/32
+Require ip 35.224.7.225/32
+Require ip 35.226.236.156/32
+Require ip 35.226.82.165/32
+Require ip 35.238.250.202/32
+Require ip 54.65.252.193/32
+Require ip 153.125.131.198/32
+Require ip 110.50.68.35/32
+Require ip 116.58.168.241/32
+Require ip 218.42.154.66/32
+Require ip 153.156.71.88/32
+Require ip 116.58.168.241/32
+Require ip 152.165.116.183/32
+Require ip 157.14.144.188/32
+Require ip 18.176.94.67/32
+Require ip 18.177.201.218/32
+Require ip 18.177.240.114/32
+Require ip 18.178.48.123/32
+Require ip 3.113.26.97/32
+Require ip 104.154.209.71/32
+Require ip 104.197.235.183/32
+Require ip 34.67.202.42/32
+Require ip 34.67.53.217/32
+Require ip 34.68.67.126/32
+Require ip 34.69.247.233/32
+Require ip 34.70.171.212/32
+Require ip 35.194.18.229/32
+Require ip 35.202.128.248/32
+Require ip 35.222.249.48/32
+Require ip 35.223.189.13/32
+Require ip 35.224.7.225/32
+Require ip 35.226.236.156/32
+Require ip 35.226.82.165/32
+Require ip 35.238.250.202/32
+Require ip 54.65.252.193/32
+Require ip 153.125.131.198/32
+Require ip 153.156.71.88/32
+Require ip 122.208.204.114/32
+Require ip 175.41.252.31/32
+Require ip 153.156.71.88/32
+Require ip 153.156.71.88/32
+Require ip 153.254.146.0/23
+Require ip 153.254.148.0/23
+Require ip 110.50.68.35/32
+Require ip 218.42.154.66/32
+Require ip 113.41.126.222/32
+Require ip 113.43.222.64/29
+Require ip 114.179.69.147/32
+Require ip 122.1.110.225/32
+Require ip 122.217.100.122/32
+Require ip 124.37.248.56/29
+Require ip 133.242.235.202/32
+Require ip 152.165.122.73/32
+Require ip 153.127.197.88/32
+Require ip 153.156.71.88/32
+Require ip 210.144.14.171/32
+Require ip 210.166.157.154/32
+Require ip 35.222.208.56/32
+Require ip 35.225.5.236/32
+Require ip 39.110.211.44/32
+Require ip 52.196.18.139/32
+Require ip 54.249.193.102/32
+Require ip 54.249.253.251/32
+Require ip 61.112.83.183/32
+Require ip 157.65.160.184/32
+Require ip 210.239.44.160/32
+Require ip 110.50.68.35/32
+Require ip 116.58.168.241/32
+Require ip 218.42.154.66/32
+Require ip 157.65.160.184/32
+Require ip 1.55.242.188/32
+Require ip 103.37.29.230/32
+Require ip 116.58.168.241/32
+Require ip 116.97.243.74/32
+Require ip 14.160.25.214/32
+Require ip 152.165.116.183/32
+Require ip 157.14.144.188/32
+Require ip 18.176.94.67/32
+Require ip 18.177.201.218/32
+Require ip 18.177.240.114/32
+Require ip 18.178.48.123/32
+Require ip 3.113.26.97/32
+Require ip 42.112.114.236/32
+Require ip 42.116.7.14/32
+Require ip 52.196.18.139/32
+Require ip 52.69.116.54/32
+Require ip 104.154.209.71/32
+Require ip 104.197.235.183/32
+Require ip 34.67.202.42/32
+Require ip 34.67.53.217/32
+Require ip 34.68.67.126/32
+Require ip 34.69.247.233/32
+Require ip 34.70.171.212/32
+Require ip 35.194.18.229/32
+Require ip 35.202.128.248/32
+Require ip 35.222.249.48/32
+Require ip 35.223.189.13/32
+Require ip 35.224.7.225/32
+Require ip 35.226.236.156/32
+Require ip 35.226.82.165/32
+Require ip 35.238.250.202/32
+Require ip 54.65.252.193/32
+Require ip 153.125.131.198/32
+Require ip 110.50.68.35/32
+Require ip 218.42.154.66/32
+Require ip 157.65.160.184/32
+Require ip 210.239.44.160/32
+Require ip 110.50.68.35/32
+Require ip 116.58.168.241/32
+Require ip 218.42.154.66/32
+Require ip 153.156.71.88/32
+Require ip 157.65.160.184/32
+Require ip 1.55.242.188/32
+Require ip 103.37.29.230/32
+Require ip 116.58.168.241/32
+Require ip 116.97.243.74/32
+Require ip 14.160.25.214/32
+Require ip 152.165.116.183/32
+Require ip 157.14.144.188/32
+Require ip 18.176.94.67/32
+Require ip 18.177.201.218/32
+Require ip 18.177.240.114/32
+Require ip 18.178.48.123/32
+Require ip 3.113.26.97/32
+Require ip 42.112.114.236/32
+Require ip 42.116.7.14/32
+Require ip 52.196.18.139/32
+Require ip 52.69.116.54/32
+Require ip 104.154.209.71/32
+Require ip 104.197.235.183/32
+Require ip 34.67.202.42/32
+Require ip 34.67.53.217/32
+Require ip 34.68.67.126/32
+Require ip 34.69.247.233/32
+Require ip 34.70.171.212/32
+Require ip 35.194.18.229/32
+Require ip 35.202.128.248/32
+Require ip 35.222.249.48/32
+Require ip 35.223.189.13/32
+Require ip 35.224.7.225/32
+Require ip 35.226.236.156/32
+Require ip 35.226.82.165/32
+Require ip 35.238.250.202/32
+Require ip 54.65.252.193/32
+Require ip 153.125.131.198/32
+Require ip 157.65.160.184/32
+Require ip 210.239.44.160/32
+Require ip 153.156.71.88/32
+Require ip 157.65.160.184/32
+Require ip 153.254.146.0/23
+Require ip 153.254.148.0/23
+
+
+#社内デフォルトIP
+Require ip 210.144.64.0/24
+Require ip 202.217.72.0/24
+Require ip 202.217.73.0/24
+Require ip 202.217.75.0/24
+Require ip 61.126.179.233/32
+Require ip 203.138.153.247/32
+Require ip 120.88.55.0/24
+Require ip 124.38.245.90/32
+Require ip 221.245.250.58/32
+Require ip 203.141.136.194/32
+Require ip 210.229.179.170/32
+Require ip 211.128.86.128/27
+Require ip 117.102.183.51/32
+Require ip 35.200.36.54/32
+Require ip 35.200.63.242/32
+Require ip 35.197.17.40/32
+Require ip 35.199.191.1/32
+Require ip 114.179.184.0/24
+# 2024/9/11 追加 NTTレゾナントVDI
+Require ip 202.217.74.160/28
+
+#gooidプロジェクト内
+Require ip 127.0.0.1/32
+Require ip 172.17.102.0/24
+
+#Qualysgurds
+Require ip 64.39.96.0/20
+
+#goo事務局
+Require ip 122.1.110.225/32
+Require ip 114.179.69.147/32
+Require ip 122.217.100.122/32
+
+
+#三鷹商用
+Require ip 202.217.75.82
+
+
+
+## 2022-10-11 k5ito
+## 下記、URL記載の、各、「社内身内IPリスト」の台帳を元に、
+## 全ての社内身内IPを列挙しました。
+## 上記で既に出現済みのIPと重複している可能性はありますが冗長に定義します。
+
+## NTT Resonant Global IP : https://bit.ly/3OKKm99
+
+### NTTレゾナント長岡(VDI)
+Require ip 203.138.153.247/32
+### 長岡Rクラウド
+Require ip 61.113.104.0/24
+### 長岡Rクラウド
+Require ip 114.179.184.0/23
+### 長岡Rクラウド
+Require ip 219.164.251.0/24
+### NTTレゾナント大手町オフィス(reso-intra(有線無線))
+Require ip 153.143.181.0/28
+### NTTレゾナント大手町オフィス(reso-wifi(有線無線))
+Require ip 153.143.181.16/28
+
+
+## NTT Resonant Global IP : http://bit.ly/2Orr0ro
+
+### 三鷹-goonet
+Require ip 210.144.64.0/24
+### 三鷹-goonet
+Require ip 202.217.72.0/24
+### 三鷹-goonet
+Require ip 202.217.73.0/24
+### 三鷹ホスティング環境
+Require ip 202.217.75.0/24
+### NTTレゾナント田町(reso-wifi)
+Require ip 61.126.179.233/32
+### NTTレゾナント長岡(VDI)
+Require ip 203.138.153.247/32
+### GIN-HB
+Require ip 120.88.55.0/24
+### 長岡Rクラウド
+Require ip 61.113.104.0/24
+### 長岡Rクラウド
+Require ip 219.167.251.0/24
+### JIG-SAW社監視拠点
+Require ip 124.38.245.90/32
+### JIG-SAW社監視拠点
+Require ip 221.245.250.58/32
+### JIG-SAW社監視拠点
+Require ip 203.141.136.194/32
+### JIG-SAW社監視拠点
+Require ip 210.229.179.170/32
+### JIG-SAW社監視拠点
+Require ip 211.128.86.128/27
+### JIG-SAW社監視拠点
+Require ip 117.102.183.51/32
+### JIG-SAW社監視拠点(GCP)
+Require ip 35.200.36.54/32
+### JIG-SAW社監視拠点(GCP)
+Require ip 35.200.63.242/32
+### JIG-SAW社監視拠点(GCP)
+Require ip 35.197.17.40/32
+### JIG-SAW社監視拠点(GCP)
+Require ip 35.199.191.1/32
+### JIG-SAW社監視拠点
+Require ip 96.45.197.202/32
+### JIG-SAW社監視拠点
+Require ip 72.138.67.80/29
+### JIG-SAW社監視拠点
+Require ip 58.12.243.208/28
+### JIG-SAW社監視拠点
+Require ip 221.245.235.248/29
+### JIG-SAW社監視拠点
+Require ip 221.115.122.18/32
+### JIG-SAW社監視拠点
+Require ip 150.249.201.237/32
+### JIG-SAW社監視拠点
+Require ip 58.157.254.162/32
+
+{# gooid-30-dev-rproxy-xxx d-acl-servers.conf #}
+
+#社内デフォルトIP
+
+## NTT Resonant Global IP : https://bit.ly/3OKKm99
+
+### NTTレゾナント長岡(VDI)
+Require ip 203.138.153.247/32
+### 長岡Rクラウド
+Require ip 61.113.104.0/24
+### 長岡Rクラウド
+Require ip 114.179.184.0/23
+### 長岡Rクラウド
+Require ip 219.164.251.0/24
+### NTTレゾナント大手町オフィス(reso-intra(有線無線))
+Require ip 153.143.181.0/28
+### NTTレゾナント大手町オフィス(reso-wifi(有線無線))
+Require ip 153.143.181.16/28
+### NTTレゾナント大手町オフィス - セカンダリ (reso-intra(有線無線)) = Gold Zone
+Require ip 202.217.74.160/28
+
+
+## NTT Resonant Global IP : http://bit.ly/2Orr0ro
+
+### 三鷹-goonet
+Require ip 210.144.64.0/24
+Require ip 202.217.72.0/24
+Require ip 202.217.73.0/24
+### 三鷹ホスティング環境（含む gooid-21/idhub-21）
+Require ip 202.217.75.0/24
+
+### GIN-HB
+Require ip 120.88.55.0/24
+### JIG-SAW社監視拠点
+Require ip 219.167.251.0/24
+Require ip 124.38.245.90/32
+Require ip 221.245.250.58/32
+Require ip 203.141.136.194/32
+Require ip 210.229.179.170/32
+Require ip 211.128.86.128/27
+Require ip 117.102.183.51/32
+### Puzzle
+Require ip 35.200.36.54/32
+Require ip 35.200.63.242/32
+Require ip 35.197.17.40/32
+Require ip 35.199.191.1/32
+### JIG-SAW社監視拠点
+Require ip 96.45.197.202/32 72.138.67.80/29 58.12.243.208/28 221.245.235.248/29 221.115.122.18/32 150.249.201.237/32 58.157.254.162/32
+
+# 下記記載のものは全て上記に含まれている
+
+## Cloud Foundary on R-Cloud
+##61.113.104.174
+##61.113.104.175
+
+## point
+### op.point.goo.ne.jp, AD/AP server on Mitaka-DC
+###202.217.75.122
+### api.point.goo.ne.jp on Mitaka-DC
+###202.217.75.123
+
+### OCN たまる・つかう や GOOxD, on R-Cloud
+###114.179.184.48
+###114.179.184.177
+###114.179.184.191
+###114.179.184.193
+###114.179.184.194
+###114.179.184.195
+###114.179.184.196
+
+## Interlink VPM
+Require ip 153.127.197.88/32
+
+## CNS
+# CNS (2025-02: IP変更に伴い "118.～","155.～" を追加。当面新旧併用)
+Require ip 210.162.169.106/32 118.238.220.252/32 155.190.52.82/32
+## CNS北海道
+Require ip 115.163.16.155/32
+
+## localhost
+Require ip 127.0.0.1
+
+## Private IP (RFC 1380, RFC 1597) : https://bit.ly/3vnYSw7
+Require ip 10.0.0.0/8
+Require ip 172.16.0.0/12
+Require ip 192.168.0.0/16
+
+## ちょコム 2022以前
+###Require ip 210.144.14.155 210.144.14.156 210.144.14.171
+## ちょコム 2023
+###Require ip 210.144.34.91 210.144.34.92 210.144.34.107
+
+## OCN マイページ
+### マイペ本番環境（東）
+###Require ip 61.118.33.152 61.118.33.153 61.118.33.154
+###Require ip 61.118.33.228
+### マイペ本番環境（西）
+###Require ip 210.145.245.145/32 210.145.245.146/31 210.145.245.148/32
+### マイペ検証環境
+Require ip 153.153.145.221/32
+
+### Qualysgurds
+Require ip 64.39.96.0/20
+
+### goo事務局
+Require ip 122.1.110.225/32
+Require ip 114.179.69.147/32
+Require ip 122.217.100.122/32
+
+
+{# gooid-30-dev-web-xxx acl-servers.conf #}
+
+# gooid
+
+#gooid独自定義IP
+Require ip 110.50.68.35/32
+Require ip 218.42.154.66/32
+Require ip 116.58.168.241/32
+Require ip 1.55.242.188/32
+Require ip 103.37.29.230/32
+Require ip 113.161.55.204/32
+Require ip 113.41.126.222/32
+Require ip 113.43.222.64/29
+Require ip 113.43.73.18/32
+Require ip 114.160.234.19/32
+#Require ip 114.160.244.6/32
+Require ip 114.179.11.16/32
+
+### Marchelベンダ カスタメディア
+Require ip 114.168.236.70/32
+Require ip 157.14.105.98/32
+Require ip 153.120.171.33/32
+
+Require ip 114.179.69.147/32
+Require ip 116.97.243.74/32
+Require ip 118.238.222.11/32
+Require ip 121.101.95.128/32
+Require ip 122.1.110.225/32
+Require ip 122.1.119.65/32
+Require ip 122.208.150.194/32
+Require ip 122.208.204.114/32
+Require ip 122.216.73.64/29
+Require ip 122.217.100.122/32
+Require ip 122.220.121.72/29
+Require ip 124.37.248.56/29
+Require ip 133.232.103.108/32
+Require ip 133.232.117.130/32
+Require ip 133.232.117.131/32
+Require ip 133.242.186.151/32
+Require ip 133.242.235.202/32
+Require ip 14.160.25.214/32
+Require ip 14.161.48.245/32
+Require ip 39.110.201.11/32
+Require ip 152.165.122.73/32
+Require ip 153.124.190.42/32
+Require ip 153.127.197.88/32
+Require ip 153.127.198.23/32
+Require ip 153.156.43.25/32
+Require ip 153.156.71.88/32
+Require ip 153.163.214.8/32
+Require ip 157.14.138.155/32
+Require ip 157.14.138.177/32
+Require ip 157.14.138.196/32
+Require ip 157.14.144.188/32
+Require ip 157.7.138.46/32
+Require ip 175.41.240.48/32
+Require ip 175.41.252.31/32
+Require ip 176.32.85.48/32
+Require ip 18.176.94.67/32
+Require ip 18.177.201.218/32
+Require ip 18.177.240.114/32
+Require ip 18.177.32.85/32
+Require ip 18.178.48.123/32
+Require ip 180.43.28.50/32
+#Require ip 180.43.32.103/32
+#Require ip 180.43.8.247/32
+Require ip 183.91.158.133/32
+Require ip 183.91.158.136/32
+Require ip 210.166.157.154/32
+Require ip 210.225.116.10/32
+Require ip 210.225.95.128/25
+Require ip 219.114.164.0/26
+Require ip 219.117.198.241/32
+Require ip 220.248.27.226/32
+Require ip 221.189.4.232/29
+Require ip 222.253.41.224/32
+Require ip 3.113.26.97/32
+Require ip 35.222.208.56/32
+Require ip 35.225.5.236/32
+Require ip 36.2.107.205/32
+Require ip 39.110.204.178/32
+Require ip 39.110.211.44/32
+Require ip 39.110.224.48/29
+Require ip 42.112.114.236/32
+Require ip 42.116.7.14/32
+Require ip 52.194.133.35/32
+Require ip 52.196.18.139/32
+Require ip 52.69.116.54/32
+Require ip 54.238.52.161/32
+Require ip 54.238.53.134/32
+Require ip 54.248.218.250/32
+Require ip 54.248.221.11/32
+Require ip 54.248.87.154/32
+Require ip 54.249.193.102/32
+Require ip 54.249.253.251/32
+Require ip 54.250.95.173/32
+Require ip 61.112.83.183/32
+Require ip 61.117.133.194/32
+Require ip 61.126.190.213/32
+Require ip 61.126.191.240/32
+Require ip 153.254.146.0/23
+Require ip 153.254.148.0/23
+Require ip 104.154.209.71/32
+Require ip 104.197.235.183/32
+Require ip 34.67.202.42/32
+Require ip 34.67.53.217/32
+Require ip 34.68.67.126/32
+Require ip 34.69.247.233/32
+Require ip 34.70.171.212/32
+Require ip 35.194.18.229/32
+Require ip 35.202.128.248/32
+Require ip 35.222.249.48/32
+Require ip 35.223.189.13/32
+Require ip 35.224.7.225/32
+Require ip 35.226.236.156/32
+Require ip 35.226.82.165/32
+Require ip 35.238.250.202/32
+Require ip 54.65.252.193/32
+Require ip 153.125.131.198/32
+Require ip 210.144.14.171/32
+Require ip 157.65.160.184/32
+Require ip 210.239.44.160/32
+
+#社内デフォルトIP
+Require ip 210.144.64.0/24
+Require ip 202.217.72.0/24
+Require ip 202.217.73.0/24
+Require ip 202.217.75.0/24
+Require ip 61.126.179.233/32
+Require ip 203.138.153.247/32
+Require ip 120.88.55.0/24
+Require ip 124.38.245.90/32
+Require ip 221.245.250.58/32
+Require ip 203.141.136.194/32
+Require ip 210.229.179.170/32
+Require ip 211.128.86.128/27
+Require ip 117.102.183.51/32
+Require ip 35.200.36.54/32
+Require ip 35.200.63.242/32
+Require ip 35.197.17.40/32
+Require ip 35.199.191.1/32
+Require ip 114.179.184.0/24
+Require ip 153.143.181.0/28
+Require ip 153.143.181.16/28
+
+#gooidプロジェクト内
+Require ip 127.0.0.1/32
+Require ip 172.17.102.0/24
+
+#Qualysgurds
+Require ip 64.39.96.0/20
+
+#マルシェル
+Require ip 133.232.100.252/32
+
+#gooドクター
+Require ip 52.196.160.91/32
+Require ip 113.161.55.204/32
+Require ip 14.161.48.245/32
+Require ip 153.127.198.23/32
+Require ip 133.232.103.108/32
+Require ip 153.125.131.198/32
+Require ip 222.253.41.224/32
+
+# レゾテク アプリ監査外部委託会社
+Require ip 210.249.67.249/32
+Require ip 210.249.67.251/32
+Require ip 153.156.95.51/32
+Require ip 203.114.218.51/32
+Require ip 221.242.28.34/32
+Require ip 221.242.28.35/32
+Require ip 219.96.62.121/32
+Require ip 118.22.31.145/32
+# 株式会社パックスクリエイション（レゾテクの再委託先） - iDraft案件
+Require ip 118.238.252.168/32
+
+#FJQS
+Require ip 111.109.17.224/28
+Require ip 118.155.224.224/28 
+Require ip 153.246.20.40/29
+Require ip 218.44.52.224/28
+Require ip 210.170.118.224/28
+Require ip 210.162.30.96/28
+
+# ベリサーブ（脆弱性監査委託会社）
+Require ip 210.166.118.245/32
+Require ip 39.110.211.214/32
+Require ip 183.77.253.181/32
+Require ip 114.160.31.18/32
+
+# OCNマイページ（検証環境）
+Require ip 210.145.245.133/32
+Require ip 210.145.245.134/32
+Require ip 210.145.245.135/32
+Require ip 210.145.245.136/32
+Require ip 210.145.245.145/32
+Require ip 210.145.245.146/32
+Require ip 210.145.245.147/32
+Require ip 210.145.245.148/32
+Require ip 61.118.33.134/32
+Require ip 61.118.33.135/32
+Require ip 61.118.33.136/32
+Require ip 61.118.33.137/32
+Require ip 61.118.33.152/32
+Require ip 61.118.33.153/32
+Require ip 61.118.33.154/32
+Require ip 61.118.33.228/32
+Require ip 210.172.143.100/32
+Require ip 122.219.121.137/32
+Require ip 219.160.178.138/32
+Require ip 153.158.160.30/32
+Require ip 153.158.175.231/32
+Require ip 153.158.175.235/32
+Require ip 153.158.175.233/32
+Require ip 153.158.175.232/32
+Require ip 153.158.175.234/32
+Require ip 210.160.194.72/29
+Require ip 210.160.194.73/32
+Require ip 218.44.58.128/28
+Require ip 61.127.114.0/28
+#Require ip 163.138.227.252/32
+Require ip 163.138.227.250/32
+
+# OCNトップ(検証環境)
+Require ip 61.113.104.174/32
+Require ip 61.113.104.175/32
+Require ip 114.179.184.94/32
+
+
+# pointシステム(社内)
+Require ip 61.113.104.161/32
+Require ip 202.217.75.122/32
+
+# デジタルハーツ
+Require ip 153.150.32.17/32
+Require ip 101.110.60.137/32
+Require ip 221.112.192.136/29
+Require ip 153.150.32.24/29
+Require ip 113.40.204.0/28
+Require ip 103.139.239.32/27
+Require ip 101.110.43.18
+Require ip 122.216.116.226
+Require ip 101.110.43.29
+Require ip 122.216.195.21
+Require ip 101.110.43.30
+Require ip 122.216.195.22
+Require ip 101.110.43.22
+Require ip 122.216.116.230 
+Require ip 122.210.131.187
+Require ip 122.210.131.188
+Require ip 122.210.131.189
+Require ip 122.218.25.34
+Require ip 103.139.239.32/27
+Require ip 122.208.118.2/32
+Require ip 153.139.229.25/32
+
+#ハベロイドベンダーOGIX社
+Require ip 114.156.83.240
+Require ip 152.165.122.58
+
+# 株式会社 ドキドキグルーヴワークス - iDraftベンダ
+Require ip 92.203.104.107/32
+# 小学館 - iDraftベンダ
+Require ip 210.146.37.69/32
+Require ip 210.146.37.70/32
+# 漢検 - iDraftベンダ
+Require ip 58.158.31.42/32
+Require ip 210.227.67.226/32
+Require ip 219.75.131.144/32
+# 株式会社ハイスポット - iDraftベンダ
+Require ip 218.219.187.54/32
+
+# GMO - OCNマイページ ベンダ
+# 2022-11-24
+# 担当： 大房 拓真
+Require ip 210.172.128.100/30
+Require ip 210.172.128.104/29
+Require ip 210.172.128.112/29
+Require ip 210.172.128.120/30
+Require ip 210.172.128.124/31
+Require ip 210.172.128.126/32
+Require ip 210.172.128.240/32
+
+# GMO (オフィスのIPアドレス)
+# 2025-02
+# 担当： 池田 佳貴 yoshiki.ikeda.fc@nttdocomo.com
+Require ip 210.172.130.73/32
+# GMO (VPN接続時のIPアドレス)
+Require ip 8.29.109.53/32 8.29.228.48/32
+
+# point - トランス・コスモス
+Require ip 114.160.234.19 52.194.217.36 18.178.255.151
+
+# テルウェル西日本
+Require ip 202.19.227.203 202.19.228.203 202.32.249.9 114.160.237.194 210.225.116.10
+
+# 地図
+Require ip 61.113.104.163
+
+# SimSeller 新Stg環境 - (Backlog) https://bit.ly/3FnTlHu
+Require ip 18.181.4.138
+Require ip 54.168.47.41
+Require ip 54.248.126.23
+
+# GOT
+Require ip 39.110.201.11
+Require ip 52.195.110.151
+
+# goo game - 検証環境 (GMO)
+Require ip 35.72.236.25
+Require ip 35.76.23.156
+# goo game - 商用環境 (GMO)
+Require ip 3.115.154.118
+Require ip 35.74.225.114
+Require ip 35.72.155.138
+Require ip 35.75.31.17
+
+# AGEST（Digital Hearts から分岐した会社。教えて！gooテスター）
+Require ip 118.3.226.97 118.3.226.98 222.255.130.162 113.160.233.145 113.160.232.105
+
+# ストリクス株式会社
+# 2022-12-06
+# 担当： 村上 裕介
+Require ip 121.101.91.63 124.219.162.134
+
+# RTK
+# 2022-12-12
+# 担当： 横須賀　康志
+Require ip 114.160.31.208/29
+
+# ちょコム 2023 検証環境
+# 以下のWebhookエンドポイントに、ちょコム システムがWebhookでRequestしてきます。
+#
+# https://svc101.goo.ne.jp/gbs/settlementInfReq/demConfidenceResult
+# https://svc101.goo.ne.jp/gbs/settlementInfReq/demMemberInf
+# https://svc101.goo.ne.jp/gbs/settlementInfReq/demConfidenceNewResult
+Require ip 210.144.34.96 210.144.34.107
+# 2024-11-19 SSLのクライアント側（ちょコム）のTLS暗号化スィートが古い（＝弱い＝OSが古い）ため
+# goo決済検証環境側（＝svc101）で拒否されてしまっていた。
+# ちょコム様側で、AWS上のForward Proxyを経由する迂回路を構築していただいた。以下はそのGlobal IPである。
+Require ip 54.238.16.81/32 18.177.43.124/32
+
+# 株式会社ドキドキグルーヴワークス
+# 2023-01-13
+# 担当： 村上 裕介
+Require ip 121.101.89.95 92.203.104.107
+
+# 株式会社電通デジタル
+# 2023-01-13
+# 担当： 鴻　裕騎
+Require ip 126.249.8.50/32
+
+{# メディア技術担当主管リバプロ acl-servers.conf #}
+
+#gooid独自定義IP
+Require ip 110.50.68.35/32
+Require ip 218.42.154.66/32
+Require ip 116.58.168.241/32
+Require ip 1.55.242.188/32
+Require ip 103.37.29.230/32
+Require ip 113.161.55.204/32
+Require ip 113.41.126.222/32
+Require ip 113.43.222.64/29
+Require ip 113.43.73.18/32
+Require ip 114.160.234.19/32
+#Require ip 114.160.244.6/32
+Require ip 114.179.11.16/32
+Require ip 114.179.125.33/32
+Require ip 114.179.69.147/32
+Require ip 116.97.243.74/32
+Require ip 118.238.222.11/32
+Require ip 121.101.95.128/32
+Require ip 122.1.110.225/32
+Require ip 122.1.119.65/32
+Require ip 122.208.150.194/32
+Require ip 122.208.204.114/32
+Require ip 122.216.73.64/29
+Require ip 122.217.100.122/32
+Require ip 122.220.121.72/29
+Require ip 124.37.248.56/29
+Require ip 133.232.103.108/32
+Require ip 133.232.117.130/32
+Require ip 133.232.117.131/32
+Require ip 133.242.186.151/32
+Require ip 133.242.235.202/32
+Require ip 14.160.25.214/32
+Require ip 14.161.48.245/32
+Require ip 152.165.116.183/32
+Require ip 152.165.122.73/32
+Require ip 153.124.190.42/32
+Require ip 153.127.197.88/32
+Require ip 153.127.198.23/32
+Require ip 153.156.43.25/32
+Require ip 153.156.71.88/32
+Require ip 153.163.214.8/32
+Require ip 157.14.138.155/32
+Require ip 157.14.138.177/32
+Require ip 157.14.138.196/32
+Require ip 157.14.144.188/32
+Require ip 157.7.138.46/32
+Require ip 175.41.240.48/32
+Require ip 175.41.252.31/32
+Require ip 176.32.85.48/32
+Require ip 18.176.94.67/32
+Require ip 18.177.201.218/32
+Require ip 18.177.240.114/32
+Require ip 18.177.32.85/32
+Require ip 18.178.48.123/32
+Require ip 180.43.28.50/32
+#Require ip 180.43.32.103/32
+#Require ip 180.43.8.247/32
+Require ip 183.91.158.133/32
+Require ip 183.91.158.136/32
+Require ip 210.166.157.154/32
+Require ip 210.225.116.10/32
+Require ip 210.225.95.128/25
+Require ip 219.114.164.0/26
+Require ip 219.117.198.241/32
+Require ip 220.248.27.226/32
+Require ip 221.189.4.232/29
+Require ip 222.253.41.224/32
+Require ip 3.113.26.97/32
+Require ip 35.222.208.56/32
+Require ip 35.225.5.236/32
+Require ip 36.2.107.205/32
+Require ip 39.110.204.178/32
+Require ip 39.110.211.44/32
+Require ip 39.110.224.48/29
+Require ip 42.112.114.236/32
+Require ip 42.116.7.14/32
+Require ip 52.194.133.35/32
+Require ip 52.196.18.139/32
+Require ip 52.69.116.54/32
+Require ip 54.238.52.161/32
+Require ip 54.238.53.134/32
+Require ip 54.248.218.250/32
+Require ip 54.248.221.11/32
+Require ip 54.248.87.154/32
+Require ip 54.249.193.102/32
+Require ip 54.249.253.251/32
+Require ip 54.250.95.173/32
+Require ip 61.112.83.183/32
+Require ip 61.117.133.194/32
+Require ip 61.126.190.213/32
+Require ip 61.126.191.240/32
+Require ip 153.254.146.0/23
+Require ip 153.254.148.0/23
+Require ip 104.154.209.71/32
+Require ip 104.197.235.183/32
+Require ip 34.67.202.42/32
+Require ip 34.67.53.217/32
+Require ip 34.68.67.126/32
+Require ip 34.69.247.233/32
+Require ip 34.70.171.212/32
+Require ip 35.194.18.229/32
+Require ip 35.202.128.248/32
+Require ip 35.222.249.48/32
+Require ip 35.223.189.13/32
+Require ip 35.224.7.225/32
+Require ip 35.226.236.156/32
+Require ip 35.226.82.165/32
+Require ip 35.238.250.202/32
+Require ip 54.65.252.193/32
+Require ip 153.125.131.198/32
+Require ip 210.144.14.171/32
+Require ip 157.65.160.184/32
+Require ip 210.239.44.160/32
+
+#社内デフォルトIP
+Require ip 210.144.64.0/24
+Require ip 202.217.72.0/24
+Require ip 202.217.73.0/24
+Require ip 202.217.75.0/24
+Require ip 61.126.179.233/32
+Require ip 203.138.153.247/32
+Require ip 120.88.55.0/24
+Require ip 124.38.245.90/32
+Require ip 221.245.250.58/32
+Require ip 203.141.136.194/32
+Require ip 210.229.179.170/32
+Require ip 211.128.86.128/27
+Require ip 117.102.183.51/32
+Require ip 35.200.36.54/32
+Require ip 35.200.63.242/32
+Require ip 35.197.17.40/32
+Require ip 35.199.191.1/32
+Require ip 114.179.184.0/24
+
+#gooidプロジェクト内
+Require ip 127.0.0.1/32
+Require ip 172.17.102.0/24
+
+#Qualysgurds
+Require ip 64.39.96.0/20
+
+#マルシェル
+Require ip 133.232.100.252/32
+
+#gooドクター
+Require ip 52.196.160.91/32
+Require ip 113.161.55.204/32
+Require ip 14.161.48.245/32
+Require ip 153.127.198.23/32
+Require ip 133.232.103.108/32
+Require ip 153.125.131.198/32
+Require ip 222.253.41.224/32
+
+# レゾテク アプリ監査外部委託会社
+Require ip 210.249.67.249/32
+Require ip 210.249.67.251/32
+Require ip 153.156.95.51/32
+Require ip 203.114.218.51/32
+Require ip 221.242.28.34/32
+Require ip 221.242.28.35/32
+Require ip 219.96.62.121/32
+Require ip 118.22.31.145/32
+# 株式会社パックスクリエイション（レゾテクの再委託先） - iDraft案件
+Require ip 118.238.252.168/32
+
+#FJQS
+Require ip 111.109.17.224/28
+Require ip 118.155.224.224/28 
+Require ip 153.246.20.40/29
+Require ip 218.44.52.224/28
+Require ip 210.170.118.224/28
+Require ip 210.162.30.96/28
+
+# 日立ソリューションズ
+Require ip 202.246.252.96/27 202.246.252.128/25 202.246.251.240/28
+Require ip 133.145.228.11/32 133.145.228.12/31
+# 日立ソリューションズ ＞ 「デプラス」環境
+Require ip 202.222.249.100/31
+
+# ベリサーブ（脆弱性監査委託会社）
+Require ip 210.166.118.245/32
+Require ip 39.110.211.214/32
+Require ip 183.77.253.181/32
+Require ip 114.160.31.18/32
+
+# OCNマイページ（検証環境）
+Require ip 210.145.245.133/32
+Require ip 210.145.245.134/32
+Require ip 210.145.245.135/32
+Require ip 210.145.245.136/32
+Require ip 210.145.245.145/32
+Require ip 210.145.245.146/32
+Require ip 210.145.245.147/32
+Require ip 210.145.245.148/32
+Require ip 61.118.33.134/32
+Require ip 61.118.33.135/32
+Require ip 61.118.33.136/32
+Require ip 61.118.33.137/32
+Require ip 61.118.33.152/32
+Require ip 61.118.33.153/32
+Require ip 61.118.33.154/32
+Require ip 61.118.33.228/32
+Require ip 210.172.143.100/32
+Require ip 122.219.121.137/32
+Require ip 219.160.178.138/32
+Require ip 153.158.160.30/32
+Require ip 153.158.175.231/32
+Require ip 153.158.175.235/32
+Require ip 153.158.175.233/32
+Require ip 153.158.175.232/32
+Require ip 153.158.175.234/32
+Require ip 210.160.194.72/29
+Require ip 210.160.194.73/32
+Require ip 218.44.58.128/28
+Require ip 61.127.114.0/28
+#Require ip 163.138.227.252/32
+Require ip 163.138.227.250/32
+
+# OCNトップ(検証環境)
+Require ip 61.113.104.174/32
+Require ip 61.113.104.175/32
+Require ip 114.179.184.94/32
+
+
+# pointシステム(社内)
+Require ip 61.113.104.161/32
+Require ip 202.217.75.122/32
+
+# デジタルハーツ
+Require ip 153.150.32.17/32
+Require ip 101.110.60.137/32
+Require ip 221.112.192.136/29
+Require ip 153.150.32.24/29
+Require ip 113.40.204.0/28
+Require ip 103.139.239.32/27
+
+
+#ハベロイドベンダーOGIX社
+Require ip 152.165.122.58
+
+# 株式会社 ドキドキグルーヴワークス - iDraftベンダ
+Require ip 92.203.104.107/32
+
+# SimSeller 新Stg環境 - (Backlog) https://bit.ly/3FnTlHu
+Require ip 18.181.4.138
+Require ip 54.168.47.41
+Require ip 54.248.126.23
+
+# Vex（脆弱性監査ツール）
+Require ip 35.76.177.112/32
+
+# RTK（脆弱性監査ツール）
+Require ip 114.160.31.208/29
+
+# 株式会社電通デジタル
+Require ip 126.249.8.50/32
+
+## NTT Resonant Global IP : https://bit.ly/3OKKm99
+
+### NTTレゾナント長岡(VDI)
+Require ip 203.138.153.247/32
+### 長岡Rクラウド
+Require ip 61.113.104.0/24
+### 長岡Rクラウド
+Require ip 114.179.184.0/23
+### 長岡Rクラウド
+Require ip 219.164.251.0/24
+### NTTレゾナント大手町オフィス(reso-intra(有線無線))
+Require ip 153.143.181.0/28
+### NTTレゾナント大手町オフィス(reso-wifi(有線無線))
+Require ip 153.143.181.16/28
+
+{# 移行マージ後にIP追加 #}
+
+# marchel脆弱性監査（外部ベンダー）
+Require ip 49.212.135.68
+Require ip 150.249.212.68
+Require ip 122.249.156.113
+Require ip 160.16.68.117
+Require ip 160.16.234.149
+Require ip 150.249.222.160/27
+Require ip 39.110.211.208
+Require ip 218.219.246.158
+
+# 開発ベンダー
+## スマートソーシャル社
+Require ip 118.238.221.37/32
+Require ip 153.121.67.166/32
+Require ip 54.65.97.92/32
+Require ip 117.102.181.30/32
+Require ip 113.148.41.215/32
+Require ip 13.231.116.152/32
+Require ip 218.45.230.138/32
+Require ip 153.134.32.12/32
+Require ip 85.122.227.68/32
+Require ip 213.21.234.220/32
+
+## GeekHive社
+Require ip 113.37.201.226/32
+Require ip 122.103.81.100/32
+Require ip 203.114.27.6/32
+Require ip 116.80.118.132/32
+Require ip 60.79.186.90/32
+Require ip 223.135.202.34/32
+
+# golfサーバ
+Require ip 52.197.7.186/32
+Require ip 54.248.220.86/32
+Require ip 52.69.199.218/32
+Require ip 52.68.111.152/32
+Require ip 54.64.192.102/32
+Require ip 3.113.202.138/32
+
+# kaizenプラットフォーム社
+Require ip 202.241.154.215
+Require ip 106.72.39.129
+Require ip 124.36.47.32
+Require ip 210.128.11.218
+Require ip 118.3.226.97
+Require ip 157.14.96.149
+
+# スマホアプリベンダー会社
+Require ip 118.238.252.168
+Require ip 113.161.55.204
+Require ip 14.161.48.245
+Require ip 153.127.198.23
+Require ip 133.232.103.108
+Require ip 222.253.41.224
+
+#テクノプロ
+Require ip 202.94.86.5/32
+
+# ZeroSpace端末-仮想デスクトップ
+Require ip 202.19.227.74/32
+Require ip 202.19.228.74/32
+Require ip 210.148.141.1/27
+Require ip 210.148.200.1/27
+Require ip 114.160.196.245/32
+Require ip 114.160.237.193/32
+
+# クロスリスティング
+Require ip 125.103.29.238
+
+# レゾナントテクノロジー-OCNオンラインショップ
+Require ip 114.168.229.117
+Require ip 219.117.249.145
+
+#オフィスワイズ社(GOLF meの協業先)
+Require ip 118.238.251.91
+
+#ドコモ脆弱性監査拠点
+Require ip 221.186.67.33
+Require ip 221.186.67.34
+Require ip 221.186.67.35
+Require ip 221.186.67.36
+Require ip 221.186.67.37
+Require ip 221.186.67.38
+Require ip 175.41.197.251
+Require ip 52.198.142.148
+Require ip 54.150.190.242
+Require ip 54.168.192.184
+
+#株式会社ウェブレッジ
+Require ip 39.110.211.208
+
+#株式会社インターリンク
+Require ip 153.124.189.63
+Require ip 153.124.191.27
+
+# X-Listing
+Require ip 125.103.29.238/32
+
+# OCNトップ
+Require ip 54.150.131.199/32
+Require ip 13.231.87.161/32
+Require ip 35.73.67.199/32
+Require ip 18.176.179.96/32
+Require ip 35.74.211.183/32
+Require ip 35.72.57.187/32
+
+# OCNxDフロント(AWS 2025)
+Require ip 18.176.176.60/32
+
+# goo News(AWS 2025)
+Require ip 13.230.113.147
+Require ip 43.206.27.197
+Require ip 54.168.114.20

@@ -1,0 +1,11 @@
+---
+- import_playbook: batch_server.yml
+- import_playbook: edb_server.yml
+- import_playbook: fgw_server.yml
+- import_playbook: hlp_server.yml
+- import_playbook: log_server.yml
+- import_playbook: mdb_server.yml
+- import_playbook: msg_server.yml
+- import_playbook: oidc_server.yml
+- import_playbook: sdb_server.yml
+- import_playbook: web_server.yml

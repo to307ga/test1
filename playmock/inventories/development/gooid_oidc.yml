@@ -1,0 +1,2 @@
+# gooid-30-dev-oidcのすべてのサーバに共通する変数を設定
+server_kinds: gooid-oidc

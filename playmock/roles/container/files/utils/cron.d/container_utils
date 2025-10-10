@@ -1,0 +1,2 @@
+# container utilities schedule
+55 03 * * * root /opt/containers/utils/container_cleanup.sh >/dev/null 2>&1

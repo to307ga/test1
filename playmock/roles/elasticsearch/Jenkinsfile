@@ -1,0 +1,44 @@
+
+// def SERVER_NAME = "idhub-30-dev-els-001"
+
+pipeline {
+  agent any
+  environment{
+    ANSIBLE_CONFIG='roles/common/files/ansible.cfg'
+    PYTHONUNBUFFERED=1
+  }
+  stages{
+    stage('clean-pre') {
+      steps {
+        deleteDir()
+      }
+    }
+    stage("checkout"){
+      steps{
+        git branch: "feature_td-agent", url: 'https://container.wbo110.goo.ne.jp/repo/nttr/playbook.git', credentialsId: 'gitea'
+      }
+      post{
+        always{
+          sh "ls -ltr"
+        }
+      }
+    }
+    stage('ansible-playbook Dry run'){
+      steps{
+        // sh: 'ansible-playbook -i inventories/virtualbox/hosts -l web00.test.internal td-agent.yml --check -u gooscp --private-key $gooscp' 
+        // gooscp
+        // ansiblePlaybook become: true, credentialsId: '971c11e6-fe26-4fda-bce2-974ccb410cfa', extras: '--check --diff -vvvvv', installation: 'Jenkins_Ansible', inventory: 'inventories/development/inventory.ini', limit: 'gooid-30-dev-log-002', playbook: 'gooid_log_server.yml', tags: 'td-agent'
+        //g-gooid_ansible
+        // ansiblePlaybook become: true, credentialsId: '1f2886ac-2aaa-473f-ad26-44051e37e89b', extras: '--check --diff', installation: 'Jenkins_Ansible', inventory: 'inventories/development/inventory.ini', limit: 'idhub-30-dev-els-103', playbook: 'idhub_els_server.yml', tags: 'elasticsearch'
+        ansiblePlaybook become: true, credentialsId: '1f2886ac-2aaa-473f-ad26-44051e37e89b', extras: '--check --diff', installation: 'Jenkins_Ansible', inventory: 'inventories/development/inventory.ini', limit: "${SERVER_NAME}", playbook: 'idhub_els_server.yml', tags: 'elasticsearch'
+      }
+    }
+    stage('ansible-playbook'){
+      steps{
+        // sh: 'ansible-playbook -i inventories/virtualbox/hosts -l web00.test.internal td-agent.yml --check -u gooscp --private-key $gooscp' 
+        // ansiblePlaybook become: true, credentialsId: '971c11e6-fe26-4fda-bce2-974ccb410cfa', extras: '--diff', installation: 'Jenkins_Ansible', inventory: 'inventories/development/inventory.ini', limit: 'gooid-30-dev-log-002', playbook: 'gooid_log_server.yml', tags: 'td-agent'
+        ansiblePlaybook become: true, credentialsId: '1f2886ac-2aaa-473f-ad26-44051e37e89b', extras: '--diff', installation: 'Jenkins_Ansible', inventory: 'inventories/development/inventory.ini', limit: "${SERVER_NAME}", playbook: 'idhub_els_server.yml', tags: 'elasticsearch'
+      }
+    }
+  }
+}

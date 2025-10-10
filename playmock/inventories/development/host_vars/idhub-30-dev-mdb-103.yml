@@ -1,0 +1,17 @@
+# mdb
+
+# galeraクラスタ設定
+galera_cluster_name: IDHUB_GALERA_DB
+galera_node_name: idhub_dev_db_3
+galera_func: galera
+galera_addr1: idhub-30-dev-mdb-103
+galera_addr2: idhub-30-dev-mdb-102
+galera_addr3: idhub-30-dev-mdb-101
+galera_addr4: idhub-30-dev-sdb-101
+galera_addr5: idhub-30-dev-sdb-102
+
+# Galera Cluster のLeaderであるか？
+# 実際に動的にステータスは見ずに、静的に定義するのみ
+# これがtrueの場合、Clusterが構築されていると前提をおいた上で、
+# MySQL GRANT定義などを行ったりする。
+# galera_cluster_leader: true

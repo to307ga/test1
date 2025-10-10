@@ -1,0 +1,86 @@
+<worker {{td_agent_worker3}}>
+  <source>
+    @type tail
+    path /db0/tdlogs/merged/gooid-{{ project_id_number_env }}-web/var.log.httpd/access_log.%Y-%m-%d.log
+    pos_file /var/log/td-agent/httpd_access_log_count.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag gooid-web_httpd_access_log
+    <parse>
+      @type regexp
+      time_format %d/%b/%Y:%H:%M:%S %z
+      # マージログはホスト名がついたりしているのでパース用のexpressionはそのまま使えないので修正が必要
+      # expression /(?<server>[^ ]*) (?<host>[^ ]*) (?<remotelog>[^ ]*) (?<user>[^ ]*) \[(?<log-time>[^\]]*)\] (?<size>[^ ]*) "(?<method>\S+)(?: +(?<path>[^ ]*) +\S*)?" (?<status>[^ ]*) (?<size2>[^ ]*) "(?<referer>[^"]*)" "(?<user-agent>[^"]*)" "(?<goo_id>[^"]*)"/
+      # expression /(?<server>[^ ]*) (?<parsed_log>(?<host>[^\s]*)\s(?<remotelog>[^\s]*)\s(?<user>[^\s]*)\s\[(?<log-time>[^\]]*)\]\s(?<size>[^\s]*)\s"(?<method>\S+)(?: +(?<path>(?:[^\"]|\\.)*?)(?: +\S*)?)?"\s(?<status>[^\s]*)\s(?<size2>[^\s]*)\s"(?<referer>(?:[^\"]|\\.)*)"\s"(?<user-agent>[^"]*)"\s"(?<goo_id>[^"]*)")/
+      # parsed_log を削除
+      # expression /(?<server>[^ ]*) (?<host>[^\s]*)\s(?<remotelog>[^\s]*)\s(?<user>[^\s]*)\s\[(?<log-time>[^\]]*)\]\s(?<size>[^\s]*)\s"(?<method>\S+)(?: +(?<path>(?:[^\"]|\\.)*?)(?: +\S*)?)?"\s(?<status>[^\s]*)\s(?<size2>[^\s]*)\s"(?<referer>(?:[^\"]|\\.)*)"\s"(?<user-agent>[^"]*)"\s"(?<goo_id>[^"]*)"/
+      # メソッドのないログ対応
+      # expression /(?<server>[^ ]*) (?<host>[^\s]*)\s(?<remotelog>[^\s]*)\s(?<user>[^\s]*)\s\[(?<log-time>[^\]]*)\]\s(?<size>[^\s]*)\s?"(?<method>(\S+|\\))(?: +(?<path>(?:[^\"]|\\.|")*?)(?: +\S*)?)?"\s(?<status>[^\s]*)\s(?<size2>[^\s]*)\s?"(?<referer>(?:[^\"]|\\.)*)?"\s?"(?<user-agent>[^"]*)?"\s?"(?<goo_id>[^"]*)?"/
+      expression /(?<server>[^ ]*) (?<host>[^\s]*)\s(?<remotelog>[^\s]*)\s(?<user>[^\s]*)\s\[(?<log-time>[^\]]*)\]\s(?<size>[^\s]*)\s?(\"|")((?<method>(\S+|\\))(?: +(?<path>(?:[^\"]|\\.|")*?)(?: +\S*)?)?|(?<method>))(\"|")\s(?<status>[^\s]*)\s(?<size2>[^\s]*)\s?(\"|")(?<referer>(?:[^\"]|\\.)*)?(\"|")\s?(\"|")(?<user-agent>.*)"\s"(?<goo_id>[^"]*)"/
+      # keep_time_key true
+    </parse>
+  </source>
+
+  <match gooid-web_httpd_access_log.**>
+    @type copy
+    <store>
+      @type datacounter
+      count_interval 5m 
+      aggregate all
+      count_key status
+      # patternX: X(1-20)
+      pattern1 to_zabbix.error.gooid.web.access.5xx ^5\d\d$
+      pattern2 to_zabbix.error.gooid.web.access.2xx ^2\d\d$
+      # pattern3 to_zabbix.alert ^3\d\d$ 
+      # pattern4 4xx ^4\d\d$
+      tag count.gooid-web_httpd.access_log.status.*
+    </store>
+    <store>
+      @type 	              elasticsearch
+      scheme	              https
+      ssl_version           {{ elasticsearch.ssl_version }}
+      # Copy from /etc/elasticsearch/certs/http_ca.crt on the els server
+      ca_file               {{ elasticsearch.ca_file }}
+      # host 	                {{ elasticsearch.hostname }}
+      # hosts https://customhost.com:443/path,https://username:password@host-failover.com:443
+      # port 9200
+      hosts                 {{ elasticsearch.hosts }}
+      user                  {{ elasticsearch.user }}
+      password              {{ elasticsearch.pwd }}
+      # Does not work with elasticsearch_dynamic
+      # index_name            fluentd.${tag}-%Y%m%d
+      logstash_format       true
+      include_timestamp     true
+      logstash_prefix       fluentd.${tag}
+      logstash_dateformat   %Y%m%d
+      time_key_format %Y-%m-%dT%H:%M:%S.%N%z
+      pipeline              host-geoip
+      # include_tag_key       true
+      with_transporter_log  true
+      @log_level             {{ plugin_log_level.elasticsearch }}
+      # utc_index             false
+      # time_key created_at
+      # time_key_format %a %b %d %H:%M:%S %z %Y
+      <buffer tag,time>
+        timekey         1d
+        # flush_interval  1m
+      </buffer>
+      flush_interval  1m
+    </store>  
+  </match>
+
+  <match count.gooid-web_httpd.access_log.status.*>
+    @type               file
+    append              true
+    # The filename of the path should be the same as the filename of this file.
+    path /db0/tdlogs/zabbix-sender-count/httpd_access_count
+    time_slice_format   %Y-%m-%d
+    <buffer time>
+      @type memory
+      timekey             1d
+      timekey_wait        0s
+      flush_mode          immediate
+      flush_at_shutdown   true
+    </buffer>
+  </match>
+</worker>

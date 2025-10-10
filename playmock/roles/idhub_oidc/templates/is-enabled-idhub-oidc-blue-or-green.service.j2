@@ -1,0 +1,12 @@
+[Unit]
+Description = If the switch file is green, start idhub-oidc-green.service
+After=syslog.target proxysql.service 
+ConditionPathExists=/usr/local/app/idhub-oidc
+
+[Service]
+ExecStart=/usr/local/app/idhub-oidc/is-enabled-idhub-oidc-blue-or-green.sh
+Restart=no
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

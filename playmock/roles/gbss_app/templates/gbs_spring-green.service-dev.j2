@@ -1,0 +1,12 @@
+[Unit]
+Description=gbs-spring-green
+After=syslog.target
+
+[Service]
+EnvironmentFile=/usr/local/app/gbs_proto/web/gbs-green.conf
+User=gooscp
+ExecStart=/usr/local/app/gbs_proto/web/gbs.sh
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

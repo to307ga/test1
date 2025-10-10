@@ -1,0 +1,5 @@
+---
+# 共通パッケージのインストール
+- import_tasks: install.yml
+- import_tasks: install_dnf-automatic.yml 
+- import_tasks: add_user_g-gooid_ansible.yml

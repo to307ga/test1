@@ -1,0 +1,122 @@
+#
+# These groups are read by MariaDB command-line tools
+# Use it for options that affect only one utility
+#
+
+###
+### gooID参照用接続設定（デフォルト）
+###
+###   - 参照用ユーザで接続します。
+[mysql]
+protocol=TCP
+
+host=localhost
+port=7033
+
+user={{mysql_reader_name}}
+password={{mysql_reader_password}}
+
+prompt=[\\u@\\{{ gooid_read }}:\\p] >
+default-character-set=utf8
+database=PDB02
+# テーブル名などのTab補完を無効にし、高速にします。
+auto-rehash=false
+
+###
+### gooID-更新用接続設定
+###
+###   - gooid-DBに更新用ユーザで接続します。
+###   - autocommitを無効にします。
+###   - 意図的に更新用に接続するには、 `mysql --defaults-group-suffix=_write_gooid` として起動します。
+[mysql_write_gooid]
+
+host=localhost
+port=7034
+user={{mysql_writer_name}}
+password={{mysql_writer_password}}
+prompt=[\\u@\\{{ gooid_write }}:\\p] >
+# autocommitを無効にします。
+init-command='SET autocommit = 0;'
+
+###
+### gooID-Admin用接続設定
+###
+###   - gooid-DBにAdminユーザで接続します。
+###   - autocommitを無効にします。
+###   - 意図的に更新用に接続するには、 `mysql --defaults-group-suffix=_admin_gooid` として起動します。
+[mysql_admin_gooid]
+
+host=localhost
+port=7034
+user={{mysql_admin_name}}
+password={{mysql_admin_password}}
+prompt=[\\u@\\{{ gooid_write }}:\\p] >
+# autocommitを無効にします。
+init-command='SET autocommit = 0;'
+
+###
+### idhub-参照用接続設定
+###
+###   - idhub-DBに更新用ユーザで接続します。
+###   - 意図的に更新用に接続するには、 `mysql --defaults-group-suffix=_read_idhub` として起動します。
+[mysql_read_idhub]
+
+host=localhost
+port=8033
+user={{mysql_reader_name}}
+password={{mysql_reader_password}}
+prompt=[\\u@\\{{ idhub_read }}:\\p] >
+
+
+###
+### idhub-更新用接続設定
+###
+###   - idhub-DBに更新用ユーザで接続します。
+###   - autocommitを無効にします。
+###   - 意図的に更新用に接続するには、 `mysql --defaults-group-suffix=_write_idhub` として起動します。
+[mysql_write_idhub]
+
+host=localhost
+port=8034
+user={{mysql_writer_name}}
+password={{mysql_writer_password}}
+prompt=[\\u@\\{{ idhub_write }}:\\p] >
+# autocommitを無効にします。
+init-command='SET autocommit = 0;'
+
+# 下記を有効にすると、WHEREやLIMIT句無しでのUPDATE/DELETEが実行されなくなり、安全になる反面、
+# JOIN や結果行数に大きく影響を与え、作業効率が低いため、無効にします。
+#safe-updates=true
+
+###
+### idhub-Admin用接続設定
+###
+###   - idhub-DBにAdminユーザで接続します。
+###   - autocommitを無効にします。
+###   - 意図的に更新用に接続するには、 `mysql --defaults-group-suffix=_admin_gooid` として起動します。
+[mysql_admin_idhub]
+
+host=localhost
+port=8034
+user={{mysql_admin_name}}
+password={{mysql_admin_password}}
+prompt=[\\u@\\{{ idhub_write }}:\\p] >
+# autocommitを無効にします。
+init-command='SET autocommit = 0;'
+
+
+[mysql_upgrade]
+
+[mysqladmin]
+
+[mysqlbinlog]
+
+[mysqlcheck]
+
+[mysqldump]
+
+[mysqlimport]
+
+[mysqlshow]
+
+[mysqlslap]

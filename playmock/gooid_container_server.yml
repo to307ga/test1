@@ -1,0 +1,12 @@
+---
+- name: コンテナホストとコンテナに統合した各サービス(Jenkine, Redmine, Gitea)
+  hosts: gooid_container
+  become: true
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: common, tags: common }
+    - { role: container, tags: container }
+    - { role: container_jenkins, tags: container_jenkins }
+    - { role: container_redmine, tags: container_redmine }
+    - { role: container_gitea, tags: container_gitea }
+    - { role: rbash, tags: rbash }

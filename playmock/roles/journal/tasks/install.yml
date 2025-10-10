@@ -1,0 +1,14 @@
+---
+- name: Install systemd-journald
+  ansible.builtin.dnf:
+    name: systemd
+    state: present
+
+- name: Make a journal directory for persistent log
+  become: true
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "02755"

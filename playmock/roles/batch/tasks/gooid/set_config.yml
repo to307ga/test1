@@ -1,0 +1,33 @@
+---
+# /usr/local,/var/log
+- name: gooid batch に必要な /usr/local,/var/log 配下のディレクトリを作成します。
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: gooscp
+    group: gooscp
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /usr/local/app, mode: '0755'}
+    - { path: /usr/local/app/gbs, mode: '0755'}
+    - { path: /usr/local/app/gbs/gbs_scp, mode: '0755'}
+    - { path: /usr/local/app/gbs/gbs_scp/lib, mode: '0755'}
+    - { path: /usr/local/app/gbs/gbs_scp/lib/exr, mode: '0755'}
+    - { path: /usr/local/app/gbs/gbs_scp/lib/gbs_batch, mode: '0755'}
+    - { path: /usr/local/app/gbs/gbs_scp/scripts, mode: '0755'}
+    - { path: /usr/local/app/goo, mode: '0755'}
+    - { path: /var/log/app, mode: '0755'}
+    - { path: /var/log/app/idc, mode: '0755'}
+    - { path: /var/log/app/idc/report, mode: '0755'}
+    - { path: /var/log/app/goo, mode: '0755'}
+    - { path: /var/log/app/gbs, mode: '0755'}
+    - { path: /var/log/app/gbs/report, mode: '0755'}
+    - { path: /var/log/app/gbs/gbs_scp, mode: '0755'}
+
+- name: Link /home/batch_file -> /db0/app/goo/batch_file
+  file:
+    state: link
+    src: /db0/app/goo/batch_file
+    dest: /home/batch_file
+    force: yes
+  when: not ansible_check_mode

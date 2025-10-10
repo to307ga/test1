@@ -1,0 +1,129 @@
+---
+# ディレクトリをループで作成する
+- name: Create directory
+  file: path={{ item }} state=directory owner=tomcat group=tomcat
+  loop:
+    - /usr/local/app/
+
+# ディレクトリをループで作成する
+- name: Create  directories
+  file: path={{ item }} state=directory owner=gooscp group=gooscp
+  loop:
+    - /usr/local/app/{{ usr_local_app_gbsdir }}/
+    - /usr/local/app/{{ usr_local_app_gbsdir }}/web
+    - /var/log/app/gbss/
+
+# このファイルはAnsible Playbookの管理下以外の箇所、Jenkinsで変更されることがある。
+# ファイルが存在しない場合のみ、配布する。
+- name: fabfile-{{ httpd_idc_hostname }}-switchの存在を確認
+  stat:
+    path: /usr/local/app/{{ usr_local_app_gbsdir }}/web/fabfile-{{ httpd_idc_hostname }}-switch
+  register: switch
+
+# このファイルはAnsible Playbookの管理下以外の箇所、Jenkinsで変更されることがある。
+# ファイルが存在しない場合のみ、配布する。
+- name: Copy fabfile-{{ httpd_idc_hostname }}-switch 
+  template:
+    src: templates/fabfile-web-switch.j2
+    dest: /usr/local/app/{{ usr_local_app_gbsdir }}/web/fabfile-{{ httpd_idc_hostname }}-switch
+    owner: gooscp
+    group: gooscp
+  when: not switch.stat.exists
+
+# バックアップを取って、gbs-blue.confをコピーする
+- name: Copy gbs-blue.conf
+  template:
+    src: templates/gbs-blue.conf-{{ release_env }}.j2
+    dest: /usr/local/app/{{ usr_local_app_gbsdir }}/web/gbs-blue.conf
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+
+# バックアップを取って、gbs-green.confをコピーする
+- name: Copy gbs-green.conf
+  template:
+    src: templates/gbs-green.conf-{{ release_env }}.j2
+    dest: /usr/local/app/{{ usr_local_app_gbsdir }}/web/gbs-green.conf
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+
+# バックアップを取って、gbs.shをコピーする
+- name: Copy gbs.sh
+  template:
+    src: templates/gbs.sh-{{ release_env }}.j2
+    dest: /usr/local/app/{{ usr_local_app_gbsdir }}/web/gbs.sh
+    backup: yes 
+    owner: gooscp
+    group: gooscp
+    mode: 0755
+
+# リンクを作成する
+- name: Link /usr/local/app/{{ usr_local_app_gbsdir }}/web/log -> /var/log/app/gbss/
+  file:
+    state: link
+    src: /var/log/app/gbss/
+    dest: /usr/local/app/{{ usr_local_app_gbsdir }}/web/log
+    owner: gooscp
+    group: gooscp
+    follow: no     # symbolic linkのオーナーとグループを変更する
+  when: not ansible_check_mode
+
+# バックアップを取って、gbs_spring-blue.serviceをコピーする
+- name: Copy gbs_spring-blue.service
+  template:
+    src: templates/gbs_spring-blue.service-{{ release_env }}.j2
+    dest: /etc/systemd/system/gbs_spring-blue.service
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# バックアップを取って、gbs_spring-green.serviceをコピーする
+- name: Copy gbs_spring-green.service
+  template:
+    src: templates/gbs_spring-green.service-{{ release_env }}.j2
+    dest: /etc/systemd/system/gbs_spring-green.service
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+# バックアップを取って、gbs_sudoersをコピーする
+- name: Copy gbs_sudoers
+  template:
+    src: templates/gbs_sudoers.j2
+    dest: /etc/sudoers.d/gbs_sudoers
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0440
+
+# 開発環境向け自働起動設定
+- name: Copy is-enabled-gbs_spring-blue-or-green.service
+  template:
+    src: templates/is-enabled-gbs_spring-blue-or-green.service.j2
+    dest: /etc/systemd/system/is-enabled-gbs_spring-blue-or-green.service
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+  when: release_env == "dev"
+
+# 開発環境向け自働起動設定
+- name: Copy gbs.sh
+  template:
+    src: templates/is-enabled-gbs_spring-blue-or-green.sh.j2
+    dest: /usr/local/app/{{ usr_local_app_gbsdir }}/web/is-enabled-gbs_spring-blue-or-green.sh
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0755
+  when: release_env == "dev"
+
+- name: is-enabled-gbs_spring-blue-or-green.serviceの開発環境自動起動設定
+  systemd:
+    name: is-enabled-gbs_spring-blue-or-green.service
+    enabled: yes
+    daemon_reload: no
+  when: release_env == "dev"

@@ -1,0 +1,18 @@
+# Systemd unit file for ESB Mule
+#
+
+[Unit]
+Description=Enterprise Service Bus Mule for GBS
+After=syslog.target network.target proxysql.service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/app/gbs/gbs_mule/gbs_mule_ctl start
+ExecStop=/usr/local/app/gbs/gbs_mule/gbs_mule_ctl stop
+User=gooidc
+Group=gooidc
+
+
+[Install]
+WantedBy=multi-user.target
+

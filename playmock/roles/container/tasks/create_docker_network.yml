@@ -1,0 +1,23 @@
+---
+
+- name: Install pip
+  yum:
+    name:   python2-pip
+    state:  present
+
+# Ansible から Docker を操作する為にインストールする
+# Note: Docker Compose requires Python 3.6 or later.
+- name: Install Docker Module for Python
+  pip:
+    name: "{{ item }}"
+    state:  present
+  loop: 
+    - docker
+    # - docker-compose
+
+# docker-compose.yml でも作成しているので本来は不要
+- name: Create a elastic network
+  docker_network:
+    name: elastic
+  when: not ansible_check_mode
+

@@ -1,0 +1,58 @@
+#
+# バックアップ＋S3転送
+#
+#   See. GOOID-65 [設計] 汎用バックアップスクリプト https://bit.ly/4ewK0yS
+#
+#   各ノード間で起動時間を分散させるため、
+#   このノードのIPアドレス "{{ansible_default_ipv4.address}}" の
+#   第3～4オクテット "{{octet_3_4}}" から動的に起動時間 {{hour}}:{{minute}} を算出してます。
+#
+#   rols/utils/templates/etc/cron.d/utils.j2
+#
+TRANSFER_S3=/usr/local/app/script/transfer-s3.sh
+BUCKET=backup-gooid-idhub-dev
+
+HTTP_PROXY={{ proxy_env.fgw_proxy_type1 }}://{{ proxy_env.fgw_proxy_address }}:{{ proxy_env.fgw_proxy_port }}
+HTTPS_PROXY={{ proxy_env.fgw_proxy_type2 }}://{{ proxy_env.fgw_proxy_address}}:{{ proxy_env.fgw_proxy_port }}
+
+{% if inventory_hostname_short in groups['gooid_web'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app/gbss /var/log/app/idc /var/log/httpd /var/log/httpd_gbs /var/log/tomcat/idc > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=3 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_mdb'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_sdb'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_hlp'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app/gbs/gbs /var/log/app/gbs/gbs_audit /var/log/app/idc /var/log/httpd /var/log/tomcat /var/log/app/gbs/gbs_mule > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=3 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_batch'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app/gbs/gbs_scp > /dev/null 2>&1 ; ${TRANSFER_S3} --include='lh*.csv'  --non-recursive --journal-id=3 ${BUCKET} /home/batch_file > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=4 -g 180 -m 360 ${BUCKET} /var/log/app/idc/report > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=5 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_msg'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app/idc /var/log/app/idc/msg > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=3 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_fgw'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/httpd /db0/www > /dev/null 2>&1 
+{% elif inventory_hostname_short in groups['gooid_oidc'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app /var/log/httpd > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=3 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_edb'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app/idc /var/log/httpd /var/log/tomcat /var/log/app/idc > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=3 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_log'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_rproxy'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/httpd > /dev/null 2>&1 
+{% elif inventory_hostname_short in groups['gooid_redmine'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['gooid_repo'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['idhub_web'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app/idhub /var/log/app/idhub-oidc /var/log/httpd /var/log/tomcat/idc > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=3 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['idhub_mdb'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['idhub_sdb'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['idhub_hlp'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=2 ${BUCKET} /var/log/app/idhub /var/log/httpd /var/log/tomcat > /dev/null 2>&1 ; ${TRANSFER_S3} --journal-id=3 ${BUCKET} --include='*.log*' /var/lib/proxysql > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['idhub_batch'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% elif inventory_hostname_short in groups['idhub_els'] %}
+{{minute}} {{hour}} * * * root ${TRANSFER_S3} --include='secure*,messages*,falcon-sensor*' --non-recursive --journal-id=1 ${BUCKET} /var/log > /dev/null 2>&1
+{% else %}
+## TODO :
+{% endif %}

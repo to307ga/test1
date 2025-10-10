@@ -1,0 +1,9 @@
+# hlp
+hlp_httpd_fqdn: idhub.wbo101.goo.ne.jp
+hlp_httpd_port: "80"
+hlp_proxysql:
+  nodes:
+    - idhub-21-dev-mdb-101
+proxy_pass: localhost:8081
+mysql_writer_host: 127.0.0.1:6034
+mysql_reader_host: 127.0.0.1:6033

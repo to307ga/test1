@@ -1,0 +1,12 @@
+---
+- name: tomcat_webのrestart_msg
+  debug:
+    msg: "{{ commands }}"
+  listen: tomcat_web_restart_msg
+
+  vars:
+    commands:
+      - "  注意：configが書き換わりました。tomcat_idcを手動で再起動してください。 "
+      - "  sudo systemctl restart tomcat_idc  "
+      - "  sudo systemctl status tomcat_idc   "
+

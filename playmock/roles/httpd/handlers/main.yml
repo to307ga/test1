@@ -1,0 +1,19 @@
+---
+- name: httpdのrestart_msg
+  debug:
+    msg: "{{ commands }}"
+  listen: httpd_restart_msg
+
+  vars:
+    commands:
+      - "  注意：server-status.configが書き換わりました。httpdを手動で再起動してください。 "
+      - "  httpd_idcの場合: "
+      - "  sudo systemctl restart httpd_idc  "
+      - "  sudo systemctl status httpd_idc   "
+      - "  httpd_gbsの場合: "
+      - "  sudo systemctl restart httpd_gbs  "
+      - "  sudo systemctl status httpd_gbs   "
+      - "  その他: "
+      - "  sudo systemctl restart httpd  "
+      - "  sudo systemctl status httpd   "
+

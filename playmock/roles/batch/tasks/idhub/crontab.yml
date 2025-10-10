@@ -1,0 +1,11 @@
+---
+# crontabの配布場所参考サイト：https://vividcode.hatenablog.com/entry/man-cron-and-crontab
+- name: cron idhubの配布
+  template:
+    src: templates/etc/cron.d/idhub.j2
+    dest: /etc/cron.d/idhub
+    owner: root
+    group: root
+    mode: 0644
+  tags: 
+    - cron

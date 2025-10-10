@@ -1,0 +1,12 @@
+[Unit]
+Description=rpm collection timer
+
+[Timer]
+OnCalendar=Tue *-*-8..14 06:00:00
+RandomizedDelaySec=0
+AccuracySec=1s
+Persistent=true
+Unit=dnf-automatic-clean-all.service
+
+[Install]
+WantedBy=timers.target

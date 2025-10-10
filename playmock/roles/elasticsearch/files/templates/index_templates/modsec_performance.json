@@ -1,0 +1,38 @@
+{
+  "index_patterns": ["fluentd.gooid-web_modsec_performance_log-*"],
+  "priority": 0,
+  "composed_of": [
+    "index-common-settings"
+  ],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":             { "type": "date" },
+        "host":		                { "type": "keyword" },
+        "virtual-host":		        { "type": "keyword" },
+        "remotehost": 	          { "type": "ip" },
+        "log-time": 	  { 
+          "type": "date",
+          "format": "dd/MMM/yyyy:HH:mm:ss Z"
+        },
+        "unique_id": 		          { 
+          "type":   "text",
+          "fields": {
+            "raw":  {
+              "type": "keyword"
+            }
+          }
+        },       
+        "first_line_of_request":  { "type": "text" },
+        "status_code": 		        { "type": "keyword" },
+        "status_of_connection": 	{ "type": "text" },
+        "bytes_received":         { "type": "text" },
+        "bytes_send":             { "type": "text" },
+        "mod_security-time1": 		{ "type": "text" },
+        "mod_security-time2": 		{ "type": "text" },
+        "mod_security-time3": 		{ "type": "text" },
+        "processing_times": 		  { "type": "text" }
+      }
+    }
+  }
+}

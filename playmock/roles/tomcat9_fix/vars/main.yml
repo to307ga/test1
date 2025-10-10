@@ -1,0 +1,86 @@
+---
+directories:
+  - /opt/tomcat/bin
+  - /opt/tomcat/conf
+  - /opt/tomcat/lib
+  - /opt/tomcat/logs
+  - /opt/tomcat/temp
+  - /opt/tomcat/webapps
+  - /opt/tomcat/work
+
+# シェルスクリプトを保持するディレクトリ
+# /opt/tomcat/bin
+# /usr/local/tomcat/bin
+# /usr/local/tomcat/idc/bin
+shell_scripts:
+  - catalina.sh
+  - ciphers.sh
+  - configtest.sh
+  - daemon.sh
+  - digest.sh
+  - makebase.sh
+  - setclasspath.sh
+  - shutdown.sh
+  - startup.sh
+  - tool-wrapper.sh
+  - version.sh
+
+# jar, xml, batなどを保持するディレクトリ
+# /opt/tomcat/bin
+# /usr/local/tomcat/bin
+# /usr/local/tomcat/idc/bin
+other_bin_files:
+  - bootstrap.jar
+  - catalina-tasks.xml
+  - catalina.bat
+  - ciphers.bat
+  - commons-daemon-native.tar.gz
+  - commons-daemon.jar
+  - configtest.bat
+  - digest.bat
+  - makebase.bat
+  - setclasspath.bat
+  - shutdown.bat
+  - startup.bat
+  - tomcat-juli.jar
+  - tomcat-native.tar.gz
+  - tool-wrapper.bat
+  - version.bat
+
+# jarを保持するディレクトリ
+# /opt/tomcat/lib
+jar_files:
+  - annotations-api.jar
+  - catalina-ant.jar
+  - catalina-ha.jar
+  - catalina-ssi.jar
+  - catalina-storeconfig.jar
+  - catalina-tribes.jar
+  - catalina.jar
+  - ecj-4.20.jar
+  - el-api.jar
+  - jasper-el.jar
+  - jasper.jar
+  - jaspic-api.jar
+  - jsp-api.jar
+  - servlet-api.jar
+  - tomcat-api.jar
+  - tomcat-coyote-ffm.jar
+  - tomcat-coyote.jar
+  - tomcat-dbcp.jar
+  - tomcat-i18n-cs.jar
+  - tomcat-i18n-de.jar
+  - tomcat-i18n-es.jar
+  - tomcat-i18n-fr.jar
+  - tomcat-i18n-ja.jar
+  - tomcat-i18n-ko.jar
+  - tomcat-i18n-pt-BR.jar
+  - tomcat-i18n-ru.jar
+  - tomcat-i18n-zh-CN.jar
+  - tomcat-jdbc.jar
+  - tomcat-jni.jar
+  - tomcat-util-scan.jar
+  - tomcat-util.jar
+  - tomcat-websocket.jar
+  - websocket-api.jar
+  

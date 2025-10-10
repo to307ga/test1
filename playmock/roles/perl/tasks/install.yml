@@ -1,0 +1,17 @@
+---
+- name: perl moduleのインストール
+  yum:
+    name: "{{ item.name }}"
+    state: present
+  loop:
+    - { name: perl-autodie }
+    - { name: perl-DBD-MySQL }
+    - { name: perl-Jcode }
+    - { name: perl-Switch }
+    - { name: perl-Digest-SHA }
+    - { name: perl-Digest-MD5 }
+    - { name: perl-Date-Calc }
+    - { name: perl-JSON }
+    - { name: perl-Mail-Sendmail }
+    - { name: perl-DateTime }
+    - { name: perl-Time-HiRes }

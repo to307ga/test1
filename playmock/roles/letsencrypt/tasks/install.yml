@@ -1,0 +1,11 @@
+---
+- name: Install certbot
+  yum:
+    name: certbot
+    state: latest
+    disable_gpg_check: true
+- name: Install python3-certbot-apache
+  yum:
+    name: python3-certbot-apache
+    state: latest
+    disable_gpg_check: true

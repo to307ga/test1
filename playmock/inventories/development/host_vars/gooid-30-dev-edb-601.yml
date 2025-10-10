@@ -1,0 +1,60 @@
+# edb
+
+# 商用・検証環境ともに、プライベートIPでアクセスされます。
+# 商用： 退避gooIDの復元手順（リモートワーク編）- 2022 : https://bit.ly/3Sy5kcA
+# 検証： SSH Port Forwarding にて。
+edb_httpd_fqdn: "{{ ansible_eth0.ipv4.address }}"
+edb_httpd_port: 80
+edb_httpd_logformat_type: combined_gooidc
+edb_httpd_logformat: '"%h %l %u %t %D \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""'
+
+# proxysql設定
+edb_proxysql:
+  #
+  # 退避DBのノードをここに定義します。
+  #
+  #   - ここはGalera Clusterではなく、通常のReplicationを採用しています。
+  #   - ノードは最小1台、最大で2大まで定義できます。
+  archive:
+    nodes:
+      - gooid-30-dev-edb-601
+  #
+  # gooIDのサービスDBのノードをここに定義します。
+  #
+  #   - ここはGalera Clusterです。
+  #   - edb上のバッチで、前述の「退避DB」と、ここで定義する「サービスDB」双方に作用し、参照・更新されます。
+  # 
+  # 1つ目のノードは、平常時の単一の書き込みノードになります。
+  # 2～3つ目のノードは、（正常時）参照用ノード ／ （故障時）1つ目のノードが故障した際、単一書き込みノードに昇格します。
+  # 4つ以上定義すると、4と5ノード目は、参照専用のノード（＝決して書き込みノードに昇格しない）となります。
+  #
+  # 詳細は、Jinja2テンプレート `roles/proxysql/templates/edb/proxysql.cnf.j2` を参照してください。
+  service:
+    nodes:
+      - gooid-30-dev-mdb-601
+      - gooid-30-dev-mdb-602
+      - gooid-30-dev-mdb-603
+      - gooid-30-dev-sdb-601
+      - gooid-30-dev-sdb-602
+
+mule_fqdn: localhost
+mule_port: 50080
+
+####################### DBの設定 ###########################
+#server-idはhostnameで分岐し"20124${db_num}"の形式,重複NG
+#rep_role:マスターDBのみmaster,それ以外はslave
+#db_num:ホスト番号3桁
+
+edb_mysql1_serverid: 20224001
+edb_mysql2_serverid: 20224002
+
+edb_mysql1_general_log_file: gooid-30-dev-edb-602
+edb_mysql2_general_log_file: gooid-30-dev-edb-601
+
+edb_mysql1_report_host: gooid-30-dev-edb-602
+edb_mysql2_report_host: gooid-30-dev-edb-601
+
+edb_mysql1_sync_binlog: 1
+edb_mysql2_sync_binlog: 1
+
+galera_func: ""

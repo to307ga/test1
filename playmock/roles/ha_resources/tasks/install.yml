@@ -1,0 +1,22 @@
+---
+# HA関連のパッケージをループでインストール
+- yum:
+    name: "{{ packages }}"
+    state: latest
+  vars:
+    packages:
+      - pacemaker
+      - corosync
+      - pcs
+
+# ダウンロード出来ないサーバがあるので、gooid-30-dev-repo-001で管理する
+- name: Install kmod-drbd90, drbd90-utils
+  yum:
+    name: "{{ drbd_packages }}"
+    state: latest
+    disable_gpg_check: yes
+  environment: "{{ proxy_env }}"
+  vars:
+    drbd_packages:
+      - kmod-drbd90
+      - drbd90-utils

@@ -1,0 +1,10 @@
+[Unit]
+Description=rpm collection service
+
+[Service]
+#User=root (デフォルトのままなので省略)
+Type=oneshot
+ExecStart=/usr/local/bin/dnf-auto-rpm-collection.sh
+
+[Install]
+WantedBy=multi-user.target

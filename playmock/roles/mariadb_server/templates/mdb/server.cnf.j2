@@ -1,0 +1,214 @@
+#マニフェストで規定すべき変数は以下
+#$serverid
+
+#
+# These groups are read by MariaDB server.
+# Use it for options that only the server (but not clients) should see
+#
+# See the examples of server my.cnf files in /usr/share/mysql/
+#
+
+# this is read by the standalone daemon and embedded servers
+[server]
+
+# this is only for the mysqld standalone daemon
+[mysqld]
+######################################################################
+# main settings
+######################################################################
+port = 3306
+socket = /var/lib/mysql/mysql.sock
+pid-file = /var/run/mariadb/mariadb.pid
+datadir = /db0/mysql/
+character-set-server = utf8
+
+######################################################################
+# replication settings for master and slave
+######################################################################
+## ansibleでmysqlのserver-idを生成 - おっさんエンジニアの忘備録
+## https://saosao-0706.hatenablog.com/entry/2019/02/27/182155
+server-id = {{ ansible_default_ipv4.address.split('.')[1].zfill(3)}}{{ ansible_default_ipv4.address.split('.')[2].zfill(3)}}{{ ansible_default_ipv4.address.split('.')[3].zfill(3)}}
+
+######################################################################
+# replication settings for master only
+######################################################################
+log-bin = /dblog/binlog/bin.log
+binlog_format = ROW
+### gooid20ではCronで180日より古いものを消去していたものをここで指定
+expire_logs_days = 99
+log_slave_updates
+### binlogへの同期を待たないようにして更新性能を向上させます
+### MySQLのレプリケーションでありがちな10の問題 | Yakst : https://yakst.com/ja/posts/1372
+sync-binlog = 0
+
+## 初回構築作業用
+## データのリストアを速くする設定
+## （効果の程は不明。おまじない）
+## backup - MySQL any way to import a huge (32 GB) sql dump faster? - Database Administrators Stack Exchange
+## https://dba.stackexchange.com/questions/83125/mysql-any-way-to-import-a-huge-32-gb-sql-dump-faster
+#disable-log-bin
+#log_slave_updates=OFF
+#innodb_doublewrite=OFF
+#innodb_flush_log_at_trx_commit=0
+
+######################################################################
+# replication settings for slave only
+######################################################################
+
+# レプリケーションサーバの時、skip-slave-start、report-hostの２つを利用する
+{% if galera_func is defined and galera_func == "replication" %}
+skip-slave-start
+## Slave SQL Threadを並列に。MariaDB特有の設定 https://bit.ly/3vBSe5r
+slave_parallel_threads=8
+report-host = {{ inventory_hostname_short }}
+read_only = ON
+{% else %}
+#skip-slave-start
+#report-host = {{ inventory_hostname_short }}
+{% endif %}
+
+#replicate-do-db=PDB02
+#replicate-ignore-table = PDB02.async_message
+
+######################################################################
+# log settings
+######################################################################
+log-error = /var/log/mariadb/mariadb.log
+slow-query-log = 1
+slow-query-log-file = /var/log/mariadb/mariadb-slow.log
+long-query-time = 2
+general-log = OFF
+general-log-file = /dblog/log/mariadb-{{ inventory_hostname_short }}-general.log
+
+######################################################################
+## Table Encryption
+#######################################################################
+plugin_dir=/usr/lib64/mysql/plugin
+plugin_load_add=file_key_management.so
+
+######################################################################
+# misc.
+######################################################################
+symbolic-links = 0
+tmpdir = /db0/loaddata/
+sql-mode = 'ALLOW_INVALID_DATES'
+table_definition_cache=464
+
+######################################################################
+### INNODB Specific options
+######################################################################
+## 有料系SpringBootが起動時にConnection Poolを大量数確保するため、多めに。
+max_connections = 2500
+
+table_open_cache = 6000
+max_allowed_packet = 16M
+binlog_cache_size = 1M
+max_heap_table_size = 64M
+sort_buffer_size = 4M
+join_buffer_size = 4M
+thread_cache_size = 800
+query_cache_size = 128M
+query_cache_limit = 2M
+thread_stack = 192K
+#########
+###
+### 2022-04 の性能試験において、idhub の d_idhub_session テーブルへ過度の大量のINSERTが発生すると、
+### Deadlock が発生する傾向が見られました。
+### 下記、トランザクション分離レベルを、REPEATABLE READ (default) から、READ COMMITED にして、
+### 一貫性を多少犠牲にすることで、これを解消できました。
+###
+### Deadlockが多発した場合には検討してください。
+### サーバ全体への適用ではなく、セッションレベルで必要な箇所での分離レベル変更を推奨します。
+### SET TRANSACTION ISOLATION LEVEL READ-COMMITTED;
+###
+###     トランザクション分離レベルについてのまとめ - Qiita
+###     https://qiita.com/song_ss/items/38e514b05e9dabae3bdb
+###
+### ただしSTATEMENT Based Replication (SBR, binlog_format=STATMENT) だと、READ-COMMITTEDが使えないので注意
+### 日々の覚書: MySQL 5.7で暗黙のデフォルトが変わりそうなはなし : https://bit.ly/3P6tQRk
+#########
+transaction_isolation = REPEATABLE-READ
+#transaction-isolation = READ-COMMITTED
+
+tmp_table_size = 64M
+read_buffer_size = 4M
+read_rnd_buffer_size = 4M
+
+{% if inventory_hostname_short == "gooid-21-pro-mdb-001" %}
+## 物理メモリの60%を指定します。  https://bit.ly/3811hnA
+## 2022/11/28
+## gooid-21-pro-mdb-001のみメモリ容量が枯渇してしまっているため
+## 対策としてbuffer_pool_sizeを物理メモリの70%から、60%まで下げた
+innodb_buffer_pool_size = {{ (ansible_memtotal_mb * 0.6 ) | int }}M
+{%- else -%}
+## 物理メモリの70%を指定します。  https://bit.ly/3811hnA
+innodb_buffer_pool_size = {{ (ansible_memtotal_mb * 0.7 ) | int }}M
+{% endif %}
+
+innodb_data_file_path = ibdata1:10M:autoextend
+innodb_write_io_threads = 8
+innodb_read_io_threads = 8
+innodb_log_buffer_size = 8M
+innodb_log_file_size = 256M
+innodb_max_dirty_pages_pct = 90
+innodb_lock_wait_timeout = 120
+### MariaDB+GaleraClusterの運用事例(MySQL勉強会2016-01-28)  https://bit.ly/3tizTcA
+### では、"innodb_flush_log_at_trx_commit=0"にすると書き込み性能が3倍向上、とのこと。
+### 以下では0, 2が早い、とのこと。
+### https://mariadb.com/docs/reference/mdb/system-variables/innodb_flush_log_at_trx_commit/
+innodb_flush_log_at_trx_commit=0
+
+######################################################################
+## Galera Cluster
+#######################################################################
+# mdb3台、sdb2台でgaleraクラスタを構成。
+# mdbの1号機だけread&write。その他のmdbはread only。
+# mdb-001がクラスタを離脱するとmdb-002がread&writeになる。
+# sdb2台はread only。
+
+[galera]
+{% if galera_func is defined and galera_func == "galera" %}
+wsrep_on = ON
+wsrep_provider = /usr/lib64/galera-4/libgalera_smm.so
+wsrep_cluster_address = gcomm://{{ galera_addr1 }},{{ galera_addr2 }},{{ galera_addr3 }},{{ galera_addr4 }},{{ galera_addr5 }}
+wsrep_cluster_name = '{{ galera_cluster_name }}'
+wsrep_node_name = '{{ galera_node_name }}'
+# wsrep_node_addressはこのserver.cnfで定義しているIPアドレスを設定すること
+wsrep_node_address = {{ galera_addr1 }}
+wsrep_sst_method = rsync
+wsrep_sst_donor_rejects_queries = ON
+#wsrep_slave_threadsはCPUコア数の2,3,4倍が推奨 4からMySQLTuner推奨値の24へ変更
+wsrep_slave_threads = 24
+innodb_autoinc_lock_mode = 2
+wsrep_auto_increment_control=OFF
+auto_increment_increment=1
+#MySQLTuner推奨値に設定。gcs.fc_limitはwsrep_slave_threadsの5倍が推奨値。gcs.fc_factorについてはMySQLTuner推奨値
+wsrep_provider_options="gcs.fc_factor=0.8; gcs.fc_limit=120; gcache.size=2048M"
+
+{% endif %}
+
+# this is only for embedded server
+[embedded]
+
+# This group is only read by MariaDB-{{ mariadb_version }} servers.
+# If you use the same .cnf file for MariaDB of different versions,
+# use this group for options that older servers don't understand
+[mysqld-{{ mariadb_version }}]
+
+# These two groups are only read by MariaDB servers, not by MySQL.
+# If you use the same .cnf file for MySQL and MariaDB,
+# you can put MariaDB-only options here
+[mariadb]
+######################################################################
+## Table Encryption
+#######################################################################
+# encryption plugin
+plugin_load_add = file_key_management.so
+file_key_management_filename = /etc/mysql/encryption/keyfile.enc
+file_key_management_filekey = FILE:/etc/mysql/encryption/key.txt
+file_key_management_encryption_algorithm=AES_CBC
+
+# 新規にテーブル構築時、テーブルを暗号化する 
+innodb_encrypt_tables = ON
+
+[mariadb-{{ mariadb_version }}]

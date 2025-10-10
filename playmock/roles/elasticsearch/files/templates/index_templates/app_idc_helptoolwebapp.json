@@ -1,0 +1,32 @@
+{
+  "index_patterns": ["fluentd.gooid-hlp_app_idc_helptoolwebapp_log-*"],
+  "priority": 0,
+  "composed_of": [
+    "index-common-settings"
+  ],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "server":		    { "type": "keyword" },
+        "logger": 	    { 
+          "type":   "text",
+          "fields": {
+            "raw":  {
+              "type": "keyword"
+            }
+          }
+        },
+        "log-time": 	  { 
+          "type": "date",
+          "format": "yyyy/MM/dd HH:mm:ss.SSS"
+        },
+        "file": 		    { "type": "text" },       
+        "method": 		  { "type": "keyword" },
+        "line": 		    { "type": "text" },
+        "level": 	      { "type": "keyword" },
+        "msg": 		      { "type": "text" }
+      }
+    }
+  }
+}

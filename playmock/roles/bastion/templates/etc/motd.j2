@@ -1,0 +1,23 @@
+rbashユーザーではお客様個人情報を閲覧不可にするため、コマンドの実行を制限しています
+現在実行可能なコマンドは下記の通りです
+{% for line in allowed_commands %}
+{{ line.split()[1] }}
+{% endfor %}
+
+またbashにデフォルトで組み込まれているコマンドも実行可能です
+詳細はこちらを参照：https://ytyaru.hatenablog.com/entry/2020/06/23/000000
+
+DBへのアクセスは以下のコマンドを使用してください
+(注意)
+* 下記コマンドはbastionサーバーからのみ実行可能です
+* 個人情報を含むカラムはすべてマスク化されます。参照が必要な場合GZからアクセスしてください。
+------------------------------------------------------------------
+| コマンド            | 接続先DB               | 接続ユーザー     |
+------------------------------------------------------------------
+| mysql-gooid-read    | {{ gooid_read }}   | {{mysql_reader_name}} |
+| mysql-gooid-write   | {{ gooid_write }}   | {{mysql_writer_name}}  |
+| mysql-gooid-admin   | {{ gooid_write }}   | {{mysql_admin_name}}     |
+| mysql-idhub-read    | {{ idhub_read }}   | {{mysql_reader_name}} |
+| mysql-idhub-write   | {{ idhub_write }}   | {{mysql_writer_name}}  |
+| mysql-idhub-admin   | {{ idhub_write }}   | {{mysql_admin_name}}     |
+------------------------------------------------------------------

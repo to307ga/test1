@@ -1,0 +1,17 @@
+---
+- name: proxysql-initial.serviceの設定
+  systemd:
+    name: proxysql-initial
+    enabled: no
+    daemon_reload: no
+  # 一度もansible-playbookしていない場合は proxysql-init.serviceが存在しないため、
+  # dryrunの場合はSkip
+  when: not ansible_check_mode
+  
+- name: proxysql.serviceの開発環境自動起動設定
+  systemd:
+    name: proxysql.service
+    state: started
+    enabled: yes
+    daemon_reload: no
+  when: (release_env == "dev") and (not ansible_check_mode)

@@ -1,0 +1,17 @@
+######################################################################
+#
+# source_log_delete.sh用コンフィグファイル
+# 
+# 書式  source_dir:source_file:pastdate
+#      (元ファイル名(フルパス):元ファイル名:N日前の日付)
+#
+######################################################################
+/var/log/app/idhub/:ProfileToolAuth.log.:30
+/var/log/app/idhub/:ProfileToolOpe.log.:30
+/var/log/app/idhub/:helptoolwebapp.log.:30
+/var/log/httpd/:access_log.:30
+/var/log/httpd/:error_log.:30
+/var/log/httpd/:ssl_access_log.:30
+/var/log/httpd/:ssl_error_log.:30
+/var/log/tomcat/:catalina.:30
+/var/log/tomcat/:localhost.:30

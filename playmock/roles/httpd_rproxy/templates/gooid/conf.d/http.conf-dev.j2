@@ -1,0 +1,6 @@
+#letsencryptのSSL証明書をサーバー認証方式で取得するための定義
+<VirtualHost *:80>
+    DocumentRoot "/var/www/html/letsencrypt"
+    ServerName any:80
+    ServerAlias  *.mail.goo.ne.jp svc*.goo.ne.jp *.auth.d.goo.ne.jp *.auth.ocn.ne.jp *.id001.goo.ne.jp wbo*.goo.ne.jp *.wbo*.goo.ne.jp fgw*.goo.ne.jp
+</VirtualHost>

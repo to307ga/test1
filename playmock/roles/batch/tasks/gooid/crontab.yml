@@ -1,0 +1,21 @@
+---
+# crontabの配布場所参考サイト：https://vividcode.hatenablog.com/entry/man-cron-and-crontab
+- name: cron gooidcの配布
+  template:
+    src: templates/etc/cron.d/gooidc.j2
+    dest: /etc/cron.d/gooidc
+    owner: root
+    group: root
+    mode: 0644
+  tags: 
+    - cron
+
+- name: cron gbsの配布
+  template:
+    src:  templates/etc/cron.d/gbs.j2
+    dest: /etc/cron.d/gbs
+    owner: root
+    group: root
+    mode: 0644
+  tags: 
+    - cron

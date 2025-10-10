@@ -1,0 +1,14 @@
+[main]
+gpgcheck=1
+installonly_limit=3
+clean_requirements_on_remove=True
+best=True
+{% if release_env == "pro" %}
+skip_if_unavailable=False
+{% endif %}
+
+# 基盤部門指定の Proxy を経由させます。
+proxy={{ proxy_env.http_proxy }}
+
+# exclude=httpd java-openjdk* tomcat MariaDB* td-agent
+exclude=tomcat

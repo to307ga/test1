@@ -1,0 +1,17 @@
+---
+- name: 監視スクリプト配置用ディレクトリの作成
+  file: path={{ item }} state=directory owner=gooscp group=gooscp mode=0755
+  with_items:
+  - /usr/local/app/monitoring
+
+- name: 監視スクリプトの配置
+  copy:
+    src: files/script/{{ item }}
+    dest: /usr/local/app/monitoring/{{ item }}
+    owner: gooscp
+    group: gooscp
+    mode: 0744
+  loop:
+    - check_adv_user_file.sh
+    - check_dgp_user_file.sh
+    - check_prohibition_file.sh

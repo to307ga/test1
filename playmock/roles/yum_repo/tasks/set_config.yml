@@ -1,0 +1,8 @@
+---
+- name: /var/www/html/yum_repoを作成
+  file:
+    name: /var/www/html/yum_repo
+    state: directory
+    owner: root
+    group: root
+    mode: 0755

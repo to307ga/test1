@@ -1,0 +1,11 @@
+# mdb
+
+# galeraクラスタ設定
+galera_cluster_name: GOOID_GALERA_DB
+galera_node_name: gooid_dev_db_5
+galera_func: galera
+galera_addr1: gooid-21-dev-sdb-301
+galera_addr2: gooid-21-dev-mdb-301
+galera_addr3: gooid-21-dev-mdb-302
+galera_addr4: gooid-21-dev-mdb-303
+galera_addr5: gooid-21-dev-sdb-302

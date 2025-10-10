@@ -1,0 +1,31 @@
+---
+# ユーザにコマンド実行を促すメッセージをアウトプット
+- name: proxysqlのrestart_msg
+  debug:
+    msg: "{{ warning }}"
+  listen: proxysqlcnf changed
+  when: inventory_hostname_short is not regex("-000$")
+
+  vars:
+    warning:
+      - "  msg, batch, idhub_batchサーバの再起動"
+      - "  active=001、standby=002と仮定する"
+      - "  (1) 001で実施"
+      - "  $ sudo pcs cluster standby  "
+      - "  $ sudo pcs status  ← 002に切り替わったことを確認"
+      - "  $ sudo pcs cluster unstanby  "
+      - "  $ sudo pcs status  ← 001,002共にonlineになっていることを確認する"
+      - "  (2)002で実施"
+      - "  $ sudo pcs cluster standby  "
+      - "  $ sudo pcs status  ← 001に切り替わったことを確認"
+      - "  $ sudo pcs cluster unstandby  "
+      - "  $ sudo pcs status  ← 001,002共にonlineになっていることを確認する"
+      - "                             "
+      - "  web, edb, hlp, idhub_web, idhub_hlpサーバの再起動"
+      - "以下の3つのコマンドを手動で、1番から順番通りに実行してください。"
+      - "1. sudo systemctl stop proxysql "
+      - "2. sudo systemctl stop proxysql-initial "
+      - "3. sudo systemctl start proxysql-initial "
+      - "サービスのステータスを確認するコマンドです。"
+      - "1. sudo systemctl status proxysql-initial "
+      - "2. sudo systemctl status proxysql "

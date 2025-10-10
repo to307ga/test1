@@ -1,0 +1,14 @@
+---
+- name: httpd.serviceの設定
+  systemd:
+    name: httpd.service
+    enabled: no
+    daemon_reload: no
+
+- name: httpd.serviceの開発環境自動起動設定
+  systemd:
+    name: httpd.service
+    state: started
+    enabled: yes
+    daemon_reload: no
+  when: release_env == "dev"

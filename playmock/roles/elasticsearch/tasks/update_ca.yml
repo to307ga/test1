@@ -1,0 +1,41 @@
+---
+
+- name: regenerate elasticsearch CA
+  shell: 
+    executable: "/bin/bash"
+    cmd: "/usr/bin/openssl genrsa -out {{ es_certs_dir}}/{{ es_ca_filename }} 2048"
+  notify: Restart elasticsearch
+
+- name: Update CA to control node
+  fetch:
+    src:  "/etc/elasticsearch/certs/{{ es_ca_filename }}"
+    dest: "{{ es_local_certs_dir }}/{{ es_ca_filename }}"
+    flat: yes
+
+- name: regenerate csr
+  shell: 
+    executable: "/bin/bash"
+    cmd: /usr/bin/openssl req -new -key /etc/elasticsearch/certs/ca.key -subj "/C=JP/ST=Tokyo/L=Chiyoda-ku/O=NTT DOCOMO,INC" > /etc/elasticsearch/certs/ca.csr
+
+- name: Update subjectnames file
+  template:
+    src: subjectnames_{{ release_env }}.j2
+    dest: /tmp/subjectnames
+    mode: 0400
+
+- name: regenerate cert
+  shell: 
+    executable: "/bin/bash"
+    cmd: /usr/bin/openssl x509 -req -days {{ es_ca_effective_days }} -in {{ es_certs_dir}}/ca.csr -signkey {{ es_certs_dir}}/{{ es_ca_filename }} -out {{ es_certs_dir}}/{{ es_cert_filename }} -extfile /tmp/subjectnames
+  notify: Restart elasticsearch
+  
+- name: Update cert to control node
+  fetch:
+    src:  "{{ es_certs_dir}}/{{ es_cert_filename }}"
+    dest: "{{ es_local_certs_dir }}/{{ es_cert_filename }}"
+    flat: true
+
+- name: Remove updated subjectnames file
+  file:
+    path: /tmp/subjectnames
+    state: absent

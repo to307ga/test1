@@ -1,0 +1,7 @@
+---
+- name: Install google-cloud-cli
+  yum:
+    name: google-cloud-cli
+    enablerepo: private
+    disablerepo: "*"
+    state: present

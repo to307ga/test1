@@ -1,0 +1,12 @@
+production:
+  relative_url_root: /ticket
+
+  email_delivery:
+    delivery_method: :smtp
+    smtp_settings:
+      address: {{ smtp_relay_host }}
+      port: 25
+      domain: {{ inventory_hostname_short }}
+      authentication: :login
+      user_name:
+      password:

@@ -1,0 +1,2 @@
+# idhubサービスステータス監視
+0 * * * * gooscp /usr/local/app/monitoring/check_web_status.sh http://localhost:40080/idhub/status.jsp > /dev/null 2>&1

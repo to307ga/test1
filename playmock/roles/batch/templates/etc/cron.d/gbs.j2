@@ -1,0 +1,132 @@
+########################################################################
+# 日付設定ジョブネット
+# 暗号文生成削除ジョブネット
+#
+0 0 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet01.sh >/dev/null 2>&1
+
+#
+# 自動継続抽出ジョブネット
+#
+5 0 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet11.sh >/dev/null 2>&1
+
+#
+# ちょコムポイント付与ジョブネット
+#
+30 1 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet12.sh >/dev/null 2>&1
+
+#
+# 退会者リスト作成ジョブネット
+#
+30 3 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet13.sh >/dev/null 2>&1
+
+#
+# 決済情報登録者数統計メール生成ジョブネット、
+#
+0 4 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet14.sh >/dev/null 2>&1
+
+#
+# 売上速報ファイル生成月次・日次ジョブネット、
+#
+15 4 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet15.sh >/dev/null 2>&1
+
+#
+# セッション削除ジョブネット
+#
+0 6 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet10.sh >/dev/null 2>&1
+
+#
+# 事業者精算ジョブネット
+#
+0 9 1 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet02.sh >/dev/null 2>&1
+
+#
+# 決済処理中のエラー通知ジョブネット
+#
+15 10 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet03.sh >/dev/null 2>&1
+
+#
+# 一括課金送信ジョブネット
+# 月初継続処理結果通知スクリプト
+#
+30 7 * * * gooscp { /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet04.sh; sleep 60; /usr/local/app/gbs/gbs_scp/scripts/notice_billing_result.pl; } >/dev/null 2>&1;
+
+#
+# gooID退会連携バッチジョブネット
+#
+30 8 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet06.sh >/dev/null 2>&1
+
+#
+# ポイント精算集計結果ファイル生成ジョブネット
+#
+0 14 1 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet07.sh >/dev/null 2>&1
+
+#
+# 一括課金取り込みジョブネット
+#
+0 15 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet08.sh >/dev/null 2>&1
+
+#
+# 自動継続取込ジョブネット
+#
+0 16 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet16.sh >/dev/null 2>&1
+
+#
+# 有料ユーザ向け通知ジョブネット
+#
+00 13 16 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbsjobnet.sh JobNetSet29.sh >/dev/null 2>&1
+
+
+
+
+#
+# アドバンス売上、会員数情報通知
+#
+40 4 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbs_member_adv.pl >/dev/null 2>&1
+45 4 1 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbs_sales_adv.pl >/dev/null 2>&1
+
+#
+# 月次処理状態チェック
+#
+15 7 2 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbs_batch_sh.sh gbs_monthly_check.pl > /dev/null 2>&1
+
+#
+# アドバンス解約アンケートレポート
+#
+5 5 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbs_batch_sh.sh gbs_adv_questionary.pl > /dev/null 2>&1
+
+#
+# gooメールアドバンス解約者リスト生成
+#
+30 1 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbs_withdraw_adv.pl > /tmp/gbs_withdraw_adv.log 2>&1
+
+#
+# 洗い換え結果反映
+# ※ 2022-06-21 初回（2022-05-25）が失敗していたため、恒久的にログ保存するようログのパスを変更
+00 12 25 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/AutoCardCleaning.sh >> /var/log/app/gbs/gbs_scp/AutoCardCleaning.log.`date +\%Y-\%m-\%d` 2>&1
+
+#
+# アドバンス有効会員リスト生成
+#
+0 23 2 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbs_memlist_adv.pl > /tmp/gbs_memlist_adv.log 2>&1
+
+#
+# ディレクトリ型商品を強制解約したユーザにメッセージを送信する
+#
+0 18 1 * * gooscp /usr/local/app/gbs/gbs_scp/scripts/DirectoryCompulsionCancelMailSendCancelListAction.sh > /dev/null 2>&1
+
+#
+# 有料系バッチ処理監視スクリプト
+#
+0 17 * * * gooscp /usr/bin/perl /usr/local/app/gbs/gbs_scp/scripts/gbs_monitoring_sttl_status.pl > /dev/null 2>&1
+
+#
+# ホスピタリティ基盤連携ファイル作成
+#
+10 0 * * * gooscp /usr/local/app/gbs/gbs_scp/scripts/gbs_history.pl >/dev/null 2>&1
+
+#
+# テーブルデータ削減スクリプト(t_set_consist_mng)
+# 2022-07-01以下の4つのテーブルのレコード数肥大化によって、月初課金処理が遅れ他サービスに影響が出てしまった。
+# 再発防止のため、実行日から1年1ヶ月前の1ヶ月間のレコード(2022-12に実行した場合2021-12が対象)を月次で削除することとした。
+# 一度に大量のデータを削除した結果、DBが止まるトラブルがあったためsleepをかけながら少しずつ消す方式としている。
+0 18 3 * * gooscp { /usr/local/app/gbs/gbs_scp/scripts/delete_old_records.pl -l 200 -s 10 -table_t_set_consist_mng; /usr/local/app/gbs/gbs_scp/scripts/delete_old_records.pl -l 200 -s 10 -table_t_set_consist_detail; /usr/local/app/gbs/gbs_scp/scripts/delete_old_records.pl -l 200 -s 10 -table_t_auto_cont_mng_work; /usr/local/app/gbs/gbs_scp/scripts/delete_old_records.pl -l 200 -s 10 -table_t_batch_billing_work; } >/dev/null 2>&1;

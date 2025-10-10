@@ -1,0 +1,27 @@
+# web
+httpd_idc_fqdn: auth.d.goo.ne.jp
+httpd_idc_port: 40080
+httpd_idc_hostname: webapps
+httpd_idc_http_conf: 2.auth.d.goo.ne.jp.conf
+httpd_idc_http_conf_template: 2.auth.d.goo.ne.jp.conf.j2
+
+tomcat_web_id_xml: idhub.xml
+
+# galeraクラスタ設定
+web_proxysql:
+  # 最低でも1ノード、最大で3ノードまでを定義できます。
+  # 
+  # 1つ目のノードは、平常時の単一の書き込みノードになります。
+  # 2～3つ目のノードは、（正常時）参照用ノード ／ （故障時）1つ目のノードが故障した際、単一書き込みノードに昇格します。
+  #
+  # 詳細は、Jinja2テンプレート `roles/proxysql/templates/web/proxysql.cnf.j2` を参照してください。
+  nodes:
+    - idhub-21-pro-mdb-001
+    - idhub-21-pro-mdb-002
+    - idhub-21-pro-mdb-003
+
+# 書き込み/参照DB
+mysql_writer_host: 127.0.0.1:6034
+mysql_reader_host: 127.0.0.1:6033
+
+idhub_spring_profiles_active: prod-ocn

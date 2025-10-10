@@ -1,0 +1,68 @@
+ServerRoot "/etc/httpd"
+Listen 40080
+Include conf.modules.d/*.conf
+User apache
+Group apache
+ServerAdmin root@localhost
+
+ErrorLog "|/usr/sbin/rotatelogs /var/log/httpd/error_log.%Y%m%d 86400 540"
+LogLevel error
+LogFormat "%a %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+LogFormat "%a %l %u %t %D \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\" \"%{GOO_ID}e\"" combined_gooid
+
+# アクセスログへのフィルタ条件を定義
+# 2024-08 アクセスログの肥大化を防ぐため、静的ファイルのログ行は除外するようにした
+# HWKOUKAI2022-246 httpアクセスログ ー 不要行をロギングしない ＋ status.jspの50xエラーを監視から除外させる。
+SetEnvIfNoCase Request_URI "\.(gif|flv|jpe?g|ico|css|js|png|rdf|svg|swf|txt|webp|xml)$" no_record_object
+
+# 2024-08 LBがアクセスしてくるヘルスチェックでのエラーを一般ユーザのエラーとは分類するため別のログファイルに出力するようにした。
+# HWKOUKAI2022-246 httpアクセスログ ー 不要行をロギングしない ＋ status.jspの50xエラーを監視から除外させる。
+SetEnvIfNoCase Request_URI "\/(heartbeat|status\.jsp)$" no_record_object object_is_healthcheck
+
+CustomLog "|/usr/sbin/rotatelogs /var/log/httpd/access_log.%Y%m%d 86400 540" combined_gooid env=!no_record_object
+CustomLog "|/usr/sbin/rotatelogs /var/log/httpd/healthcheck_access_log.%Y%m%d 86400 540" combined env=object_is_healthcheck
+
+TypesConfig /etc/mime.types
+AddType application/x-compress .Z
+AddType application/x-gzip .gz .tgz
+AddDefaultCharset UTF-8
+MIMEMagicFile conf/magic
+EnableSendfile on
+
+ServerTokens ProductOnly
+PidFile run/httpd.pid
+Timeout 120
+KeepAliveTimeout 1
+StartServers 250
+MinSpareServers 5
+MaxSpareServers 250
+ServerLimit 750
+MaxRequestWorkers 750
+MaxConnectionsPerChild 5000
+
+# リクエストヘッダのサイズオーバーにより 400 Bad Request を返すケースがある。
+# この問題に対応するためにRequestヘッダのMAX許容量を30720bytesに上げる。
+LimitRequestFieldSize 30720
+ProxyIOBufferSize 30720
+
+ErrorDocument 503 /error.html.utf8
+ErrorDocument 500 /error.html.utf8
+ErrorDocument 404 /error.html.utf8
+ErrorDocument 403 /error.html.utf8
+ErrorDocument 400 /error.html.utf8
+
+
+RemoteIPHeader X-Forwarded-For
+
+# X-Forwarded-Forのアクセス元IPの偽装対策
+# 指定IP以外からのX-Forwarded-Forは受け取らない
+# 今後proxyIPが変更になる可能性も考慮し社内IPをすべて許可する
+
+# Private IP (RFC1579, RFC1918)
+RemoteIPTrustedProxy 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+# R-Cloud
+RemoteIPTrustedProxy 61.113.104.0/24 114.179.184.0/24 114.179.185.0/24 219.164.251.0/24
+# 三鷹goonet
+RemoteIPTrustedProxy 210.144.64.0/24 202.217.72.0/24 202.217.73.0/24 202.217.75.0/24
+
+IncludeOptional conf.d/*.conf

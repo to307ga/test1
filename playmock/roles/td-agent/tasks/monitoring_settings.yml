@@ -1,0 +1,10 @@
+---
+
+- name: distribute check_error_count.sh
+  copy:
+    src:    files/check_error_count.sh
+    dest:   /usr/local/monitoring/bin/
+    owner:  zabbix
+    group:  zabbix
+    mode:   0755
+

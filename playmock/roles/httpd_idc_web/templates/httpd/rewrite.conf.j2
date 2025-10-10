@@ -1,0 +1,112 @@
+# LogLevel debug rewrite:trace8
+
+### Rewrite ###
+# site -> Site
+#RewriteCond %{QUERY_STRING} !^Site=
+#RewriteCond %{QUERY_STRING} !&Site=
+#RewriteCond %{QUERY_STRING} ^site=([^&]+) [OR]
+#RewriteCond %{QUERY_STRING} &site=([^&]+)
+#RewriteRule ^(.*)$ $1?Site=%1&%{QUERY_STRING} [NE]
+
+# success , complete -> Success
+#RewriteCond %{QUERY_STRING} !^Success=
+#RewriteCond %{QUERY_STRING} !&Success=
+#RewriteCond %{QUERY_STRING} ^(success|complete)=([^&]+) [OR]
+#RewriteCond %{QUERY_STRING} &(success|complete)=([^&]+)
+#RewriteRule ^(.*)$ $1?Success=%2&%{QUERY_STRING} [NE]
+
+# set domain to redirect host.
+RewriteRule .* - [E=R_DOMAIN:login.mail.goo.ne.jp]
+RewriteCond %{HTTP_HOST} ^lin([0-9]{3})\.mail\.goo\.ne\.jp
+RewriteRule .* - [E=R_DOMAIN:lin%1.mail.goo.ne.jp]
+
+# set domain to redirect host.(srvc.goo.ne.jp)
+RewriteRule .* - [E=SRVC_DOMAIN:srvc.goo.ne.jp]
+RewriteCond %{HTTP_HOST} ^lin([0-9]{3})\.mail\.goo\.ne\.jp
+RewriteRule .* - [E=SRVC_DOMAIN:svc%1.goo.ne.jp]
+
+# URL redirect
+#-- obsolete page
+RewriteRule ^/id/portal/Password/Index$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/portal/Profile/Index$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/portal/BuyList/Index$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/portal/Withdraw/Index$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/NoticeNTTID$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/AboutSettlementRenewal$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/portal/Settle/AboutChocomPoint$ https://%{ENV:R_DOMAIN}/id/portal/Settle/AboutChocom [R=301,L]
+RewriteRule ^/id/portal/Settle/AboutNttWest$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/portal/Settle/AboutNttEast$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/AboutRakuten$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/AboutRakutenA$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/AboutRakutenB$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/FAQ$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/Contract20020530$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/AboutNoticeMailChangeProfile$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/AboutNoticeMailChangePassword$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/AboutNoticeMailResetPassword$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/NoticeTwoStepAuth$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/Terms1603/Notice$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+
+#-- profile
+RewriteRule ^/top/(index)?$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/settle/(index)?$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/portal/Settle/Index$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/pw/(index)?$ https://%{ENV:R_DOMAIN}/id/portal/Password/Index [R=301,L]
+RewriteRule ^/profile/(index)?$ https://%{ENV:R_DOMAIN}/id/portal/Profile/Index [R=301,L]
+RewriteRule ^/buylst/(index)?$ https://%{ENV:R_DOMAIN}/id/portal/BuyList/Index [R=301,L]
+RewriteRule ^/withdrawal/(index)?$ https://%{ENV:R_DOMAIN}/id/portal/Withdraw/Index [R=301,L]
+RewriteRule ^/faq/(index)?$ https://%{ENV:R_DOMAIN}/id/common/FAQ [R=301,L]
+RewriteRule ^/tos/(index)?$ https://%{ENV:R_DOMAIN}/id/common/Contract [R=301,L]
+RewriteRule ^/fed/masterid$ https://%{ENV:R_DOMAIN}/id/common/AboutMasterID [R=301,L]
+RewriteRule ^/top/login_hold$ https://%{ENV:R_DOMAIN}/id/common/AboutLoginHold [R=301,L]
+RewriteRule ^/pw/mobileLoginGuide$ https://%{ENV:R_DOMAIN}/id/common/AboutEasyLogin [R=301,L]
+RewriteRule ^/profile/verify_email_info$ https://%{ENV:R_DOMAIN}/id/common/AboutMailVerify [R=301,L]
+RewriteRule ^/settle/chocom_campaign(1|2)?$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id/common/ChocomCampaign(UnReg|Reg)?$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/settle/inst_chocom$ https://%{ENV:R_DOMAIN}/id/portal/Settle/AboutChocom [R=301,L]
+RewriteRule ^/settle/inst_ebank$ https://%{ENV:R_DOMAIN}/id/portal/Settle/AboutEbank [R=301,L]
+RewriteRule ^/settle/point$ https://%{ENV:R_DOMAIN}/id/portal/Settle/AboutChocomPoint [R=301,L]
+RewriteRule ^/settle/inst_plala$ https://%{ENV:R_DOMAIN}/id/portal/Settle/AboutPlala [R=301,L]
+#-- profile(SSL)
+RewriteRule ^/profile/profile_change$ https://%{ENV:R_DOMAIN}/id/portal/Profile [R=301,NE,L,QSA]
+RewriteRule ^/profile/verify_email$ https://%{ENV:R_DOMAIN}/id/portal/CheckAddressStart [R=301,NE,L,QSA]
+RewriteRule ^/pw/reset_password$ https://%{ENV:R_DOMAIN}/id/portal/ForgotPwVerificationStart [R=301,L]
+RewriteRule ^/func/Regist$ https://%{ENV:SRVC_DOMAIN}/gbs/settlementInfReg/show [R=301,L]
+RewriteRule ^/id/portal/Settle/Regist$ https://%{ENV:SRVC_DOMAIN}/gbs/settlementInfReg/show [R=301,L]
+RewriteRule ^/func/UpdatePassword$ https://%{ENV:R_DOMAIN}/id/portal/ChgPwStart [R=301,L]
+
+#-- login
+RewriteRule ^/certify-cgi/logout.cgi$ https://%{ENV:R_DOMAIN}/id/authn/Logout [R=301,NE,L,QSA]
+#-- login(SSL)
+RewriteRule ^/certify-cgi/login.cgi$ https://%{ENV:R_DOMAIN}/id/authn/LoginStart [R=301,NE,L,QSA]
+RewriteRule ^/certify-cgi/bbr/login.cgi$ https://%{ENV:R_DOMAIN}/id/authn/bbr/Login [R=301,NE,L,QSA]
+
+#-- regist(SSL)
+RewriteRule ^/id/regist$ https://%{ENV:R_DOMAIN}/id/portal/RegIDAndSvcStart [R=301,NE,L,QSA]
+RewriteRule ^/id/addition/update_option/index$ https://%{ENV:R_DOMAIN}/id/portal/RegUserOptionStart [R=301,L]
+RewriteRule ^/id/srvc_regist$ https://%{ENV:R_DOMAIN}/id/portal/RegServiceStart [R=301,NE,L,QSA]
+RewriteRule ^/id/srvc_reject$ https://%{ENV:R_DOMAIN}/id/portal/WithdrawServiceStart [R=301,NE,L,QSA]
+RewriteRule ^/id/reject$ https://%{ENV:R_DOMAIN}/id/portal/WithdrawStart [R=301,L]
+RewriteRule ^/id/dm_reject$ https://%{ENV:R_DOMAIN}/id/portal/Profile [R=301,L]
+
+RewriteCond %{QUERY_STRING} &str_cd=20001051
+RewriteCond %{QUERY_STRING} &gds_id=00001
+RewriteRule ^/id/pay_srvc_br$ https://%{ENV:SRVC_DOMAIN}/gbs/sttlServiceSelect/sttlPreRegist?svcid=01&str_cd=20001051&gds_id=S0001 [R=301,L]
+RewriteRule ^/id/pay_srvc_br$ https://%{ENV:SRVC_DOMAIN}/gbs/sttlServiceSelect/sttlPreRegist [R=301,L,QSA]
+RewriteRule ^/id/pay_srvc_br_plala$ https://%{ENV:SRVC_DOMAIN}/gbs/plalaSttl/goods?svcid=01&str_cd=20001051&gds_id=00001&isptp=3 [R=301,L]
+
+# old redirect
+RewriteRule ^/func/(index|passport|basic)$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/func/raku/ebank/(.*)$ https://%{ENV:R_DOMAIN}/id/portal/Settle/AboutEbank [R=301,L]
+RewriteRule ^/func/isp/plala/(.*)$ https://%{ENV:R_DOMAIN}/id/portal/Settle/AboutPlala [R=301,L]
+RewriteRule ^/func/mobileLoginGuide$ https://%{ENV:R_DOMAIN}/id/common/AboutEasyLogin [R=301,L]
+RewriteRule ^/func/login_hold$ https://%{ENV:R_DOMAIN}/id/common/AboutLoginHold [R=301,L]
+RewriteRule ^/func/kiyaku/index$ https://%{ENV:R_DOMAIN}/id/common/Contract [R=301,L]
+RewriteRule ^/func/premium$ https://%{ENV:R_DOMAIN}/id/Top [R=301,L]
+RewriteRule ^/id-cgi/(reject|reject_2|reject_3).cgi$ https://%{ENV:R_DOMAIN}/id/portal/Profile [R=301,L]
+RewriteRule ^/func/(ShowProfile|UpdateProfile)$ https://%{ENV:R_DOMAIN}/id/portal/Profile [R=301,L]
+RewriteRule ^/func/Reminder$ https://%{ENV:R_DOMAIN}/id/portal/ForgotPwVerificationStart [R=301,L]
+RewriteRule ^/func/Login$ https://%{ENV:R_DOMAIN}/id/authn/LoginStart [R=301,NE,L,QSA]
+
+RewriteRule ^/passport/regist_1.ghtml$ https://%{ENV:R_DOMAIN}/id/portal/RegUserStart [R=301,NE,L,QSA]
+

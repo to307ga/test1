@@ -1,0 +1,74 @@
+#
+# These groups are read by MariaDB command-line tools
+# Use it for options that affect only one utility
+#
+
+###
+### mysql cli、参照用接続設定（デフォルト）
+###
+###   - 参照用ユーザで接続します。
+[mysql]
+protocol=TCP
+
+{# mdbやsdbの場合は、商用/開発 環境に関わらず、自身を参照クエリの接続先にします。 #}
+{% if server_role in ['mdb', 'sdb', 'edb'] %}
+host={{inventory_hostname_short}}
+{# 商用は、mdb-004を参照先に固定します。 #}
+{% elif release_env == 'pro' %}
+{# 開発は、mdb-001を参照先に固定します。 #}
+host={{db_hostname_prefix}}04
+{% else %}
+host={{db_hostname_prefix}}01
+{% endif %}
+port=3306
+
+user={{mysql_reader_name}}
+password={{mysql_reader_password}}
+
+prompt=[\\u@\\h:\\p] >
+default-character-set=utf8
+database=PDB02
+# テーブル名などのTab補完を無効にし、高速にします。
+auto-rehash=false
+
+###
+### mysql cli、更新用接続設定
+###
+###   - 更新用ユーザで接続します。
+###   - autocommitを無効にします。
+###   - 意図的に更新用に接続するには、 `mysql --defaults-group-suffix=_write` として起動します。
+[mysql_write]
+
+host={{db_hostname_prefix}}01
+user={{mysql_writer_name}}
+password={{mysql_writer_password}}
+
+# autocommitを無効にします。
+init-command='SET autocommit = 0;'
+
+{# proxysqlを経由させHealthcheckを有効にしようと考えたが、実現できず。
+ # MySQL Variables - ProxySQL : https://bit.ly/3Cw2EpL
+ # Backend DBに直接接続することとします。
+#host=localhost
+#port=6034
+#}
+
+# 下記を有効にすると、WHEREやLIMIT句無しでのUPDATE/DELETEが実行されなくなり、安全になる反面、
+# JOIN や結果行数に大きく影響を与え、作業効率が低いため、無効にします。
+#safe-updates=true
+
+[mysql_upgrade]
+
+[mysqladmin]
+
+[mysqlbinlog]
+
+[mysqlcheck]
+
+[mysqldump]
+
+[mysqlimport]
+
+[mysqlshow]
+
+[mysqlslap]

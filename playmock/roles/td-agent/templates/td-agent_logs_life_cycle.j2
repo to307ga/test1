@@ -1,0 +1,9 @@
+SHELL=/bin/bash
+PATH=$PATH:/usr/local/bin:/bin:/usr/bin
+# Log
+10 01 * * * root find /db0/tdlogs/merged/ -type f -mtime +{{time_to_gz}} -name "*.log" | xargs gzip > /dev/null 2>&1
+10 02 * * * root find /db0/tdlogs/merged/ -type f -mtime +{{time_to_delete}} -name "*.gz" -daystart -delete > /dev/null 2>&1
+10 03 * * * root find /db0/tdlogs/gooid-*/ -type f -mtime +{{time_to_delete}} -name "*.gz" -daystart -delete > /dev/null 2>&1
+10 04 * * * root find /db0/tdlogs/idhub-*/ -type f -mtime +{{time_to_delete}} -name "*.gz" -daystart -delete > /dev/null 2>&1
+# empty directory
+10 04 * * * root find /db0/tdlogs/buffer/ -type d -mtime +{{time_to_delete}} -empty -delete > /dev/null 2>&1

@@ -1,0 +1,6 @@
+---
+# configの設定
+- import_tasks: set_config.yml
+  tags:
+    - etc_hosts
+    - hosts

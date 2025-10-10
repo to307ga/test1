@@ -1,0 +1,12 @@
+---
+- name: tomcat_edbのrestart_msg
+  debug:
+    msg: "{{ commands }}"
+  listen: tomcat_edb_restart_msg
+
+  vars:
+    commands:
+      - "  注意：configが書き換わりました。tomcatを手動で再起動してください。 "
+      - "  sudo systemctl restart tomcat  "
+      - "  sudo systemctl status tomcat   "
+

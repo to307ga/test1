@@ -1,0 +1,27 @@
+######################################################################
+#
+# source_log_delete.sh用コンフィグファイル
+# 
+# 書式  source_dir:source_file:pastdate
+#      (元ファイル名(フルパス):元ファイル名:N日前の日付)
+#
+######################################################################
+/var/log/app/gbss/:event-spring-blue.log.:7
+/var/log/app/gbss/:error-spring-blue.log.:7
+/var/log/app/gbss/:debug-spring-blue.log.:7
+/var/log/app/gbss/:event-spring-green.log.:7
+/var/log/app/gbss/:error-spring-green.log.:7
+/var/log/app/gbss/:debug-spring-green.log.:7
+/var/log/app/idc/:openid.log.:30
+/var/log/app/idc/:root.log.:30
+/var/log/app/idc/:user.log.:30
+/var/log/httpd/:access_log.:30
+/var/log/httpd/:error_log.:30
+/var/log/httpd/:modsec_audit.log-:30
+/var/log/httpd/:modsec_performance.log.:30
+/var/log/httpd_gbs/:access_log.:30
+/var/log/httpd_gbs/:error_log.:30
+/var/log/tomcat/idc/:catalina.:20
+/var/log/tomcat/idc/:localhost.:20
+/var/log/tomcat/gbs/:catalina.:30
+/var/log/tomcat/gbs/:localhost.:30

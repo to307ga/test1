@@ -1,0 +1,43 @@
+---
+##
+##
+## Must be done before installing MariaDB
+##
+##
+- name: Make directory
+  file: path={{ item }} state=directory owner=root group=root
+  with_items:
+  ## Owner: root
+  - /db0
+  - /db0/backup/
+
+# mariadbをインストールする時は、/db0/mysqlの所有者はroot
+# ディレクトリがない -> mariadbはインストールしていない -> インストールできるように所有者をrootに設定
+- name: /db0/mysqlが存在するか確認
+  stat: path=/db0/mysql
+  register: result
+- name: /db0/mysqlを作成
+  file:
+    path: /db0/mysql
+    state: directory
+    owner: root
+    group: root
+  when: result.stat.exists == false
+
+# シンボリックリンクリンク /db0/mysql -> /var/lib/mysql を作成する (10.6.4以降)
+# RPM パッケージ内部で物理ディレクトリ /var/lib/mysql が作成されてしまうため、
+# それ以前に Symbolic Linkを作成する必要がある。
+# MariaDBパッケージがInstallされていなければ mysqlユーザが存在しないため、いったん rootオーナとする。
+- name: Symlink /var/lib/mysql が存在するか確認
+  stat: path=/var/lib/mysql
+  register: result_symlink_var_lib_mysql
+- name: Link /var/lib/mysql -> /db0/mysql
+  file:
+    state: link
+    src: /db0/mysql
+    dest: /var/lib/mysql
+    owner: root
+    group: root
+    follow: no
+  # ansible_check_mode(dry-run)の時は実行しない
+  when: result_symlink_var_lib_mysql.stat.exists == false and not ansible_check_mode

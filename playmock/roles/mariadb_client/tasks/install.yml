@@ -1,0 +1,21 @@
+---
+# 検証環境のパッケージのインストール
+- name: Install Mariadb-client
+  yum:
+    name: 
+      - MariaDB-client
+    state: latest
+    enablerepo: private
+    disablerepo: "*"
+  when: release_env == "dev"
+  
+# 商用環境のパッケージのインストール
+- name: Install Mariadb-client
+  yum:
+    name: 
+      - MariaDB-client
+    state: latest
+    enablerepo: private
+    disablerepo: "*"
+  when: release_env == "pro"
+  environment: "{{ proxy_env }}"

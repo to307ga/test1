@@ -1,0 +1,6 @@
+---
+# パッケージをループでインストール
+- import_role:
+    name: mod_ldap
+- import_role:
+    name: httpd

@@ -1,0 +1,31 @@
+---
+
+# 初期構築時のみ実行
+- import_tasks: advance_preparation.yml
+- import_tasks: install.yml
+
+# CAの作成
+- import_tasks: create_ca.yml
+  when: inventory_hostname in groups['elasticsearch_ca']
+
+# クラスタ構築 起動 確認
+- import_tasks: cluster_settings.yml
+
+# 初期構築後は以下のElastcisearch Index のメンテナンスのみ実行
+- import_tasks: create_lcms.yml
+- import_tasks: create_component_templates.yml
+- import_tasks: create_index_templates.yml
+- import_tasks: create_ingest_templates.yml
+
+# CAの更新  実行する場合は ca_and_cert_update_enabled: yes であることを確認してください
+# ansible-playbook コマンドに --start-at-task="regenerate elasticsearch CA" を追加してください
+- import_tasks: update_ca.yml
+  when: inventory_hostname in groups['elasticsearch_ca'] and ca_and_cert_update_enabled
+
+# 各種certの更新  実行する場合は ca_and_cert_update_enabled: yes であることを確認してください
+# CAの更新とワンセットで実施してください
+- import_tasks: update_cert.yml
+  when: ca_and_cert_update_enabled
+
+# 運用要件次第　ユーザやロールの作成　
+# - import_tasks: create_users.yml

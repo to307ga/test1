@@ -1,0 +1,13 @@
+######################################################################
+#
+# log_compression.sh用コンフィグファイル
+# 
+# 書式  source_path:destination_dir:destination_file
+#       (元ファイル名(フルパス):gzip結果保存dir:gzip結果ファイル名)
+#
+######################################################################
+#gooid-oidcはログの出力方式をソース側で変更する必要あり
+#/var/log/app/:oidc_audit.log.$PASTDATE2.gz:/home/log/tmp/var/log/app/:oidc_audit.log.$PASTDATE2.gz
+#/var/log/app/:oidc_request.log.$PASTDATE2.gz:/home/log/tmp/var/log/app/:oidc_request.log.$PASTDATE2.gz
+/var/log/httpd/access_log.$PASTDATE1:/home/log/tmp/var/log/httpd/:access_log.$PASTDATE1.gz
+/var/log/httpd/error_log.$PASTDATE1:/home/log/tmp/var/log/httpd/:error_log.$PASTDATE1.gz

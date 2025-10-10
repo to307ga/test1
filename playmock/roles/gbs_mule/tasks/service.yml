@@ -1,0 +1,14 @@
+---
+- name: gbs_mule.serviceの設定
+  systemd:
+    name: gbs_mule.service
+    enabled: no
+    daemon_reload: no
+
+- name: gbs_mule.serviceの開発環境自動起動設定
+  systemd:
+    name: gbs_mule.service
+    state: started
+    enabled: yes
+    daemon_reload: no
+  when: release_env == "dev"

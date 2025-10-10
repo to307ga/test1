@@ -1,0 +1,164 @@
+
+# dnf-automatic
+
+- yum:
+    name: dnf-automatic
+    state: latest
+
+# dnf.conf の配布はPuppetの領域なのでここでやるべきではない
+# - name: distribute dnf.conf
+#   template:
+#     src:        templates/etc/dnf/dnf.conf.j2
+#     dest:       /etc/dnf/dnf.conf
+#     owner:      root
+#     group:      root
+#     mode:       0644
+
+- name: distribute automatic.conf
+  template:
+    src:        templates/etc/dnf/automatic.conf.j2
+    dest:       /etc/dnf/automatic.conf
+    owner:      root
+    group:      root
+    mode:       0644
+
+- name: distribute install timer
+  template:
+    src:        templates/usr/lib/systemd/system/dnf-automatic-install.timer.j2
+    dest:       /usr/lib/systemd/system/dnf-automatic-install.timer
+    owner:      root
+    group:      root
+    mode:       0644
+  notify:       Reload dnf-automatic.timer
+
+- name: distribute download timer
+  template:
+    src:        templates/usr/lib/systemd/system/dnf-automatic-download.timer.j2
+    dest:       /usr/lib/systemd/system/dnf-automatic-download.timer
+    owner:      root
+    group:      root
+    mode:       0644
+  notify:       Reload dnf-automatic.timer
+
+
+- name: enabled dnf-automatic-download.timer
+  systemd:
+    name: dnf-automatic-download.timer
+    state: started 
+    enabled: yes
+  when: release_env == "pro" and not ansible_check_mode
+
+- name: enabled dnf-automatic-install.timer
+  systemd:
+    name: dnf-automatic-install.timer
+    state: started 
+    enabled: yes
+  when: release_env == "dev" and not ansible_check_mode
+
+- name : create download directory
+  file:
+    path: /opt/dnf-automatic-downloads/old
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+    recurse: true
+
+# これ以降は以前配布したスクリプトやタイマー等の削除などの暫定処理がある
+
+# ペースメーカでcronを管理しているので、cronを使うのを止める
+# - name: distribute dnf_automatic in cron.d
+#   copy:
+#     src:  files/etc/cron.d/dnf_automatic
+#     dest: /etc/cron.d/dnf_automatic
+#     owner: root
+#     group: root
+#     mode: 0644
+
+# timerを有効化するのでcron.dのdnf_automaticは削除する
+- name: delete dnf_automatic in cron.d
+  file:
+    path=/etc/cron.d/dnf_automatic
+    state=absent
+
+# dnf-automaticの実行後に自動でシャットダウンするスクリプトを配置
+# - name: Add dnf-automatic post-bash
+#   template:
+#     src:        templates/usr/local/bin/dnf-auto-shutdown.sh.j2
+#     dest:       /usr/local/bin/dnf-auto-shutdown.sh
+#     owner:      root
+#     group:      root
+#     mode:       0755
+
+- name: delete dnf-auto-shutdown.sh
+  file:
+    path=/usr/local/bin/dnf-auto-shutdown.sh
+    state=absent
+
+# 暫定処理はここまで。以降はこのまま残す
+
+# dnf-automaticの実行前に以前のキャッシュをクリアする
+- name: Add dnf-automatic pre-bash
+  template:
+    src:        templates/usr/local/bin/dnf-auto-rpm-clean-all.sh.j2
+    dest:       /usr/local/bin/dnf-auto-rpm-clean-all.sh
+    owner:      root
+    group:      root
+    mode:       0755
+
+# dnf-automaticの実行後にrpmファイルを収集（開発環境はシャットダウン）するスクリプトを配置
+- name: Add dnf-automatic post-bash
+  template:
+    src:        templates/usr/local/bin/dnf-auto-rpm-collection.sh.j2
+    dest:       /usr/local/bin/dnf-auto-rpm-collection.sh
+    owner:      root
+    group:      root
+    mode:       0755
+
+- name: distribute dnf-automatic-rpm-collection.service
+  template:
+    src:        templates/usr/lib/systemd/system/dnf-automatic-rpm-collection.service.j2
+    dest:       /usr/lib/systemd/system/dnf-automatic-rpm-collection.service
+    owner:      root
+    group:      root
+    mode:       0644
+
+- name: distribute dnf-automatic-rpm-collection.timer
+  template:
+    src:        templates/usr/lib/systemd/system/dnf-automatic-rpm-collection.timer.j2
+    dest:       /usr/lib/systemd/system/dnf-automatic-rpm-collection.timer
+    owner:      root
+    group:      root
+    mode:       0644
+  notify:       Reload dnf-automatic.timer
+
+- name: enabled dnf-automatic-rpm-collection.timer
+  systemd:
+    name: dnf-automatic-rpm-collection.timer
+    state: started 
+    enabled: yes
+  when: not ansible_check_mode
+
+- name: distribute dnf-automatic-clean-all.service
+  template:
+    src:        templates/usr/lib/systemd/system/dnf-automatic-clean-all.service.j2
+    dest:       /usr/lib/systemd/system/dnf-automatic-clean-all.service
+    owner:      root
+    group:      root
+    mode:       0644
+
+- name: distribute dnf-automatic-clean-all.timer
+  template:
+    src:        templates/usr/lib/systemd/system/dnf-automatic-clean-all.timer.j2
+    dest:       /usr/lib/systemd/system/dnf-automatic-clean-all.timer
+    owner:      root
+    group:      root
+    mode:       0644
+  notify:       Reload dnf-automatic.timer
+
+- name: enabled dnf-automatic-clean-all.timer
+  systemd:
+    name: dnf-automatic-clean-all.timer
+    state: started 
+    enabled: yes
+  when: not ansible_check_mode

@@ -1,0 +1,14 @@
+---
+- name: Enable podman.socket
+  ansible.builtin.systemd:
+    name: podman.socket
+    state: started
+    enabled: true
+
+# podman.service は podman.socket が必要に応じて起動するので設定不要
+# - name: Enable podman.service
+#  ansible.builtin.systemd:
+#    name: podman.service
+#    state: started
+#    enabled: true
+#  become: true

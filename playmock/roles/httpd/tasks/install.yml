@@ -1,0 +1,10 @@
+---
+- name: Install httpd-{{ httpd_version }}
+  yum:
+    name: httpd-{{ httpd_version }}
+    state: present
+    enablerepo: private
+    disablerepo: "*"
+  environment: "{{ proxy_env }}"
+  when: not ansible_check_mode
+  

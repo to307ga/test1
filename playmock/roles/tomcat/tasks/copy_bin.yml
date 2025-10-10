@@ -1,0 +1,39 @@
+---
+# webの場合はなぜか、パスが違うんです。idcというサブディレクトリがあります。
+- name: /usr/local/tomcat/bin/ へ配布
+  copy:
+    src: files/bin/{{ item }}
+    dest: >-
+      {%- if inventory_hostname_short is regex("-web-\d{3}$") -%} /usr/local/tomcat/idc/bin/{{ item }}
+      {%- else -%} /usr/local/tomcat/bin/{{ item }}
+      {%- endif -%}
+    owner: tomcat
+    group: tomcat
+  loop:
+    - bootstrap.jar
+    - catalina-tasks.xml
+    - catalina.bat
+    - catalina.sh
+    - ciphers.bat
+    - ciphers.sh
+    - commons-daemon-native.tar.gz
+    - commons-daemon.jar
+    - configtest.bat
+    - configtest.sh
+    - daemon.sh
+    - digest.bat
+    - digest.sh
+    - makebase.bat
+    - makebase.sh
+    - setclasspath.bat
+    - setclasspath.sh
+    - shutdown.bat
+    - shutdown.sh
+    - startup.bat
+    - startup.sh
+    - tomcat-juli.jar
+    - tomcat-native.tar.gz
+    - tool-wrapper.bat
+    - tool-wrapper.sh
+    - version.bat
+    - version.sh

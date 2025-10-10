@@ -1,0 +1,11 @@
+---
+# パッケージをインストール
+- import_role:
+    name: httpd
+
+# パッケージのインストール
+- name: Install mod_gooaes
+  yum:
+    name: mod_gooaes
+    state: present
+    disable_gpg_check: yes

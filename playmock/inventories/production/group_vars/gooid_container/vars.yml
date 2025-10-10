@@ -1,0 +1,16 @@
+---
+
+kibana_version:         "8.8.0"
+kibana_hostname:        "kibana-001"
+kibana_no_proxy:        "127.0.0.1,localhost,10.23.101.0/24,172.25.69.0/24,10.23.102.0/24"
+elastic_host1 :         "gooid-21-pro-search-001:10.23.101.111"
+elastic_host2 :         "gooid-21-pro-search-002:10.23.101.112"
+elastic_host3 :         "gooid-21-pro-search-003:10.23.101.113"
+kibana_crt_name:        "kibana"
+server_basePath:        "/kibana"
+kibana_cpu_limit:       1.5
+kibana_cpu_reservation: 1
+kibana_mem_limit:       "5g"
+kibana_mem_reservation: "3g"
+httpd_base_image:       "httpd:2.4.58-bookworm"
+httpd_hostname:         "httpd-001"

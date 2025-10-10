@@ -1,0 +1,109 @@
+---
+##
+##
+## This section should be executed after installing MariaDB
+##
+##
+- name: Make directory
+  file: path={{ item }} state=directory owner=mysql group=mysql
+  with_items:
+  - /var/run/mariadb
+  - /db0/dblog/
+  - /db0/dblog/binlog/
+  - /db0/dblog/log/
+  - /db0/loaddata/
+
+# テーブル暗号化で利用するディレクトリを作成
+- name: Make directory
+  file: path={{ item }} state=directory owner=mysql group=mysql mode=0700
+  with_items:
+  - /etc/mysql
+  - /etc/mysql/encryption
+
+# ディレクトリを作成する
+- name: /var/log/mariadbの作成 
+  file:
+    state: directory
+    path: /var/log/mariadb
+    owner: mysql
+    group: mysql
+    mode: 0755
+
+- name: Link /dblog -> /db0/dblog
+  file:
+    state: link
+    src: /db0/dblog
+    dest: /dblog
+  # ansible_check_mode(dry-run)の時は実行しない
+  when: not ansible_check_mode
+
+# server_role: mdb, edb, sdbのいずれかが想定です。
+- name: Copy my.cnf
+  template:
+    src: templates/{{ server_role }}/my.cnf.j2
+    dest: /etc/my.cnf
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - mariadb_server_restart_msg
+
+# mysql cliを安全に実行できるよう role "mariadb_cliet" を includeし、mysql-client.cnfを配布する。
+- name: Copy /etc/my.cnf.d/mysql-clients.cnf
+  include_tasks: ../../mariadb_client/tasks/set_config.yml
+
+- name: Copy server.cnf 
+  template:
+    src: templates/{{ server_role }}/server.cnf.j2
+    dest: /etc/my.cnf.d/server.cnf  
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - mariadb_server_restart_msg
+
+
+# インストール時は、所有者はルートにしていたが、mariadbが起動出来るように所有者をmysqlに変更
+- name: /db0/mysql, /var/lib/mysql の所有者を変更
+  file: path={{ item }} owner=mysql group=mysql
+  with_items:
+  - /db0/mysql
+  - /var/lib/mysql
+  # ansible_check_mode(dry-run)の時は実行しない
+  when: not ansible_check_mode
+
+# logrotate
+- name: Set logrotation for mysql. /etc/logrotate.d/mysql
+  template:
+    src: templates/mysql.j2
+    dest: /etc/logrotate.d/mysql
+    owner: root
+    group: root
+    mode: 0644
+
+# DBの暗号化に必要なファイルの1つを配布する
+- name: Copy key.txt
+  template:
+    src: templates/key.txt.j2
+    dest: /etc/mysql/encryption/key.txt
+    owner: mysql
+    group: mysql
+    mode: 0600
+
+# DBの暗号化に必要なファイルの1つを配布する
+- name: Copy keyfile.enc
+  copy:
+    src: files/keyfile.enc
+    dest: /etc/mysql/encryption/keyfile.enc
+    owner: mysql
+    group: mysql
+    mode: 0600
+
+# DBの暗号化に必要なファイルの1つを配布する
+- name: Copy keyfile.txt
+  copy:
+    src: files/keyfile.txt
+    dest: /etc/mysql/encryption/keyfile.txt
+    owner: mysql
+    group: mysql
+    mode: 0600

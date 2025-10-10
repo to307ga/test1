@@ -1,0 +1,45 @@
+{#
+    監視対象外になったのでvars の方でコメントアウト中
+#}
+<worker {{td_agent_worker3}}>
+  <source>
+    @type tail
+    path /db0/tdlogs/merged/gooid-{{ project_id_number_env }}-hlp/var.log.app.gbs.gbs_mule/gbs_mule.%Y-%m-%d.log
+    pos_file /var/log/td-agent/app_gbs_gbs_mule_count.pos
+    pos_file_compaction_interval 240h 
+    rotate_wait 60
+    tag gooid-hlp_app_gbs_gbs_mule_log
+    <parse>
+      @type regexp
+      time_format %Y-%m-%d %H:%M:%S,%L
+      # マージログはホスト名がついたりしているのでパース用のexpressionはそのまま使えないので修正が必要 (?<server>[^ ]*)  を先頭に付ければOK
+      expression /(?<server>[^ ]*) (?<parsed_log>(?<level>[A-Z]{1,5}).*(?<log-time>[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2},[0-9]{3}) \[(?<thread>.*) (?<filename>.*) (?<line>.*) (?<method>.*)\] (?<category>[^:].*): (?<message>.+))/
+      # keep_time_key true
+    </parse>
+  </source>
+
+  <match gooid-hlp_app_gbs_gbs_mule_log.**>
+    @type         datacounter         
+    count_interval 5m 
+    aggregate all
+    count_key level
+    # patternX: X(1-20)
+    pattern1 to_zabbix.error.gooid.hlp.gbs.gbs_mule ^FATAL|^ERROR
+    tag count.gooid-hlp_app_gbs_gbs_mule_log.level.*
+  </match>  
+
+  <match count.gooid-hlp_app_gbs_gbs_mule_log.level.*>
+    @type               file
+    append              true
+    # The filename of the path should be the same as the filename of this file.
+    path /db0/tdlogs/zabbix-sender-count/app_gbs_gbs_mule_count
+    time_slice_format   %Y-%m-%d
+    <buffer time>
+      @type memory
+      timekey             1d
+      timekey_wait        0s
+      flush_mode          immediate
+      flush_at_shutdown   true
+    </buffer>
+  </match>
+</worker>

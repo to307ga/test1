@@ -1,0 +1,122 @@
+[commands]
+#  What kind of upgrade to perform:
+# default                            = all available upgrades
+# security                           = only the security upgrades
+upgrade_type = default
+# タイマーでもこれとは別に最大一時間のランダム遅延を適用している
+random_sleep = 60
+
+# Maximum time in seconds to wait until the system is on-line and able to
+# connect to remote repositories.
+network_online_timeout = 60
+
+# To just receive updates use dnf-automatic-notifyonly.timer
+
+# 以下はautomatic.timer等で上書きされるとのことだが一応環境に応じて記載しておく
+# Whether updates should be downloaded when they are available, by
+# dnf-automatic.timer. notifyonly.timer, download.timer and
+# install.timer override this setting.
+# download_updates = yes
+
+# Whether updates should be applied when they are available, by
+# dnf-automatic.timer. notifyonly.timer, download.timer and
+# install.timer override this setting.
+# ここは開発と商用とで分ける必要（開発：yes 商用：no）があるか要確認（automatic.timer と automatic-download.timer とで使い分けているので不要？）
+# apply_updates = no
+
+# serviceの再起動要不要を判定する機能は無いので変更があったら一律再起動する
+# 個人で公開しているもので
+# https://github.com/agross/dnf-automatic-restart
+# tracer を使って kernel や systemd 等OS再起動が必要なものがアップデートされているのを検出したらOSを再起動し
+# サービスの再起動が必要なサービスがアップデートされている場合は、そのサービスのみを再起動する
+# というものがあるが、入れるには星が少ない
+# シェル（dnf needs-restarting -s）を作ってcron起動でも良いかもしれない
+# reboot = when-changed
+# never (デフォルト) – アップグレード後にシステムを再起動しない
+# when-changed – アップグレード変更後にシステムを自動的に再起動する
+# when-needed – systemdまたはkernelへのアップグレード変更後にのみ自動的に再起動する
+
+{% if release_env == "pro" %}
+download_updates = yes
+apply_updates = no
+reboot = never
+{% else %}
+download_updates = yes
+apply_updates = yes
+reboot = when-changed
+reboot_command = “shutdown -r +5 ‘Rebooting after applying package updates’”
+{% endif %}
+
+
+[emitters]
+# Name to use for this system in messages that are emitted.  Default is the
+# hostname.
+# system_name = my-host
+
+# How to send messages.  Valid options are stdio, email and motd.  If
+# emit_via includes stdio, messages will be sent to stdout; this is useful
+# to have cron send the messages.  If emit_via includes email, this
+# program will send email itself according to the configured options.
+# If emit_via includes motd, /etc/motd file will have the messages. if
+# emit_via includes command_email, then messages will be send via a shell
+# command compatible with sendmail.
+# Default is email,stdio.
+# If emit_via is None or left blank, no messages will be sent.
+# emit_via = stdio
+
+emit_via = command_email
+
+[email]
+# The address to send email messages from.
+email_from = goo-idpay-sys@ml.nttdocomo.com
+
+# List of addresses to send messages to.
+email_to = root
+
+# Name of the host to connect to to send email messages.
+email_host = localhost
+
+
+[command]
+# The shell command to execute. This is a Python format string, as used in
+# str.format(). The format function will pass a shell-quoted argument called
+# `body`.
+# command_format = "cat"
+
+# The contents of stdin to pass to the command. It is a format string with the
+# same arguments as `command_format`.
+# stdin_format = "{body}"
+
+
+[command_email]
+# The shell command to use to send email. This is a Python format string,
+# as used in str.format(). The format function will pass shell-quoted arguments
+# called body, subject, email_from, email_to.
+command_format = "mail -Ssendwait -s {subject} -r {email_from} {email_to}"
+
+# The contents of stdin to pass to the command. It is a format string with the
+# same arguments as `command_format`.
+stdin_format = "Executed in dnf-automatic. {body}"
+
+# The address to send email messages from.
+email_from = goo-idpay-sys@ml.nttdocomo.com
+
+# List of addresses to send messages to.
+email_to = goo-idpay-sys@ml.nttdocomo.com
+
+
+
+[base]
+# This section overrides dnf.conf
+
+# Use this to filter DNF core messages
+debuglevel = 1
+
+# 以下dnf.conf 設定の上書き
+
+# 基盤部門指定の Proxy を経由
+proxy={{ proxy_env.http_proxy }}
+
+# 自動アップデートの除外設定 
+excludepkgs=java*,tomcat,MariaDB*,td-agent
+

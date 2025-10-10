@@ -1,0 +1,185 @@
+<VirtualHost *:40080>
+ServerName {{ httpd_idc_fqdn }}:{{ httpd_idc_port }}
+DocumentRoot "/var/www/html"
+DirectoryIndex index.html
+
+<Directory />
+    AllowOverride none
+    Require all denied
+</Directory>
+
+<Directory "/var/www">
+    AllowOverride None
+    Require all granted
+</Directory>
+
+<Directory "/var/www/html">
+    Options FollowSymLinks
+    AllowOverride None
+    Require all granted
+</Directory>
+
+<Files ".ht*">
+    Require all denied
+</Files>
+
+RewriteEngine on
+RewriteCond %{REQUEST_METHOD} !^(GET|POST|HEAD)$
+RewriteRule .* - [F]
+
+## 2022-05 システム更改
+## 外部からはメンテ画面、内部からは通常動作
+###IncludeOptional conf/external-maintenance.conf
+
+# OpenID2.0 OP
+RewriteRule ^/openid/id/(.*)$ /openid/index.php?userId=$1 [L]
+RewriteRule ^/openid$ /openid/index.php [L]
+
+# SSL
+RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+## 性能試験をLAN同士で行うため、Private IPは除外
+RewriteCond %{REMOTE_ADDR} !=127.0.0.1
+RewriteCond %{REMOTE_ADDR} !^172\.2[0-9]\.
+RewriteCond %{REMOTE_ADDR} !^10\.2[0-9]\.
+RewriteRule ^/(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+Include conf/rewrite.conf
+
+RequestHeader set X-GOOID-USER_ID_FOR_GA %{USER_ID_FOR_GA}e
+
+<Location /api/>
+    Require all denied
+</Location>
+
+<Location /api/portal/>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</Location>
+
+<Location /api/auth/>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</Location>
+
+<Location /api/user/>
+    Options FollowSymLinks
+    Require all denied
+</Location>
+
+<LocationMatch ^/api/v[0-9_]+/(authn|portal)/>
+    Options FollowSymLinks
+    Require all denied
+    # Require ip [IPAddress of gooService]
+
+    ## localhost
+    Require ip 127.0.0.1
+    ## Private IP (RFC 1380, RFC 1597) : https://bit.ly/3vnYSw7
+    Require ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+
+    ## gooid, idhub family
+    ## 自身のSNAT IPから自身のVIPへのアクセスを許可する。
+    ## 本来、NWポリシー的にはNGだが、gbsのアプリケーションが login.mail.goo.ne.jp への
+    ## APIリクエストが必要となり、暫定的に許可する。
+    Require ip 202.217.75.82/31 202.217.75.84/30
+
+    # blog @ R, stg, pro
+    Require ip 114.179.184.62/32 114.179.184.64/32
+    # goopoint - 2020-04-20 new server
+    Require ip 202.217.75.122
+    # goopoint, OCNxD point site, lounge, GOOxD .etc @ R-cloud - https://bit.ly/3DkPADD
+    Require ip 114.179.184.48/32 114.179.184.177/32 114.179.184.191/32 114.179.184.193/32 114.179.184.194/31 114.179.184.196/32
+    # oshiete @ R, production
+    Require ip 114.179.184.44 114.179.184.50 114.179.184.57 114.179.184.58 114.179.184.60 114.179.184.80
+    # SimSeller 新 商用環境 - https://bit.ly/3FnTlHu
+    Require ip 18.177.53.251 3.114.215.117 54.168.15.92
+    # doctor
+    Require ip 52.199.98.136 52.193.38.33 18.177.81.25
+    # house
+    Require ip 114.179.184.82
+    # telop
+    Require ip 18.176.184.49
+    # map
+    Require ip 114.179.184.26 114.179.184.27
+    # mail
+    Require ip 114.179.184.188 114.179.184.189
+
+    # golfサーバ
+    Require ip 52.197.7.186/32 54.248.220.86/32 52.69.199.218/32 52.68.111.152/32 54.64.192.102/32
+    # 新goo https://news.goo.ne.jp/topics/
+    Require ip 219.164.251.21
+    # goo news(AWS stg pro)
+    Require ip 13.113.78.172 54.250.155.111 54.65.181.225 43.206.19.135 52.199.31.152 57.182.66.89
+    # xstore pro, 開発環境端末
+    Require ip 202.217.72.24/31 202.217.73.17/32
+</LocationMatch>
+
+<Location /id/api/>
+    Require all denied
+</Location>
+
+<Location /id/api/auth/>
+    Options FollowSymLinks
+    Require all denied
+    Require all granted
+</Location>
+
+<Location /id/api/authn/CheckAuthState>
+    Options FollowSymLinks
+    Require all denied
+
+    # 2024-11 Global IP経由でのアクセスを全てローカルIP経由にした。
+    # 関連
+    #   GOOID-831 decode-authn-ticket-module - 内部通信をローカルIPに - https://bit.ly/3YF0ZJc
+
+    ## Private IP (RFC 1380, RFC 1597) : https://bit.ly/3vnYSw7
+    Require ip 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+
+    # 2024-11 Global IP経由のアクセスを駆逐したはずだが安全のため残す。
+    # （長期間経過後のアクセスログで下記IPからのアクセスが無ければ削除してよい。）
+    ### gooID/goo gbs/idhub, 2022 generation
+    # gooid-21-pro-web-00[1-4]
+    Require ip 202.217.75.82
+</Location>
+
+<Location /id/tools>
+    Options FollowSymLinks
+    Require all denied
+    # Require ip NTTR社内からのみ許可
+    # 社内LAN
+    Require ip 202.217.72.215 153.254.171.9
+    # NTTレゾナント 大手町
+    Require ip 202.217.74.160/28
+    Require ip 153.143.181.0/28
+
+    # NTTレゾナントVDI
+    Require ip 203.138.153.247/32
+    Require ip 202.217.74.160/28
+
+    # 検証環境
+    Require ip 114.179.184.0/24
+    # 商用環境
+    Require ip 202.217.73.0/24
+
+    ### gooID/goo gbs/idhub, 2022 generation
+    # gooid-21-pro-web-00[1-4]
+    Require ip 202.217.75.82
+    # srvc.goo.ne.jp (inbound/dns only)
+    Require ip 202.217.75.83
+    # gooid-21-pro-oidc-00[1-3]
+    Require ip 202.217.75.84
+    # gooid-21-pro-rproxy-00[1-2]
+    Require ip 202.217.75.85
+    # idhub-21-pro-web-00[1-4]
+    Require ip 202.217.75.86
+    # idhub-21-pro-rproxy-00[1-2]
+    Require ip 202.217.75.87
+</Location>
+
+{% include 'roles/kagemusha/templates/kagemusha.conf.j2' %}
+
+ProxyPass /api/ ajp://localhost:48009/id/api/
+ProxyPass /id/ ajp://localhost:48009/id/
+
+</VirtualHost>

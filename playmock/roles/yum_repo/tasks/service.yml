@@ -1,0 +1,6 @@
+---
+- name: Start httpd.service
+  systemd:
+    name: httpd.service
+    state: started
+    enabled: yes

@@ -1,0 +1,41 @@
+---
+# playbookを初めて実行する時、root権限を持つidc_alladmin が存在しない。
+# ここでidc_alladminを登録する
+
+#  mariadbが起動できるように`wsrep_on = ON`を一時的に無効にする
+- name: /etc/my.cnf.d/server.cnfの`wsrep_on = ON` を無効にする
+  replace:
+    path: /etc/my.cnf.d/server.cnf
+    regexp: 'wsrep_on\s*=\s*ON'
+    replace: '# wsrep_on = ON'
+
+# mariadbを起動する
+- name: mariadbを起動
+  systemd:
+    name: mariadb
+    state: started
+
+#  mariadbが起動したので`wsrep_on = ON`を有効に戻す
+- name: /etc/my.cnf.d/server.cnfの`wsrep_on = ON`を有効にする
+  replace:
+    path: /etc/my.cnf.d/server.cnf
+    regexp: '# wsrep_on = ON'
+    replace: 'wsrep_on = ON'
+
+# /var/lib/mysql/mysql.sockを使ってadminを作成する
+- name: DB adminを作成
+  # ログにPasswordなどが残らないようにする。
+  #no_log: true
+  mysql_user:
+    login_unix_socket: /var/lib/mysql/mysql.sock
+    login_user: root
+    login_password: ""
+    name: "{{ mysql_admin_name }}"
+    password: "{{ mysql_admin_password }}"
+    host: "{{ item }}"
+    priv: '*.*:GRANT,ALL'   # 'GRANT' が無いと権限付与できない
+    state: present
+  with_items:
+    - "{{ mysql_admin_hosts }}"
+  when: galera_cluster_leader is defined
+

@@ -1,0 +1,86 @@
+#
+#
+#   gooid-21-dev
+#
+#
+
+# フロント系表NW
+# ※ 表NICだが、Puppetの都合上、 `-b` を付けている。 (2012-03-02 基盤 山下くん談)
+172.25.75.84    gooid-21-dev-web-101-b.mt.internal      gooid-21-dev-web-101-b
+172.25.75.85    gooid-21-dev-web-201-b.mt.internal      gooid-21-dev-web-201-b
+172.25.75.86    gooid-21-dev-web-301-b.mt.internal      gooid-21-dev-web-301-b
+172.25.75.90    gooid-21-dev-rproxy-101-b.mt.internal   gooid-21-dev-rproxy-101-b
+172.25.75.91    gooid-21-dev-rproxy-201-b.mt.internal   gooid-21-dev-rproxy-201-b
+172.25.75.68    gooid-21-dev-hlp-101-b.mt.internal      gooid-21-dev-hlp-101-b
+172.25.75.69    gooid-21-dev-hlp-201-b.mt.internal      gooid-21-dev-hlp-201-b
+172.25.75.70    gooid-21-dev-hlp-301-b.mt.internal      gooid-21-dev-hlp-301-b
+172.25.75.92    gooid-21-dev-msg-101-b.mt.internal      gooid-21-dev-msg-101-b
+172.25.75.93    gooid-21-dev-msg-201-b.mt.internal      gooid-21-dev-msg-201-b
+172.25.75.94    gooid-21-dev-msg-301-b.mt.internal      gooid-21-dev-msg-301-b
+172.25.75.95    gooid-21-dev-msg-302-b.mt.internal      gooid-21-dev-msg-302-b
+172.25.75.96    gooid-21-dev-msg-300-b.mt.internal      gooid-21-dev-msg-300-b
+172.25.75.64    gooid-21-dev-fgw-101-b.mt.internal      gooid-21-dev-fgw-101-b
+172.25.75.65    gooid-21-dev-fgw-102-b.mt.internal      gooid-21-dev-fgw-102-b
+172.25.75.66    gooid-21-dev-fgw-100-b.mt.internal      gooid-21-dev-fgw-100-b
+172.25.75.77    gooid-21-dev-oidc-101-b.mt.internal     gooid-21-dev-oidc-101-b
+172.25.75.78    gooid-21-dev-oidc-201-b.mt.internal     gooid-21-dev-oidc-201-b
+172.25.75.79    gooid-21-dev-oidc-301-b.mt.internal     gooid-21-dev-oidc-301-b
+172.25.75.200   gooid-21-pro-pm-101-b.mt.internal       gooid-21-pro-pm-101-b
+
+# フロント系裏NW
+10.23.113.84    gooid-21-dev-web-101.mt.internal        gooid-21-dev-web-101
+10.23.113.85    gooid-21-dev-web-201.mt.internal        gooid-21-dev-web-201
+10.23.113.86    gooid-21-dev-web-301.mt.internal        gooid-21-dev-web-301
+10.23.113.90    gooid-21-dev-rproxy-101.mt.internal     gooid-21-dev-rproxy-101
+10.23.113.91    gooid-21-dev-rproxy-201.mt.internal     gooid-21-dev-rproxy-201
+10.23.113.68    gooid-21-dev-hlp-101.mt.internal        gooid-21-dev-hlp-101
+10.23.113.69    gooid-21-dev-hlp-201.mt.internal        gooid-21-dev-hlp-201
+10.23.113.70    gooid-21-dev-hlp-301.mt.internal        gooid-21-dev-hlp-301
+10.23.113.92    gooid-21-dev-msg-101.mt.internal        gooid-21-dev-msg-101
+10.23.113.93    gooid-21-dev-msg-201.mt.internal        gooid-21-dev-msg-201
+10.23.113.94    gooid-21-dev-msg-301.mt.internal        gooid-21-dev-msg-301
+10.23.113.95    gooid-21-dev-msg-302.mt.internal        gooid-21-dev-msg-302
+10.23.113.96    gooid-21-dev-msg-300.mt.internal        gooid-21-dev-msg-300
+10.23.113.64    gooid-21-dev-fgw-101.mt.internal        gooid-21-dev-fgw-101
+10.23.113.65    gooid-21-dev-fgw-102.mt.internal        gooid-21-dev-fgw-102
+10.23.113.66    gooid-21-dev-fgw-100.mt.internal        gooid-21-dev-fgw-100
+10.23.113.77    gooid-21-dev-oidc-101.mt.internal       gooid-21-dev-oidc-101
+10.23.113.78    gooid-21-dev-oidc-201.mt.internal       gooid-21-dev-oidc-201
+10.23.113.79    gooid-21-dev-oidc-301.mt.internal       gooid-21-dev-oidc-301
+
+# データベースNW
+10.23.114.100   gooid-21-dev-mdb-101.mt.internal        gooid-21-dev-mdb-101
+10.23.114.101   gooid-21-dev-mdb-201.mt.internal        gooid-21-dev-mdb-201
+10.23.114.102   gooid-21-dev-mdb-301.mt.internal        gooid-21-dev-mdb-301
+10.23.114.103   gooid-21-dev-mdb-302.mt.internal        gooid-21-dev-mdb-302
+10.23.114.104   gooid-21-dev-mdb-303.mt.internal        gooid-21-dev-mdb-303
+10.23.114.105   gooid-21-dev-mdb-304.mt.internal        gooid-21-dev-mdb-304
+10.23.114.107   gooid-21-dev-sdb-301.mt.internal        gooid-21-dev-sdb-301
+10.23.114.108   gooid-21-dev-sdb-302.mt.internal        gooid-21-dev-sdb-302
+10.23.114.65    gooid-21-dev-batch-101.mt.internal      gooid-21-dev-batch-101
+10.23.114.66    gooid-21-dev-batch-201.mt.internal      gooid-21-dev-batch-201
+10.23.114.67    gooid-21-dev-batch-301.mt.internal      gooid-21-dev-batch-301
+10.23.114.68    gooid-21-dev-batch-302.mt.internal      gooid-21-dev-batch-302
+10.23.114.69    gooid-21-dev-batch-300.mt.internal      gooid-21-dev-batch-300
+10.23.114.70    gooid-21-dev-log-101.mt.internal        gooid-21-dev-log-101
+10.23.114.96    gooid-21-dev-edb-301.mt.internal        gooid-21-dev-edb-301
+10.23.114.97    gooid-21-dev-edb-302.mt.internal        gooid-21-dev-edb-302
+10.23.114.200   gooid-21-pro-pm-101.mt.internal         gooid-21-pro-pm-101
+
+# DBレプリケーションNW
+10.23.115.100   gooid-21-dev-mdb-101-b.mt.internal      gooid-21-dev-mdb-101-b
+10.23.115.101   gooid-21-dev-mdb-201-b.mt.internal      gooid-21-dev-mdb-201-b
+10.23.115.102   gooid-21-dev-mdb-301-b.mt.internal      gooid-21-dev-mdb-301-b
+10.23.115.103   gooid-21-dev-mdb-302-b.mt.internal      gooid-21-dev-mdb-302-b
+10.23.115.104   gooid-21-dev-mdb-303-b.mt.internal      gooid-21-dev-mdb-303-b
+10.23.115.105   gooid-21-dev-mdb-304-b.mt.internal      gooid-21-dev-mdb-304-b
+10.23.115.107   gooid-21-dev-sdb-301-b.mt.internal      gooid-21-dev-sdb-301-b
+10.23.115.108   gooid-21-dev-sdb-302-b.mt.internal      gooid-21-dev-sdb-302-b
+10.23.115.65    gooid-21-dev-batch-101-b.mt.internal    gooid-21-dev-batch-101-b
+10.23.115.66    gooid-21-dev-batch-201-b.mt.internal    gooid-21-dev-batch-201-b
+10.23.115.67    gooid-21-dev-batch-301-b.mt.internal    gooid-21-dev-batch-301-b
+10.23.115.68    gooid-21-dev-batch-302-b.mt.internal    gooid-21-dev-batch-302-b
+10.23.115.69    gooid-21-dev-batch-300-b.mt.internal    gooid-21-dev-batch-300-b
+10.23.115.70    gooid-21-dev-log-101-b.mt.internal      gooid-21-dev-log-101-b
+10.23.115.96    gooid-21-dev-edb-301-b.mt.internal      gooid-21-dev-edb-301-b
+10.23.115.97    gooid-21-dev-edb-302-b.mt.internal      gooid-21-dev-edb-302-b

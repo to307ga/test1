@@ -1,0 +1,2 @@
+#area-aに配置されたファイルはセキュリティ強化のため最大7日で削除する
+0 0 * * * root find /db0/area-a -type f -mtime +7 -exec rm -v {} \; >> /var/tmp/area-a-removal-$(date '+\%Y\%m\%d').log 2>&1

@@ -1,0 +1,10 @@
+---
+- name: Install httpd
+  yum:
+    name: 
+      - httpd
+      - yum-utils
+      - createrepo
+    state: installed
+
+

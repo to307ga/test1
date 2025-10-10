@@ -1,0 +1,140 @@
+---
+
+- name: create directories for buffers
+  file:
+    path: /db0/tdlogs/{{item}}
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+    recurse: yes
+  loop:
+    - pos
+    - merged
+    - buffer
+    - merge-buffer
+    - zabbix-sender-count
+
+#- name: overwrite td-agent.conf (temporary posting)
+#  copy:
+#    src: ../files/td-agent.conf
+#    dest: /etc/td-agent/td-agent.conf
+#    mode: 0644
+#  notify: Restart td-agent
+
+- name: confirmation of fluent-plugin-forest installation
+  shell:  /usr/sbin/td-agent-gem list|grep "fluent-plugin-forest (0.3.3)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- name: install fluent-plugin-forest
+  shell: /usr/sbin/td-agent-gem install fluent-plugin-forest -v 0.3.3
+  when:  result_fluent_plugin.rc != 0
+
+- name: confirmation of fluent-plugin-rewrite-tag-filter installation
+  shell:  /usr/sbin/td-agent-gem list|grep "fluent-plugin-rewrite-tag-filter (2.4.0)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- name: install fluent-plugin-rewrite-tag-filter
+  shell: /usr/sbin/td-agent-gem install fluent-plugin-rewrite-tag-filter -v 2.4.0
+  when:  result_fluent_plugin.rc != 0
+
+- name: confirmation of fluent-plugin-concat installation
+  shell:  /usr/sbin/td-agent-gem list|grep "fluent-plugin-concat (2.5.0)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- name: install fluent-plugin-concat
+  shell: /usr/sbin/td-agent-gem install fluent-plugin-concat -v 2.5.0
+  when:  result_fluent_plugin.rc != 0
+
+- name: confirmation of fluent-plugin-datacounter installation
+  shell:  /usr/sbin/td-agent-gem list|grep "fluent-plugin-datacounter (1.0.0)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- name: install fluent-plugin-datacounter
+  shell: /usr/sbin/td-agent-gem install fluent-plugin-datacounter -v 1.0.0
+  when:  result_fluent_plugin.rc != 0
+
+- name: confirmation of fluent-plugin-zabbix installation
+  shell:  /usr/sbin/td-agent-gem list|grep "fluent-plugin-zabbix (0.3.0)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- name: install fluent-plugin-zabbix
+  shell: /usr/sbin/td-agent-gem install fluent-plugin-zabbix -v 0.3.0
+  when:  result_fluent_plugin.rc != 0
+
+- name: confirmation of fluent-plugin-geoip installation
+  shell:  /usr/sbin/td-agent-gem list|grep "fluent-plugin-geoip (1.3.2)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- name: install fluent-plugin-geoip
+  shell: /usr/sbin/td-agent-gem install fluent-plugin-geoip -v 1.3.2
+  when: result_fluent_plugin.rc != 0
+
+### Sigdump already has 0.2.4 installed 
+- name: confirmation of sigdump installation
+  shell:  /usr/sbin/td-agent-gem list|grep "sigdump (0.2.4)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+# not work -v 0.2.5  ambiguous option: -v
+- name: update sigdump
+  shell: /usr/sbin/td-agent-gem update sigdump
+  when: result_fluent_plugin.rc != 0
+
+- name: confirmation of fluent-plugin-sigdump installation
+  shell:  /usr/sbin/td-agent-gem list|grep "fluent-plugin-sigdump (1.0.1)"
+  register: result_fluent_plugin
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- name: install fluent-plugin-sigdump
+  shell: /usr/sbin/td-agent-gem install fluent-plugin-sigdump -v 1.0.1
+  when: result_fluent_plugin.rc != 0
+
+###
+
+- name: install custom plugins
+  copy:
+    src: ../files/plugin/
+    dest: /etc/td-agent/plugin/
+    mode: 0644
+
+- name: setup logrotate
+  copy:
+    src: ../files/td-agent
+    dest: /etc/logrotate.d/td-agent
+    mode: 0644
+
+- name: setup td-agent to root activation
+  replace: >-
+    dest='/usr/lib/systemd/system/td-agent.service'
+    regexp="{{item.regexp}}"
+    replace="{{item.replace}}"
+  loop:
+    - regexp: "User=.*"
+      replace: "User=root"
+    - regexp: "Group=.*"
+      replace: "Group=root"
+  notify: Restart td-agent
+  when: not ansible_check_mode

@@ -1,0 +1,86 @@
+FROM docker.io/jenkins/jenkins:2.462.3-almalinux
+
+USER root
+
+ENV http_proxy="{{ proxy_env.http_proxy }}"
+ENV https_proxy="{{ proxy_env.http_proxy }}"
+ENV HTTP_PROXY="{{ proxy_env.http_proxy }}"
+ENV HTTPS_PROXY="{{ proxy_env.http_proxy }}"
+ENV no_proxy="localhost,127.0.0.1"
+ENV NO_PROXY="localhost,127.0.0.1"
+
+
+# システムの更新と必要なパッケージのインストール
+RUN dnf -y update && \
+    rpm --setcaps shadow-utils 2>/dev/null && \
+    dnf install -y epel-release rsync tzdata make python27 shadow-utils openssh-clients ant && \
+    dnf install -y ansible && \
+    dnf clean all  && \
+    rm -rf /var/cache /var/log/dnf* /var/log/yum.*
+
+# container-selinuxがインストールされている場合は削除
+RUN dnf remove -y container-selinux
+
+# Podmanクライアントのみインストール（DinDではないのでコンテナ実行機能は不要）
+RUN dnf -y install podman-remote podman-docker && \
+    dnf clean all
+
+# dockerコマンドを使っても警告が出ないようにする
+RUN touch /etc/containers/nodocker
+
+COPY subuid /etc/subuid
+COPY subgid /etc/subgid
+
+# コンテナ内のPodman設定
+COPY containers.conf /etc/containers/containers.conf
+COPY storage.conf /etc/containers/storage.conf
+
+# Jenkinsユーザー用にPodman関連の設定
+WORKDIR /var
+RUN mkdir -p /var/jenkins_home/.config/containers /var/jenkins_home/.local/share/containers && \
+    chown -R jenkins:jenkins /var/jenkins_home/.config /var/jenkins_home/.local 
+
+# Python 2.7のpipと必要なPythonパッケージのインストール
+RUN curl -kL https://bootstrap.pypa.io/pip/2.7/get-pip.py | /usr/bin/python2.7 && \
+    pip install --no-cache-dir 'fabric<2.0' && \
+    cp -f /usr/share/zoneinfo/Asia/Tokyo /etc/localtime
+
+# --- podman-compose 実行時に jenkins_home ボリュームがマウントされるので tasks/volume_settings.yml に移行
+# # SSH設定の準備
+# RUN mkdir -p /var/jenkins_home.ssh && \
+#     chmod 700 /var/jenkins_home/.ssh && \
+#     find /var/jenkins_home/.ssh/ -type f -exec chmod 400 {} \; && \
+#     find /var/jenkins_home/.ssh/ -type d -exec chmod 700 {} \; && \
+#     chown -R jenkins:jenkins /var/jenkins_home/.ssh && \
+# RUN git config --global http.sslVerify false
+
+# JenkinsとJavaのオプションを設定
+ENV JENKINS_OPTS="--httpPort=8080 --prefix=/jenkins --logfile=/var/jenkins_home/jenkins.log"
+ENV JAVA_OPTS="-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Tokyo -Duser.timezone=Asia/Tokyo -Djava.awt.headless=true"
+
+# --- podman-compose 実行時に jenkins_home ボリュームがマウントされるので tasks/volume_settings.yml に移行
+# # Jenkinsホームディレクトリを適切に設定
+# RUN chown -R jenkins:jenkins /var/jenkins_home && \
+#     setcap cap_setuid=ep /usr/bin/newuidmap && \
+#     setcap cap_setgid=ep /usr/bin/newgidmap && \
+#     chmod -R 755 /var/jenkins_home
+
+RUN dnf install -y epel-release && \
+    dnf groupinstall -y 'Development Tools' && \
+    dnf clean all && \
+    ln -s /usr/bin/ucpp /usr/local/bin/cpp && \
+    setcap cap_setuid+ep /usr/bin/newuidmap && \
+    setcap cap_setgid+ep /usr/bin/newgidmap && \
+    chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap
+
+# DinD に必要なディレクトリを作成
+RUN mkdir -p /var/lib/containers /var/run/containers /var/run/crun && \
+    chmod 755 /var/lib/containers /var/run/containers /var/run/crun
+
+# --- podman-compose 実行時に jenkins_home ボリュームがマウントされるので tasks/volume_settings.yml に移行
+# # jenkinsユーザーが使用するディレクトリを作成
+# RUN mkdir -p /var/jenkins_home/.local/share/containers /var/jenkins_home/.config/containers && \
+#     chown -R jenkins:jenkins /var/jenkins_home/.local /var/jenkins_home/.config
+
+WORKDIR /var/jenkins_home
+USER jenkins

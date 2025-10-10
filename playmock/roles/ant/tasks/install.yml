@@ -1,0 +1,6 @@
+---
+# パッケージのインストール
+- name: Install ant
+  yum:
+    name: ant
+    state: latest

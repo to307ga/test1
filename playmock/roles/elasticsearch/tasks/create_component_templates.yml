@@ -1,0 +1,37 @@
+---
+
+- name: ensure component_templates dir is created
+  file:
+    path: "{{ es_conf_dir }}/templates/{{ item }}"
+    state: directory
+    owner: root
+    group: elasticsearch
+    mode: "2750"
+  loop:
+    - LCM_templates
+    - component_templates
+    - index_templates
+    - ingest_templates
+
+- name: Copy component_templates to elasticsearch
+  copy: src={{ item }} dest={{ es_conf_dir }}/templates/component_templates owner=root group=elasticsearch mode=0660
+  register: load_templates
+  with_fileglob:
+    - "{{ es_component_templates_fileglob | default('')  }}"
+
+
+- name: Install component_templates
+  uri:
+    url: "{{ es_api_uri }}/_component_template/{{ item | basename | regex_replace('^(.*)\\.[^\\.]*$','\\1') }}"
+    method: PUT
+    status_code: 200
+    user:   "{{ es_api_basic_auth_username }}"
+    password: "{{ es_api_basic_auth_password }}"
+    force_basic_auth: yes
+    body_format: json
+    body: "{{ lookup('file', item) }}"
+    validate_certs: "{{ es_validate_certs }}"
+  when: load_templates.changed and es_start_service
+  with_fileglob:
+    - "{{ es_component_templates_fileglob | default('') }}"
+  run_once: True

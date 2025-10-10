@@ -1,0 +1,24 @@
+<VirtualHost *:443>
+  DocumentRoot "/var/www/html/" 
+  ServerName graph.wbo110.goo.ne.jp:443
+  SSLEngine on
+  SSLProtocol -ALL +TLSv1.2
+  SSLCipherSuite ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256
+  # SSLHonorCipherOrder Off
+  SSLProxyEngine On
+  SSLCertificateFile /etc/letsencrypt/live/graph.wbo110.goo.ne.jp/cert.pem
+  SSLCertificateKeyFile /etc/letsencrypt/live/graph.wbo110.goo.ne.jp/privkey.pem
+  SSLProxyVerify none
+  SSLProxyCheckPeerCN off
+  SSLProxyCheckPeerName off
+  SSLProxyCheckPeerExpire off
+  ProxyRequests Off
+  ProxyPreserveHost On
+  RequestHeader set X-Forwarded-Proto https
+
+ProxyPass /readonly/ http://gooid-21-pro-container-001.mt.internal/readonly/
+ProxyPassReverse /readonly/ http://gooid-21-pro-container-001.mt.internal/readonly/
+ProxyPass / https://gooid-21-pro-container-001.mt.internal:5601/
+ProxyPassReverse / https://gooid-21-pro-container-001.mt.internal:5601/
+
+</VirtualHost>

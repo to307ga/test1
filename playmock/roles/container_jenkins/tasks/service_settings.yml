@@ -1,0 +1,30 @@
+---
+- name: サービス定義ファイルの生成 - podman-compose-jenkins.service
+  ansible.builtin.template:
+    src: templates/podman-compose-jenkins.service.j2
+    dest: /opt/containers/.config/systemd/user/podman-compose-jenkins.service
+    owner: container_user
+    group: container_user
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: サービスの有効化 - podman-compose-jenkins
+  become: true
+  become_user: container_user
+  block:
+    - name: サービスが起動していることを保証する
+      ansible.builtin.systemd:
+        name: podman-compose-jenkins.service
+        state: started
+        daemon_reload: true
+        scope: user
+        enabled: true
+      when: not image_updated
+    - name: イメージが更新された場合にサービスを再起動する
+      ansible.builtin.systemd:
+        name: podman-compose-jenkins.service
+        state: restarted
+        daemon_reload: true
+        scope: user
+        enabled: true
+      when: image_updated

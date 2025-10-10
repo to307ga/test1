@@ -1,0 +1,9 @@
+---
+- hosts: gooid_search
+  become: yes
+  # gather_facts: no
+  environment: "{{ proxy_env }}"
+  roles:
+    - { role: common, tags: common }
+    - { role: elasticsearch, tags: elasticsearch }
+    - { role: rbash, tags: rbash }

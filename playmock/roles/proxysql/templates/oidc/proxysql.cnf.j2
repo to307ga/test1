@@ -1,0 +1,116 @@
+datadir="/var/lib/proxysql"
+errorlog="/var/lib/proxysql/proxysql.log"
+
+admin_variables=
+{
+        admin_credentials="admin:admin"
+        mysql_ifaces="0.0.0.0:6032"
+        debug=true
+}
+
+mysql_variables=
+{
+        threads=4
+        max_connections=2048
+        default_query_delay=0
+        default_query_timeout=36000000
+        have_compress=true
+        poll_timeout=2000
+        interfaces="0.0.0.0:6033;0.0.0.0:6034"
+        default_schema="information_schema"
+        stacksize=1048576
+        server_version="5.5.30"
+        connect_timeout_server=3000
+        monitor_username="{{ mysql_monitor_name }}"
+        monitor_password="{{ mysql_monitor_password }}"
+        monitor_history=600000
+        monitor_connect_interval=60000
+        monitor_ping_interval=10000
+        monitor_read_only_interval=1500
+        monitor_read_only_timeout=500
+        ping_interval_server_msec=120000
+        ping_timeout_server=500
+        commands_stats=true
+        sessions_sort=true
+        connect_retries_on_failure=10
+}
+
+
+{# ノードが1台かどうか、boolean変数へ格納 #}
+{%
+        set standalone = true if oidc_proxysql.nodes | length <=1 else false
+%}
+# Galera Configuration - ProxySQL
+# https://proxysql.com/documentation/galera-configuration/
+mysql_galera_hostgroups =
+(
+        {
+                # 書き込み用ノードが所属するグループID
+                writer_hostgroup=10
+                # 書き込み用待機ノードが所属するグループID
+                backup_writer_hostgroup=20
+                # 読み込み用ノードが所属するグループID
+{% if standalone %}
+                # （スタンドアローンであるため無効にします。）
+                ###reader_hostgroup=30
+{% else %}
+                reader_hostgroup=30
+{% endif %}
+                # 「故障者リスト」が所属するグループID
+                offline_hostgroup=9999
+                # 書き込み用ノード数の最大数。
+                # max_writers=1 なのでwriterは常に1台のみ。
+                max_writers=1
+                # writer_is_also_reader=1 なのでwriterはreaderにもなれます。
+                writer_is_also_reader=1
+
+                max_transactions_behind=30
+                active=1
+        }
+)
+
+# mdb3台とも10(writer)で、weightが高い順に選ばれます。
+mysql_servers =
+(
+        { hostgroup=10, address="{{ oidc_proxysql.nodes[0] }}", port=3306, weight=1003 },
+{#
+        以降は、host_varsへ定義してあるノード分だけ出力します。
+#}
+        {% if oidc_proxysql.nodes[1] is not defined %}###{% endif %}{ hostgroup=10, address="{{ oidc_proxysql.nodes[1] | default('(2nd node is not defined)') }}", port=3306, weight=1002 },
+        {% if oidc_proxysql.nodes[2] is not defined %}###{% endif %}{ hostgroup=10, address="{{ oidc_proxysql.nodes[2] | default('(3rd node is not defined)') }}", port=3306, weight=1001 },
+)
+
+
+mysql_users:
+(
+        { username = "{{ mysql_admin_name }}", password = "{{ mysql_admin_password }}", transaction_persistent = 0, active = 1 },
+        { username = "{{ mysql_maintainer_name }}", password = "{{ mysql_maintainer_password }}", transaction_persistent = 0, active = 1 },
+        { username = "{{ mysql_reader_name }}", password = "{{ mysql_reader_password }}", transaction_persistent = 0, active = 1 },
+        { username = "{{ mysql_writer_name }}", password = "{{ mysql_writer_password }}", transaction_persistent = 0, active = 1 },
+        { username = "{{ mysql_monitor_name }}", password = "{{ mysql_monitor_password }}", transaction_persistent = 0, active = 1 },
+)
+
+
+mysql_query_rules:
+(
+        {
+                rule_id=100
+                active=1
+                proxy_port=6033
+{% if standalone %}
+                # スタンドアローンの場合、参照用エンドポイントとして port:6033 も解放
+                ###destination_hostgroup=30
+                destination_hostgroup=10
+{% else %}
+                destination_hostgroup=30
+{% endif %}
+                apply=1
+        },
+        {
+                rule_id=200
+                active=1
+                proxy_port=6034
+                destination_hostgroup=10
+                apply=1
+        }
+)

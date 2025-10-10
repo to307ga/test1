@@ -1,0 +1,22 @@
+# メールアドバンスおよびアドバンスパッケージの購入入り口停止
+#RewriteCond %{QUERY_STRING} str_cd=20001051
+#RewriteCond %{QUERY_STRING} gds_id=00101 [OR]
+#RewriteCond %{QUERY_STRING} gds_id=S0001
+#RewriteRule ^/gbs/sttlServiceSelect/sttlPreRegist https://srvc.goo.ne.jp/mente.html [L]
+
+# ブログアドバンスおよびアドバンスパッケージの購入入り口停止
+#RewriteCond %{QUERY_STRING} str_cd=20001051
+#RewriteCond %{QUERY_STRING} gds_id=00201 [OR]
+#RewriteCond %{QUERY_STRING} gds_id=00202 [OR]
+#RewriteCond %{QUERY_STRING} gds_id=S0001
+#RewriteRule ^/gbs/sttlServiceSelect/sttlPreRegist https://srvc.goo.ne.jp/mente.html [L]
+
+# ブログ有料全て、購入入り口停止
+#RewriteCond %{QUERY_STRING} str_cd=20001051
+#RewriteCond %{QUERY_STRING} gds_id=00201 [OR]
+#RewriteCond %{QUERY_STRING} gds_id=00202 [OR]
+#RewriteCond %{QUERY_STRING} gds_id=00203
+#RewriteRule ^/gbs/sttlServiceSelect/sttlPreRegist https://srvc.goo.ne.jp/mente.html [L]
+
+# 購入入り口を停止
+#RewriteRule ^/gbs/sttlServiceSelect/sttlPreRegist https://srvc.goo.ne.jp/mente.html [L]

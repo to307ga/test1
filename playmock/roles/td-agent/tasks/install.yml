@@ -1,0 +1,63 @@
+---
+- name: setup ulimit
+  pam_limits:
+    domain: "{{ item.domain }}"
+    limit_type: "{{ item.limit_type }}"
+    limit_item: nofile
+    value: "655360"
+  loop: "{{ulimit_settings}}"
+
+- name: setup sysctl
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    ignoreerrors: yes
+  loop: "{{sysctl_settings}}"
+
+
+- name: td-agent version
+  shell: td-agent --version
+  register: td_version
+  changed_when: false
+  failed_when: no
+  check_mode: no
+
+- debug: var=td_version
+
+- name: Fetch td-agent
+  ansible.builtin.uri:
+    url: https://toolbelt.treasuredata.com/sh/install-redhat-td-agent{{td_agent_version}}.sh
+    return_content: yes
+    use_proxy: yes
+  when: td_version.stdout.find('td-agent ' ~ td_agent_version) == -1
+  register: td_agent_installer
+
+- debug: var=td_agent_installer
+
+- name: Run td-agent installer
+  ansible.builtin.shell:
+    cmd: sh
+    stdin: "{{td_agent_installer.content}}"
+  environment: "{{ proxy_env }}"
+  when: td_version.stdout.find('td-agent ' ~ td_agent_version) == -1 and td_agent_installer.msg.find("OK") == 0
+  
+- name: install geoip
+  # yum: name="{{ item }}" state=present
+  yum: 
+    name: 
+      - '@Development tools'
+      - 'epel-release'
+      - 'libmaxminddb-devel'
+    state: present
+  #with_items:
+    #- "@Development tools"
+    #- "epel-release"
+    #- "libmaxminddb-devel"
+
+- name: install geoip-devel
+  yum:
+    name: geoip-devel
+    state: present
+    enablerepo: epel
+  when: not ansible_check_mode

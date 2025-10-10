@@ -1,0 +1,122 @@
+# No.29 : ヘルプツールログローテート
+# category: 運用
+3 0 * * * gooscp /usr/bin/wget -O - https://gooid.wbo110.goo.ne.jp/g_help/tool/DummyLogging > /dev/null 2>&1
+
+# No.1 : 退会者リスト抽出（サービス共通）
+# category: service
+0 1 * * * gooscp /usr/local/app/goo/perl/batch/make_common_reject_list.pl > /dev/null 2>&1
+
+# No.2 : 教えてgoo メルマガ用会員リスト作成
+# category: service
+0 2 * * 2,5 gooscp /usr/local/app/goo/perl/batch/oshiete_member.pl > /dev/null 2>&1
+
+# No.27 : 国コードテーブル更新
+# category: UI
+# 2022-11-16 : 書き込みDB mdb-001 が 2:30AM にメモリ空き容量が0.04GBぐらい減る事象に伴い、
+# [1] アラート発生の深夜早朝を避け、安眠を確保する。 ／ [2] メモリ容量減、の発生時間帯もズレるか？の確認
+# の目的で、起動時間を変更する。
+# 2023-01-10 : 本バッチの更新量が多いため、DELETE+INSERT 形式から、TRUNCATE TABLE + LOAD DATA 形式に変更した。
+# 参考： HWKOUKAI2022-157 update_ip2country.pl をMariaDBフレンドリーに https://bit.ly/3ItlX7m
+2 9 * * * gooscp /usr/local/app/goo/perl/ip-country/update_ip2country.pl --load-data >/dev/null 2>&1
+
+# No.6 : 認証セッション情報削除
+# category: clean
+0 3 * * * gooscp /usr/local/app/goo/perl/authn/DeleteAuthenticationSession.pl > /dev/null 2>&1
+15 3 * * * gooscp /usr/local/app/goo/perl/authn/DeleteEnhancedSession.pl > /dev/null 2>&1
+
+# No.3 : 有効なgooIDリスト作成 (gooポイント向け)
+# category: service
+30 3 5 * * gooscp /usr/local/app/goo/perl/batch/make_active_gooid_list.pl > /dev/null 2>&1
+
+# No.5 : ホスピタリティ基盤連携ファイル プライバシー設定拒否リスト作成
+# category: service
+45 3 * * * gooscp /usr/local/app/goo/perl/batch/make_denied_privacy_list.pl > /dev/null 2>&1
+
+# No.4 : ホスピタリティ基盤連携ファイル作成
+# category: service
+0 4 * * * gooscp /usr/local/app/goo/perl/batch/make_hospitality_list.pl > /dev/null 2>&1
+
+# No.7 : gooID新規登録セッション情報削除
+# category: clean
+30 4 * * * gooscp /usr/local/app/goo/perl/portal/DeleteRegisterSession.pl > /dev/null 2>&1
+
+# No.8 : パスワード再設定メール送信情報削除
+# category: clean
+0 5 * * * gooscp /usr/local/app/goo/perl/portal/DeleteReSettingPasswordInfo.pl > /dev/null 2>&1
+
+# No.11 : 電話番号認証リクエスト履歴削除
+# category: clean
+30 5 * * * gooscp /usr/local/app/goo/perl/portal/DeleteAuthTelephoneHistory.pl > /dev/null 2>&1
+
+# No.9 : ログイン履歴情報削除
+# category: clean
+0 6 * * * gooscp /usr/local/app/goo/perl/portal/ExportLoginHistory.pl /home/batch_file > /dev/null 2>&1
+
+# No.10 : リスク判定履歴情報削除
+# category: clean
+30 6 * * * gooscp /usr/local/app/goo/perl/authn/DeleteAccessRiskHistory.pl > /dev/null 2>&1
+
+# No.13 : サービスレポート集計
+# category: report
+30 8 * * * gooscp /usr/local/app/goo/perl/report/ServiceReport.pl > /dev/null 2>&1
+
+# No.14 : 教えてgoo会員登録レポート作成
+# category: report
+4 9 * * * gooscp /usr/local/app/goo/perl/report/oshiete_report.pl > /dev/null 2>&1
+2 9 * * * gooscp /usr/local/app/goo/perl/report/oshiete_regist_report.pl > /dev/null 2>&1
+
+# No.26 : gooIDC dアカウント連携ログイン利用サービスレポート作成
+# category: report
+6 9 * * * gooscp /usr/local/app/goo/perl/report/docomo_login_report.pl >/dev/null 2>&1
+
+# No.23 : エラーコード集計レポート
+# category: report
+8 9 * * * gooscp /usr/local/app/goo/perl/report/errorcode_report.pl > /dev/null 2>&1
+
+# No.25 : リスクベース認証 TMX リスク判定結果レポート
+# category: report
+10 9 * * * gooscp /usr/local/app/goo/perl/report/riskbased_authn_report.pl > /dev/null 2>&1
+
+# No.16 : 外部ID連携　利用状況レポート作成
+# category: report
+12 9 * * * gooscp /usr/local/app/goo/perl/report/federate_report.pl > /dev/null 2>&1
+
+# No.17 : API利用サービスレポート作成
+# category: report
+14 9 * * * gooscp /usr/local/app/goo/perl/report/api_access_report.pl > /dev/null 2>&1
+
+# No.19 : 2段階認証利用状況レポート作成
+# category: report
+16 9 * * * gooscp /usr/local/app/goo/perl/report/twostepauth_report.pl >/dev/null 2>&1
+
+# No.18 : ログイン利用サービスレポート作成
+# category: report
+18 9 * * * gooscp /usr/local/app/goo/perl/report/login_report.pl > /dev/null 2>&1
+
+# No.24 : ログイン利用 月間レポート作成
+# category: report
+20 9 1 * * gooscp /usr/local/app/goo/perl/report/login_monthly_report.pl > /dev/null 2>&1
+
+# No.22 : リスクベース認証レポート作成
+# category: report
+22 9 * * * gooscp /usr/local/app/goo/perl/report/riskbasedauth_report.pl >/dev/null 2>&1
+
+# No.12 : 電話番号認証リクエスト(TeleSign)集計レポート作成
+# category: report
+24 9 * * * gooscp /usr/local/app/goo/perl/report/auth_telephone_report.pl > /dev/null 2>&1
+
+# No.33 : async_messageのキュー監視
+# category: 運用
+5 * * * * gooscp /db0/app/goo/mqcheck/mqcheck.pl > /dev/null 2>&1
+
+# No.34 : Shopify会員データ登録状況確認バッチ
+# category: 運用
+10 * * * * gooscp /usr/local/app/goo/perl/portal/CheckShopifyCustomerRegistrationStatus.pl > /dev/null 2>&1
+
+# No.28 : 不正アクセス遮断プログラム
+# category: security
+3,8,13,18,23,28,33,38,43,48,53,58 * * * * gooscp /db0/app/goo/ipcheck/ipcheck.sh
+
+# No.36 : メールマガジン購読者リスト作成バッチ
+# category: service
+15 2 * * * gooscp /usr/local/app/goo/perl/batch/make_goo_magazine_list.pl > /dev/null 2>&1

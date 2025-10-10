@@ -1,0 +1,22 @@
+{
+  "index_patterns": ["fluentd.gooid-hlp_app_idc_profiletoolauth_log-*"],
+  "priority": 0,
+  "composed_of": [
+    "index-common-settings"
+  ],
+  "template": {
+    "mappings": {
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "server": 		  { "type": "keyword" },
+        "log-time": 	  { 
+          "type": "date",
+          "format": "yyyy/MM/dd HH:mm:ss"
+        },
+        "username": 		{ "type": "keyword" },
+        "number": 		  { "type": "text" },
+        "message": 		  { "type": "text" }
+      }
+    }
+  }
+}

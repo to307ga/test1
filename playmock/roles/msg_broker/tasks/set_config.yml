@@ -1,0 +1,65 @@
+---
+# ディレクトリをループで作成する
+- name: Create directories
+  file: path={{ item }} state=directory owner=tomcat group=tomcat mode=0755
+  loop:
+    - /var/log/app
+    - /var/log/app/idc
+
+- name: Make a directory /usr/local/app/goo
+  file:
+    state: directory
+    path:  /usr/local/app/goo
+    owner: root
+    group: root
+    mode: 0755
+
+# ディレクトリをループで作成する
+- name: Create directories
+  file: path={{ item }} state=directory owner=gooidc group=gooidc mode=0755
+  loop:
+    - /var/log/app/idc/msg
+    - /usr/local/app/goo/msg
+
+- name: Link /usr/local/app/goo/msg/log -> /var/log/app/idc/msg
+  file:
+    state: link
+    src: /var/log/app/idc/msg
+    dest: /usr/local/app/goo/msg/log
+    owner: gooidc
+    group: gooidc
+    follow: no
+  when: not ansible_check_mode
+
+- name: Make a directory /usr/local/app/goo/msg
+  file:
+    state: directory
+    path: /usr/local/app/goo/msg
+    owner: gooidc
+    group: gooidc
+    mode: 0755
+
+- name: Copy to /etc/sysconfig/msg-broker 
+  template:
+    src: templates/msg-broker.j2
+    dest: /etc/sysconfig/msg-broker
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Copy to /etc/systemd/system/msg-broker.service
+  template:
+    src: templates/msg-broker.service.j2
+    dest: /etc/systemd/system/msg-broker.service
+    backup: yes 
+    owner: root
+    group: root
+    mode: 0644
+
+- name: msg-broker.serviceの開発環境自動起動設定
+  systemd:
+    name: msg-broker.service
+    enabled: yes
+    daemon_reload: no
+  when: release_env == "dev"
