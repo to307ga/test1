@@ -1,9 +1,0 @@
----
-- hosts: idhub_els
-  become: yes
-  # gather_facts: no
-  environment: "{{ proxy_env }}"
-  roles:
-    - { role: td-agent, tags: td-agent }
-    - { role: common, tags: common }
-    - { role: elasticsearch, tags: elasticsearch }

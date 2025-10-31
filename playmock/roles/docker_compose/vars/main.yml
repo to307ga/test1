@@ -1,4 +1,0 @@
----
-# 現状インストールバージョンは固定で、以下のダウンロードURLの一部として定義する必要があります
-# url: "https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-{{ ansible_system }}-{{ ansible_architecture }}"
-docker_compose_version: "1.29.2"

@@ -1,8 +1,0 @@
----
-- hosts: idhub_sdb
-  become: yes
-  environment: "{{ proxy_env }}"
-  roles:
-    - { role: common, tags: common }
-    - { role: mariadb_server, tags: mariadb_server }
-    - { role: rbash, tags: rbash }

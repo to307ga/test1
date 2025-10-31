@@ -1,2 +1,0 @@
-# container_jenkins backup schedule
-05 01 * * * root /opt/containers/backup/jenkins_backup.sh >/dev/null 2>&1

@@ -1,6 +1,0 @@
-# mdb
-
-# DB設定
-galera_cluster_name: GOOID_GALERA_DB
-galera_node_name: gooid_dev_db_5
-galera_func: replication

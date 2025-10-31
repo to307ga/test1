@@ -1,9 +1,0 @@
-#!/bin/bash
-
-if [ `/usr/bin/grep green /usr/local/app/idhub-oidc/ACTIVE_MODE` ]; then
-  systemctl start idhub-oidc-green.service
-else
-  systemctl start idhub-oidc-blue.service
-fi
-
-exit 0

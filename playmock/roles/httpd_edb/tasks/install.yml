@@ -1,9 +1,0 @@
----
-# パッケージをインストール
-- import_role:
-    name: mod_ldap
-- import_role:
-    name: mod_ssl
-- import_role:
-    name: httpd
-

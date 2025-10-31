@@ -1,4 +1,0 @@
-- name: Install maxscale
-  yum:
-    name: maxscale
-    state: latest

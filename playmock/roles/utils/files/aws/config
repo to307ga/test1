@@ -1,3 +1,0 @@
-[default]
-s3 =
-    max_bandwidth = 1MB/s

@@ -1,5 +1,0 @@
----
-- name: Install php-mbstring
-  yum:
-    name: php-mbstring
-    state: latest

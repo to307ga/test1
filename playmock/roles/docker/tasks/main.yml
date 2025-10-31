@@ -1,6 +1,0 @@
----
-- import_tasks: install.yml
-
-# チーム内で利用するだけのでDockerを起動させる
-- import_tasks: service.yml
-  when: server_kinds == "gooid-redmine"

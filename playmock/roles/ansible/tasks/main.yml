@@ -1,6 +1,0 @@
----
-# パッケージのインストール
-- name: Install ansible
-  ansible.builtin.dnf:
-    name: ansible
-    state: present

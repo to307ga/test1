@@ -1,5 +1,0 @@
----
-- name: Install php-mysql
-  yum:
-    name: php-mysqlnd
-    state: latest

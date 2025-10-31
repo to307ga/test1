@@ -1,9 +1,0 @@
----
-- name: Copy /etc/ssh/sshd_config
-  copy:
-    src: "{{ playbook_dir }}/roles/bastion/files/etc/ssh/sshd_config"
-    dest: /etc/ssh/sshd_config
-    owner: root
-    group: root
-    mode: '0644'
-  when: server_role == 'bastion'

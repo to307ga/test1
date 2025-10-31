@@ -1,7 +1,0 @@
----
-- name: squid.serviceの設定
-  systemd:
-    name: squid.service
-    enabled: no
-    daemon_reload: no
-

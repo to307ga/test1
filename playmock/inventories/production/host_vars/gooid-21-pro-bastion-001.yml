@@ -1,9 +1,0 @@
-# bastion
-
-# 参照用DB
-gooid_read: gooid-21-pro-mdb-004
-idhub_read: idhub-21-pro-mdb-004
-
-# 更新用DB
-gooid_write: gooid-21-pro-mdb-001
-idhub_write: idhub-21-pro-mdb-001

@@ -1,5 +1,0 @@
-SetEnvIf Request_URI "\.(gif|jpg|ico|png|js|css)$" no_cache_object
-Header set Pragma no-cache env=!no_cache_object
-Header set Cache-Control "no-cache, no-store, must-revalidate" env=!no_cache_object
-Header set Expires "Wed, 31 Dec 1969 15:00:00 GMT" env=!no_cache_object
-#Header set X-FRAME-OPTIONS "DENY"

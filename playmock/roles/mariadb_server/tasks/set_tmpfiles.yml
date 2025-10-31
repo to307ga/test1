@@ -1,9 +1,0 @@
----
-
-- name: Copy mariadb.conf to tmpfiles.d
-  copy:
-    src: files/etc/tmpfiles.d/mariadb.conf
-    dest: /etc/tmpfiles.d/mariadb.conf
-    owner: root
-    group: root
-    mode: 0644

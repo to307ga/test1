@@ -1,5 +1,0 @@
----
-- name: Install pdsh
-  yum:
-    name: pdsh
-    state: latest

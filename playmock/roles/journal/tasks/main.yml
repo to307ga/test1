@@ -1,4 +1,0 @@
----
-- name: Install systemd-journald
-  ansible.builtin.import_tasks:
-    file: install.yml

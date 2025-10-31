@@ -1,6 +1,0 @@
----
-
-- include_tasks: install.yml
-- include_tasks: create_user.yml
-- include_tasks: settings.yml
-- include_tasks: install_utils.yml

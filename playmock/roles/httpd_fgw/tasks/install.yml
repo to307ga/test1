@@ -1,6 +1,0 @@
----
-# パッケージをループでインストール
-- import_role:
-    name: mod_ssl
-- import_role:
-    name: httpd

@@ -1,3 +1,0 @@
-# container_redmine restore schedule
-# Note: Replace BACKUP_SOURCE_HOSTNAME with actual container hostname before deploying this file to /etc/cron.d/
-45 02 * * * root /opt/containers/backup/redmine_restore.sh BACKUP_SOURCE_HOSTNAME -y >/dev/null 2>&1

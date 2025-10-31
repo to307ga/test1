@@ -1,7 +1,0 @@
-# fgw
-
-httpd_fqdn: fgw001.goo.ne.jp
-httpd_port: 80
-# Reverse Proxyの下にいるため %h ではなく %a によってリアルなClientのIPがロギングされる。
-httpd_logformat: '"%a %l %u %t %D \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\""'
-httpd_logformat_type: combined_gooidc

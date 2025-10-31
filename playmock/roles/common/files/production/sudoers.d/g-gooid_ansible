@@ -1,1 +1,0 @@
-g-gooid_ansible  ALL=(ALL) NOPASSWD: /usr/libexec/platform-python, /bin/sh, /usr/bin/python

@@ -1,9 +1,0 @@
----
-- name: Redmine service
-  hosts: gooid_redmine
-  become: true
-  environment: "{{ proxy_env }}"
-  roles:
-    - { role: container, tags: container }
-    - { role: container_redmine, tages: container_redmine }
-    - { role: rbash, tags: rbash }

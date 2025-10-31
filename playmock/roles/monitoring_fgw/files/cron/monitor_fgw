@@ -1,8 +1,0 @@
-# fgwに未来日のファイルが存在しないことを監視する
-0 * * * * gooscp /usr/local/app/monitoring/check_prohibition_file.sh > /dev/null 2>&1
-
-# 初月一括課金時の強制解約者リストが正常に生成されていることを監視する
-0 17 1 * * root /usr/local/app/monitoring/check_dgp_user_file.sh > /dev/null 2>&1
-
-# ブログ会員の有効会員リストが正常に生成されていることを確認する
-0 7 3 * * root /usr/local/app/monitoring/check_adv_user_file.sh > /dev/null 2>&1

@@ -1,6 +1,0 @@
----
-- name: Install docker
-  yum:
-    name: docker
-    state: latest
-

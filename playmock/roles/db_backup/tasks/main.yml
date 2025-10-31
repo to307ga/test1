@@ -1,9 +1,0 @@
----
-- include_tasks: set_config.yml
-  when: inventory_hostname_short is regex("(-mdb-004$|-edb-)")
-
-- include_tasks: root_cron.yml
-  when: inventory_hostname_short is regex("(-mdb-004$|-edb-)")
-
-- include_tasks: gooscp_cron.yml
-  when: inventory_hostname_short is regex("-edb-")

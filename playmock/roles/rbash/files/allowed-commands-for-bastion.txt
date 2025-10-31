@@ -1,7 +1,0 @@
-/usr/bin/mysql /opt/bin/rbash_user/mysql
-/usr/local/bin/mysql-gooid-admin /opt/bin/rbash_user/mysql-gooid-admin
-/usr/local/bin/mysql-gooid-read /opt/bin/rbash_user/mysql-gooid-read
-/usr/local/bin/mysql-gooid-write /opt/bin/rbash_user/mysql-gooid-write
-/usr/local/bin/mysql-idhub-admin /opt/bin/rbash_user/mysql-idhub-admin
-/usr/local/bin/mysql-idhub-read /opt/bin/rbash_user/mysql-idhub-read
-/usr/local/bin/mysql-idhub-write /opt/bin/rbash_user/mysql-idhub-write

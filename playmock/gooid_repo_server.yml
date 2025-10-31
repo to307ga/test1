@@ -1,6 +1,0 @@
----
-- hosts: gooid_repo
-  become: yes
-  environment: "{{ proxy_env }}"
-  roles:
-    - { role: yum_repo, tags: yum_repo }

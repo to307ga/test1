@@ -1,9 +1,0 @@
-#!/bin/bash
-
-if [ `/usr/bin/grep green /usr/local/app/gbs_proto/web/fabfile-{{ httpd_idc_hostname }}-switch` ]; then
-  systemctl start gbs_spring-green.service
-else
-  systemctl start gbs_spring-blue.service
-fi
-
-exit 0

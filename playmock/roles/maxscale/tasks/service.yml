@@ -1,9 +1,0 @@
----
-- name: maxscale.serviceの設定
-  systemd:
-    name: maxscale
-    enabled: yes
-    daemon_reload: yes
-  # 一度もansible-playbookしていない場合はmaxscale.serviceが存在しないため、
-  # dryrunの場合はSkip
-  when: not ansible_check_mode

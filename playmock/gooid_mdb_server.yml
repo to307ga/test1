@@ -1,9 +1,0 @@
----
-- hosts: gooid_mdb
-  become: yes
-  environment: "{{ proxy_env }}"
-  roles:
-    - { role: common, tags: common }
-    - { role: mariadb_server, tags: mariadb_server }
-    - { role: db_backup, tags: db_backup }
-    - { role: rbash, tags: rbash }

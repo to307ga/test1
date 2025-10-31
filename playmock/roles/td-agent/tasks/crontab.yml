@@ -1,9 +1,0 @@
----
-
-- name: Distribution of life cycle settings
-  template:
-    src: td-agent_logs_life_cycle.j2
-    dest: /etc/cron.d/td-agent_logs_life_cycle
-    owner: root
-    group: root
-    mode: 0644

@@ -1,9 +1,0 @@
----
-# フォルダの権限変更
-- name: アクセスログフォルダの権限変更
-  file:
-    state: directory
-    path: /var/log/httpd
-    owner: root
-    group: root
-    mode: 0755

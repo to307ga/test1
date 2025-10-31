@@ -1,6 +1,0 @@
----
-- name: rsyncdの設定
-  systemd:
-    name: rsyncd
-    state: started
-    enabled: yes

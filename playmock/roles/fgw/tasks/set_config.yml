@@ -1,3 +1,0 @@
----
-- import_tasks: db0.yml
-  when: inventory_hostname_short is regex("-fgw-000$")

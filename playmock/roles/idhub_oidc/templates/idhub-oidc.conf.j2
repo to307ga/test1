@@ -1,8 +1,0 @@
-# IDHUB-OIDC Configuration
-ProxyPass /.well-known/openid-configuration http://localhost:48081/.well-known/openid-configuration
-
-<Location /oidc>
-  Require all granted
-  ProxyPass http://localhost:48081/oidc
-  ProxyPassReverse http://localhost:48081/oidc
-</Location>

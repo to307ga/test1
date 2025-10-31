@@ -1,9 +1,0 @@
-# bastion
-
-# 参照用DB
-gooid_read: gooid-30-dev-sdb-101
-idhub_read: idhub-30-dev-sdb-101
-
-# 更新用DB
-gooid_write: gooid-30-dev-mdb-101
-idhub_write: idhub-30-dev-mdb-101

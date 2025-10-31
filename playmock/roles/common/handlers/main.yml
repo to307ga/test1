@@ -1,9 +1,0 @@
----
-
-# systemd の daemon_reload: yes ではダメ
-- name: Reload dnf-automatic.timer 
-  command: systemctl daemon-reload
-  become: yes
-
-# systemctl list-timers で次のスケジュールが更新されていることを確認する
-

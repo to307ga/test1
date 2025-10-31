@@ -1,8 +1,0 @@
-
-- name: area-aにおける7日より古いファイルの削除cron配置
-  copy:
-    src: files/etc/cron.d/fgw
-    dest: /etc/cron.d/fgw
-    owner: root
-    group: root
-    mode: 0644

@@ -1,3 +1,0 @@
----
-- name: Docker-compose role
-  ansible.builtin.import_tasks: install.yml

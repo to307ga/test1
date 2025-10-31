@@ -1,2 +1,0 @@
-#!/bin/bash
-mysql --defaults-group-suffix=_write_gooid

@@ -1,7 +1,0 @@
-# oidc
-spring_profiles_active: dev
-oidc_proxysql:
-  nodes:
-    - gooid-21-dev-mdb-301
-    - gooid-21-dev-mdb-302
-    - gooid-21-dev-mdb-303

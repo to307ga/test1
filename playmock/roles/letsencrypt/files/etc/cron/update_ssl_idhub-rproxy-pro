@@ -1,1 +1,0 @@
-0 0 22 * * root sh /usr/local/app/script/update_letsencrypt_rproxy.sh idhub.wbo110.goo.ne.jp pro > /dev/null 2>&1

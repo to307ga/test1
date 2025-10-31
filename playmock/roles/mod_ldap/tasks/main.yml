@@ -1,6 +1,0 @@
----
-# パッケージのインストール
-- name: Install mod_ldap
-  yum:
-    name: mod_ldap
-    state: latest

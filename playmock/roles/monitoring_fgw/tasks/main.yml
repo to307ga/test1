@@ -1,3 +1,0 @@
----
-- import_tasks: set_monitoring_cron.yml
-- import_tasks: set_monitoring_script.yml

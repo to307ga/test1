@@ -31,3 +31,4 @@
 
 # すべてのテキストファイルをLF・UTF-8で統一（明示的に指定されていないファイルも含む）
 * text eol=lf encoding=utf-8
+*.zip binary

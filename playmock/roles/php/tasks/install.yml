@@ -1,6 +1,0 @@
----
-# パッケージをインストール
-- import_tasks: php.yml
-- import_tasks: php-mysql.yml
-- import_tasks: php-mbstring.yml
-

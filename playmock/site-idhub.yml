@@ -1,7 +1,0 @@
-- import_playbook: idhub_batch_server.yml
-- import_playbook: idhub_els_server.yml
-- import_playbook: idhub_hlp_server.yml
-- import_playbook: idhub_mdb_server.yml
-- import_playbook: idhub_rproxy_server.yml
-- import_playbook: idhub_sdb_server.yml
-- import_playbook: idhub_web_server.yml

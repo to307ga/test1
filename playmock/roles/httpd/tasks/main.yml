@@ -1,5 +1,0 @@
----
-- import_tasks: install.yml
-
-# 不要なファイルを削除
-- import_tasks: set_config.yml

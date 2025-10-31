@@ -1,6 +1,0 @@
----
-# パッケージのインストール
-- name: Install maven
-  yum:
-    name: maven
-    state: latest

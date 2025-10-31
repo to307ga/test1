@@ -1,9 +1,0 @@
----
-# チーム内で利用するだけのでDockerを起動させる
-- name: Dockerの起動
-  systemd:
-    name: docker
-    state: started
-    enabled: yes
-    daemon_reload: yes
-

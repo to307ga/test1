@@ -1,2 +1,0 @@
-# container_redmine backup schedule
-05 02 * * * root /opt/containers/backup/redmine_backup.sh >/dev/null 2>&1

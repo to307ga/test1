@@ -1,5 +1,0 @@
----
-- name: Install mod_security
-  yum:
-    name: mod_security
-    state: latest
