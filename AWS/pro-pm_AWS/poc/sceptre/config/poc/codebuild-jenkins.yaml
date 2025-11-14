@@ -1,0 +1,24 @@
+template:
+  type: file
+  path: codebuild-jenkins.yaml
+
+parameters:
+  Environment: poc
+  ProjectName: jenkins-docker-build
+  GiteaUsername: tomo
+  GiteaRepositoryName: jenkins-docker
+  DockerfilePath: "Dockerfile"
+  BuildContext: "jenkins"
+  ECRRepositoryURI: !stack_output poc/ecr-jenkins.yaml::ECRRepositoryURI
+  GiteaLoadBalancerDNS: !stack_output poc/ecs-gitea.yaml::LoadBalancerDNS
+  HadolintIgnoredRules:
+    - DL3041  # When using `dnf install`, the package version is not specified.
+    - DL3059  # Consecutive RUN instructions should be consolidated.
+    - DL3013  # Pin versions in pip. Instead of `pip install <package>` use `pip install <package>==<version>`
+
+  TrivySeverityThreshold: CRITICAL
+
+dependencies:
+  - poc/ecr-jenkins.yaml
+  - poc/vpc.yaml
+  - poc/ecs-gitea.yaml

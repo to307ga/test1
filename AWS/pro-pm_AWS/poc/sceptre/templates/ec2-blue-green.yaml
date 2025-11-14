@@ -1,0 +1,496 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC EC2 Template - Blue-Green Deployment Support with Immutable Infrastructure'
+
+Parameters:
+  # Network Configuration
+  VPCId:
+    Type: String
+    Description: VPC ID for EC2 instances
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Description: List of private subnet IDs for EC2 placement
+
+  SecurityGroupId:
+    Type: String
+    Description: Security group ID for EC2 instances
+
+  # Blue-Green Configuration
+  DeploymentColor:
+    Type: String
+    Default: blue
+    AllowedValues:
+      - blue
+      - green
+    Description: Deployment color for Blue-Green strategy
+
+  # Instance Configuration
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+      - t3.small
+      - t3.medium
+      - t3.large
+    Description: EC2 instance type
+
+  ImageId:
+    Type: String
+    Description: AMI ID for EC2 instances (Golden AMI from Packer)
+    Default: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64}}'
+
+  KeyPairName:
+    Type: String
+    Default: ""
+    Description: EC2 Key Pair name (optional, SSM Session Manager recommended)
+
+  # Auto Scaling Configuration
+  MinCapacity:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 10
+    Description: Minimum number of instances
+
+  MaxCapacity:
+    Type: Number
+    Default: 6
+    MinValue: 1
+    MaxValue: 20
+    Description: Maximum number of instances
+
+  DesiredCapacity:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 10
+    Description: Desired number of instances
+
+  # Application Configuration
+  ApplicationName:
+    Type: String
+    Default: poc-web
+    Description: Application name for tagging
+
+  Environment:
+    Type: String
+    Default: poc
+    AllowedValues:
+      - dev
+      - stg
+      - poc
+      - prod
+    Description: Environment name
+
+  ProjectCode:
+    Type: String
+    Default: poc
+    Description: Project code for naming and tagging
+
+  # Load Balancer Configuration
+  LoadBalancerArn:
+    Type: String
+    Description: Application Load Balancer ARN
+
+  LoadBalancerListenerArn:
+    Type: String
+    Description: Application Load Balancer Listener ARN
+
+  BlueTargetGroupArn:
+    Type: String
+    Default: ""
+    Description: Blue Target Group ARN (existing)
+
+  # Immutable Deployment Configuration
+  AMIVersion:
+    Type: String
+    Default: "latest"
+    Description: AMI version tag for tracking
+
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
+  IsBlueDeployment: !Equals [!Ref DeploymentColor, "blue"]
+  IsGreenDeployment: !Equals [!Ref DeploymentColor, "green"]
+  HasBlueTargetGroup: !Not [!Equals [!Ref BlueTargetGroupArn, ""]]
+
+Resources:
+  # IAM Role for EC2 instances (enhanced for Blue-Green)
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-ec2-role-${DeploymentColor}-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # SSM Session Manager policy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        # Patch management policy
+        - arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
+        # CloudWatch Logs policy
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: BlueGreenDeploymentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:DescribeAutoScalingInstances
+                  - ec2:DescribeInstances
+                  - ec2:DescribeTags
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:DescribeTargetHealth
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-ec2-role-${DeploymentColor}-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Color
+          Value: !Ref DeploymentColor
+
+  # Instance Profile for EC2
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${ProjectCode}-ec2-profile-${DeploymentColor}-${Environment}'
+      Roles:
+        - !Ref EC2Role
+
+  # Target Group for this deployment color
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ProjectCode}-tg-${DeploymentColor}-${Environment}'
+      Protocol: HTTP
+      Port: 80
+      VpcId: !Ref VPCId
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health.php
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '300'
+        - Key: stickiness.enabled
+          Value: 'false'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-tg-${DeploymentColor}-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Color
+          Value: !Ref DeploymentColor
+        - Key: Project
+          Value: !Ref ProjectCode
+
+  # Launch Template for Auto Scaling Group
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${ProjectCode}-lt-${DeploymentColor}-${Environment}'
+      LaunchTemplateData:
+        # Use the provided Golden AMI
+        ImageId: !Ref ImageId
+        InstanceType: !Ref InstanceType
+        KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref SecurityGroupId
+
+        # Enhanced UserData for Blue-Green deployment
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+
+            # Set deployment metadata
+            echo "DEPLOYMENT_COLOR=${DeploymentColor}" >> /etc/environment
+            echo "ENVIRONMENT=${Environment}" >> /etc/environment
+            echo "AMI_VERSION=${AMIVersion}" >> /etc/environment
+            echo "INSTANCE_ROLE=${DeploymentColor}" >> /etc/environment
+
+            # Update system packages
+            dnf update -y
+
+            # Install additional monitoring tools
+            dnf install -y htop iotop
+
+            # Configure CloudWatch Agent for Blue-Green visibility
+            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOF'
+            {
+              "metrics": {
+                "namespace": "POC/${DeploymentColor}/EC2",
+                "metrics_collected": {
+                  "cpu": {
+                    "measurement": ["cpu_usage_idle", "cpu_usage_user", "cpu_usage_system"],
+                    "metrics_collection_interval": 60,
+                    "totalcpu": true
+                  },
+                  "mem": {
+                    "measurement": ["mem_used_percent", "mem_available_percent"],
+                    "metrics_collection_interval": 60
+                  },
+                  "disk": {
+                    "measurement": ["used_percent", "free"],
+                    "metrics_collection_interval": 60,
+                    "resources": ["*"]
+                  },
+                  "netstat": {
+                    "measurement": ["tcp_established", "tcp_time_wait"],
+                    "metrics_collection_interval": 60
+                  }
+                }
+              },
+              "logs": {
+                "logs_collected": {
+                  "files": {
+                    "collect_list": [
+                      {
+                        "file_path": "/var/log/messages",
+                        "log_group_name": "/aws/ec2/${Environment}/${DeploymentColor}/system",
+                        "log_stream_name": "{instance_id}"
+                      },
+                      {
+                        "file_path": "/var/log/httpd/access_log",
+                        "log_group_name": "/aws/ec2/${Environment}/${DeploymentColor}/httpd-access",
+                        "log_stream_name": "{instance_id}"
+                      },
+                      {
+                        "file_path": "/var/log/httpd/error_log",
+                        "log_group_name": "/aws/ec2/${Environment}/${DeploymentColor}/httpd-error",
+                        "log_stream_name": "{instance_id}"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+            EOF
+
+            # Start CloudWatch Agent
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+                -a fetch-config \
+                -m ec2 \
+                -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+                -s
+
+            # Create deployment info file for application
+            cat > /opt/deployment/info.json << EOF
+            {
+              "deployment_color": "${DeploymentColor}",
+              "environment": "${Environment}",
+              "ami_version": "${AMIVersion}",
+              "deployment_time": "$(date -Iseconds)",
+              "instance_id": "$(curl -s http://169.254.169.254/latest/meta-data/instance-id)",
+              "availability_zone": "$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)"
+            }
+            EOF
+
+            # Ensure services are running
+            systemctl enable httpd php-fpm
+            systemctl start httpd php-fpm
+
+        # Enhanced monitoring
+        Monitoring:
+          Enabled: true
+
+        # Comprehensive tagging for Blue-Green tracking
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${ProjectCode}-${DeploymentColor}-${Environment}'
+              - Key: Application
+                Value: !Ref ApplicationName
+              - Key: Environment
+                Value: !Ref Environment
+              - Key: Color
+                Value: !Ref DeploymentColor
+              - Key: Project
+                Value: !Ref ProjectCode
+              - Key: PatchGroup
+                Value: !Sub '${Environment}-${DeploymentColor}-instances'
+              - Key: SSMManaged
+                Value: 'true'
+              - Key: AMIVersion
+                Value: !Ref AMIVersion
+              - Key: DeploymentType
+                Value: 'Immutable'
+          - ResourceType: volume
+            Tags:
+              - Key: Name
+                Value: !Sub '${ProjectCode}-${DeploymentColor}-${Environment}-volume'
+              - Key: Application
+                Value: !Ref ApplicationName
+              - Key: Environment
+                Value: !Ref Environment
+              - Key: Color
+                Value: !Ref DeploymentColor
+              - Key: Project
+                Value: !Ref ProjectCode
+
+  # Auto Scaling Group for Blue-Green deployment
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub '${ProjectCode}-asg-${DeploymentColor}-${Environment}'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: !Ref MinCapacity
+      MaxSize: !Ref MaxCapacity
+      DesiredCapacity: !Ref DesiredCapacity
+      VPCZoneIdentifier: !Ref PrivateSubnets
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      # Distribute across AZs for high availability
+      AvailabilityZones:
+        - ap-northeast-1a
+        - ap-northeast-1c
+        - ap-northeast-1d
+      # Instance replacement policy for Immutable updates
+      NewInstancesProtectedFromScaleIn: false
+      # Termination policies for Blue-Green
+      TerminationPolicies:
+        - NewestInstance
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-asg-${DeploymentColor}-${Environment}'
+          PropagateAtLaunch: false
+        - Key: Application
+          Value: !Ref ApplicationName
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref Environment
+          PropagateAtLaunch: true
+        - Key: Color
+          Value: !Ref DeploymentColor
+          PropagateAtLaunch: true
+        - Key: Project
+          Value: !Ref ProjectCode
+          PropagateAtLaunch: true
+        - Key: AMIVersion
+          Value: !Ref AMIVersion
+          PropagateAtLaunch: true
+
+  # CloudWatch Log Groups for deployment color separation
+  SystemLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/ec2/${Environment}/${DeploymentColor}/system'
+      RetentionInDays: 14
+
+  HttpdAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/ec2/${Environment}/${DeploymentColor}/httpd-access'
+      RetentionInDays: 7
+
+  HttpdErrorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/ec2/${Environment}/${DeploymentColor}/httpd-error'
+      RetentionInDays: 30
+
+  # CloudWatch Alarms for Blue-Green monitoring
+  HighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectCode}-${DeploymentColor}-${Environment}-high-cpu'
+      AlarmDescription: !Sub 'High CPU utilization for ${DeploymentColor} environment'
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref AutoScalingGroup
+      TreatMissingData: notBreaching
+
+  UnhealthyHostsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectCode}-${DeploymentColor}-${Environment}-unhealthy-hosts'
+      AlarmDescription: !Sub 'Unhealthy hosts in ${DeploymentColor} target group'
+      MetricName: UnHealthyHostCount
+      Namespace: AWS/ApplicationELB
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: TargetGroup
+          Value: !GetAtt TargetGroup.TargetGroupFullName
+      TreatMissingData: notBreaching
+
+Outputs:
+  AutoScalingGroupName:
+    Description: Auto Scaling Group Name
+    Value: !Ref AutoScalingGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-asg-name'
+
+  AutoScalingGroupArn:
+    Description: Auto Scaling Group ARN
+    Value: !Ref AutoScalingGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-asg-arn'
+
+  LaunchTemplateId:
+    Description: Launch Template ID
+    Value: !Ref LaunchTemplate
+    Export:
+      Name: !Sub '${AWS::StackName}-launch-template-id'
+
+  LaunchTemplateVersion:
+    Description: Launch Template Version
+    Value: !GetAtt LaunchTemplate.LatestVersionNumber
+    Export:
+      Name: !Sub '${AWS::StackName}-launch-template-version'
+
+  TargetGroupArn:
+    Description: Target Group ARN
+    Value: !Ref TargetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-target-group-arn'
+
+  TargetGroupFullName:
+    Description: Target Group Full Name
+    Value: !GetAtt TargetGroup.TargetGroupFullName
+    Export:
+      Name: !Sub '${AWS::StackName}-target-group-full-name'
+
+  EC2RoleArn:
+    Description: EC2 IAM Role ARN
+    Value: !GetAtt EC2Role.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ec2-role-arn'
+
+  DeploymentColor:
+    Description: Deployment Color
+    Value: !Ref DeploymentColor
+    Export:
+      Name: !Sub '${AWS::StackName}-deployment-color'
+
+  AMIVersion:
+    Description: AMI Version Used
+    Value: !Ref AMIVersion
+    Export:
+      Name: !Sub '${AWS::StackName}-ami-version'

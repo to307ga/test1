@@ -1,0 +1,19 @@
+template:
+  path: ecs-gitea.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  PrivateSubnets: !stack_output poc/vpc.yaml::PrivateSubnets
+  SecurityGroupId: !stack_output poc/securitygroup.yaml::GiteaSecurityGroupId
+  # Aurora不使用のためダミー値
+  DatabaseEndpoint: "localhost"
+  DatabaseSecretArn: "arn:aws:secretsmanager:ap-northeast-1:000000000000:secret:dummy"
+  DatabaseName: "gitea"
+  DatabaseUser: "gitea"
+  # カスタムGiteaイメージを使用する場合は以下をコメントアウト
+  # GiteaImageUri: '123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/poc-gitea:latest'
+
+dependencies:
+  - poc/vpc.yaml
+  - poc/securitygroup.yaml
+  - poc/iam-group.yaml

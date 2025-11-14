@@ -1,0 +1,559 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['poc', 'dev', 'staging', 'prod'],
+            description: 'Target environment for deployment'
+        )
+        choice(
+            name: 'DEPLOYMENT_TYPE',
+            choices: ['patch', 'application', 'full'],
+            description: 'Type of deployment: patch (OS/middleware updates), application (app updates), full (both)'
+        )
+        choice(
+            name: 'TRAFFIC_STRATEGY',
+            choices: ['gradual', 'immediate', 'canary'],
+            description: 'Traffic switching strategy for Blue-Green deployment'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip application tests and validation'
+        )
+        booleanParam(
+            name: 'DRY_RUN',
+            defaultValue: false,
+            description: 'Perform a dry run without actual deployment'
+        )
+        string(
+            name: 'AMI_VERSION',
+            defaultValue: '',
+            description: 'Custom AMI version (leave empty for auto-generated timestamp)'
+        )
+        string(
+            name: 'CANARY_PERCENTAGE',
+            defaultValue: '10',
+            description: 'Initial traffic percentage for canary deployment (1-50)'
+        )
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'ap-northeast-1'
+        PROJECT_CODE = 'poc'
+        APPLICATION_NAME = 'poc-web'
+        PACKER_LOG = '1'
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
+        ANSIBLE_STDOUT_CALLBACK = 'yaml'
+    }
+
+    stages {
+        stage('Preparation') {
+            steps {
+                script {
+                    // Set AMI version if not provided
+                    if (params.AMI_VERSION == '') {
+                        env.AMI_VERSION = new Date().format('yyyyMMdd-HHmmss')
+                    } else {
+                        env.AMI_VERSION = params.AMI_VERSION
+                    }
+
+                    // Determine deployment color
+                    env.CURRENT_COLOR = sh(
+                        script: """
+                            python3 -c "
+import boto3
+try:
+    cf = boto3.client('cloudformation', region_name='${AWS_DEFAULT_REGION}')
+    stack_name = '${params.ENVIRONMENT}-${APPLICATION_NAME}-alb-blue-green'
+    response = cf.describe_stacks(StackName=stack_name)
+    outputs = {o['OutputKey']: o['OutputValue'] for o in response['Stacks'][0].get('Outputs', [])}
+    blue_weight = int(outputs.get('BlueTrafficWeight', 100))
+    current_color = 'blue' if blue_weight > 50 else 'green'
+    print(current_color)
+except:
+    print('blue')  # Default to blue if stack doesn't exist
+"
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    env.TARGET_COLOR = env.CURRENT_COLOR == 'blue' ? 'green' : 'blue'
+
+                    // Display build information
+                    echo """
+                    ===== Blue-Green Immutable Deployment Pipeline =====
+                    Environment: ${params.ENVIRONMENT}
+                    Deployment Type: ${params.DEPLOYMENT_TYPE}
+                    Traffic Strategy: ${params.TRAFFIC_STRATEGY}
+                    AMI Version: ${env.AMI_VERSION}
+                    Current Color: ${env.CURRENT_COLOR}
+                    Target Color: ${env.TARGET_COLOR}
+                    Skip Tests: ${params.SKIP_TESTS}
+                    Dry Run: ${params.DRY_RUN}
+                    ===================================================
+                    """
+                }
+
+                // Clean workspace and checkout code
+                cleanWs()
+                checkout scm
+
+                // Validate Packer template
+                dir('packer') {
+                    sh 'packer validate golden-ami.pkr.hcl'
+                }
+            }
+        }
+
+        stage('AMI Build') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Checkout Ansible playbooks from Gitea
+                    dir('ansible-playbooks') {
+                        git branch: 'main',
+                            url: 'http://gitea/tomo/ansible-playbooks.git',
+                            credentialsId: 'gitea-credentials'
+                    }
+
+                    dir('packer') {
+                        // Build Golden AMI with Packer
+                        sh """
+                            packer build \\
+                                -var 'environment=${params.ENVIRONMENT}' \\
+                                -var 'project_code=${env.PROJECT_CODE}' \\
+                                -var 'ami_version=${env.AMI_VERSION}' \\
+                                -var 'deployment_color=${env.TARGET_COLOR}' \\
+                                golden-ami.pkr.hcl
+                        """
+
+                        // Extract AMI ID from manifest
+                        script {
+                            def manifest = readJSON file: 'manifest.json'
+                            env.NEW_AMI_ID = manifest.builds[0].artifact_id.split(':')[1]
+                            echo "New AMI created: ${env.NEW_AMI_ID}"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    // Archive Packer logs and manifest
+                    archiveArtifacts artifacts: 'packer/manifest.json', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'packer/packer.log', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Infrastructure Deployment') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    dir('sceptre') {
+                        // Update Target environment configuration with new AMI
+                        sh """
+                            # Update Target Color environment configuration
+                            sed -i 's/ImageId:.*/ImageId: ${env.NEW_AMI_ID}/' config/${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR}.yaml
+
+                            # Deploy Target Color environment
+                            echo "Deploying ${env.TARGET_COLOR} environment..."
+                            uv run sceptre create ${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR} --yes || \\
+                            uv run sceptre update ${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR} --yes
+                        """
+
+                        // Wait for instances to be ready
+                        sh """
+                            echo "Waiting for ${env.TARGET_COLOR} environment instances to be ready..."
+                            sleep 120
+
+                            # Verify instances are running
+                            aws ec2 describe-instances \\
+                                --filters "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                          "Name=tag:DeploymentColor,Values=${env.TARGET_COLOR}" \\
+                                          "Name=instance-state-name,Values=running" \\
+                                --query 'Reservations[].Instances[].{InstanceId:InstanceId,State:State.Name}' \\
+                                --output table
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Application Deployment') {
+            when {
+                allOf {
+                    not { params.DRY_RUN }
+                    anyOf {
+                        equals expected: 'application', actual: params.DEPLOYMENT_TYPE
+                        equals expected: 'full', actual: params.DEPLOYMENT_TYPE
+                    }
+                }
+            }
+            steps {
+                script {
+                    // Checkout application code from Gitea
+                    dir('application') {
+                        git branch: 'main',
+                            url: 'http://gitea/tomo/application.git',
+                            credentialsId: 'gitea-credentials'
+                    }
+
+                    // Deploy application using Ansible to Target Color environment
+                    sh """
+                        # Get Target Color environment instances
+                        aws ec2 describe-instances \\
+                            --filters "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                      "Name=tag:DeploymentColor,Values=${env.TARGET_COLOR}" \\
+                                      "Name=instance-state-name,Values=running" \\
+                            --query 'Reservations[].Instances[].InstanceId' \\
+                            --output text > target_instances.txt
+
+                        # Create dynamic inventory for Ansible
+                        echo "[${env.TARGET_COLOR}_servers]" > inventory/${env.TARGET_COLOR}_hosts
+                        for instance in \$(cat target_instances.txt); do
+                            echo "\$instance ansible_connection=aws_ssm" >> inventory/${env.TARGET_COLOR}_hosts
+                        done
+
+                        # Deploy application to Target Color environment
+                        ansible-playbook -i inventory/${env.TARGET_COLOR}_hosts \\
+                            ansible-playbooks/deploy-application.yml \\
+                            --extra-vars "environment=${params.ENVIRONMENT}" \\
+                            --extra-vars "deployment_color=${env.TARGET_COLOR}" \\
+                            --extra-vars "deployment_type=${params.DEPLOYMENT_TYPE}" \\
+                            --extra-vars "app_source_dir=\$(pwd)/application"
+                    """
+                }
+            }
+        }
+
+        stage('Health Check & Validation') {
+            when {
+                allOf {
+                    not { params.DRY_RUN }
+                    not { params.SKIP_TESTS }
+                }
+            }
+            parallel {
+                stage('Infrastructure Health Check') {
+                    steps {
+                        script {
+                            sh """
+                                echo "Performing health checks on ${env.TARGET_COLOR} environment..."
+
+                                # Wait for Load Balancer Target Group to be healthy
+                                for i in {1..20}; do
+                                    HEALTHY_COUNT=\$(aws elbv2 describe-target-health \\
+                                        --target-group-arn \$(aws elbv2 describe-target-groups \\
+                                            --names ${params.ENVIRONMENT}-${env.APPLICATION_NAME}-${env.TARGET_COLOR}-tg \\
+                                            --query 'TargetGroups[0].TargetGroupArn' --output text) \\
+                                        --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \\
+                                        --output text)
+
+                                    TOTAL_COUNT=\$(aws elbv2 describe-target-health \\
+                                        --target-group-arn \$(aws elbv2 describe-target-groups \\
+                                            --names ${params.ENVIRONMENT}-${env.APPLICATION_NAME}-${env.TARGET_COLOR}-tg \\
+                                            --query 'TargetGroups[0].TargetGroupArn' --output text) \\
+                                        --query 'length(TargetHealthDescriptions)' \\
+                                        --output text)
+
+                                    echo "Health check attempt \$i: \$HEALTHY_COUNT/\$TOTAL_COUNT targets healthy"
+
+                                    if [ "\$HEALTHY_COUNT" -eq "\$TOTAL_COUNT" ] && [ "\$TOTAL_COUNT" -gt "0" ]; then
+                                        echo "All targets are healthy!"
+                                        break
+                                    fi
+
+                                    if [ \$i -eq 20 ]; then
+                                        echo "Health check timeout: Not all targets are healthy"
+                                        exit 1
+                                    fi
+
+                                    sleep 30
+                                done
+                            """
+                        }
+                    }
+                }
+
+                stage('Application Testing') {
+                    steps {
+                        script {
+                            // Direct testing via SSM to Target Color instances
+                            sh """
+                                # Get Target Color instances for testing
+                                aws ec2 describe-instances \\
+                                    --filters "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                              "Name=tag:DeploymentColor,Values=${env.TARGET_COLOR}" \\
+                                              "Name=instance-state-name,Values=running" \\
+                                    --query 'Reservations[].Instances[].InstanceId' \\
+                                    --output text > target_instances.txt
+
+                                # Test application on each instance
+                                for instance in \$(cat target_instances.txt); do
+                                    echo "Testing application on instance: \$instance"
+
+                                    # Basic health check
+                                    aws ssm send-command \\
+                                        --instance-ids \$instance \\
+                                        --document-name "AWS-RunShellScript" \\
+                                        --parameters 'commands=["systemctl is-active httpd","curl -f http://localhost/health.php || exit 1"]' \\
+                                        --output text --query 'Command.CommandId' > command_id.txt
+
+                                    # Wait for command to complete
+                                    sleep 10
+
+                                    # Check command result
+                                    aws ssm get-command-invocation \\
+                                        --command-id \$(cat command_id.txt) \\
+                                        --instance-id \$instance \\
+                                        --query 'Status' --output text
+                                done
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Traffic Switch Decision') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Confirmation prompt for production
+                    if (params.ENVIRONMENT == 'prod') {
+                        input message: "Proceed with traffic switch to ${env.TARGET_COLOR} environment?",
+                              ok: 'Proceed',
+                              submitterParameter: 'APPROVER'
+                    }
+
+                    echo "Approved by: ${env.APPROVER ?: 'Auto-approved (non-prod)'}"
+                }
+            }
+        }
+
+        stage('Blue-Green Traffic Switch') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    def trafficScript = "scripts/blue_green_traffic_manager.py"
+
+                    switch(params.TRAFFIC_STRATEGY) {
+                        case 'immediate':
+                            echo "Performing immediate traffic switch to ${env.TARGET_COLOR}..."
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage 100 \\
+                                    --validation-minutes 1
+                            """
+                            break
+
+                        case 'canary':
+                            echo "Performing canary deployment with ${params.CANARY_PERCENTAGE}% traffic..."
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage ${params.CANARY_PERCENTAGE} \\
+                                    --validation-minutes 5
+                            """
+
+                            // Manual approval for full switch after canary
+                            input message: "Canary deployment successful. Proceed with full traffic switch?",
+                                  ok: 'Proceed'
+
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage 100 \\
+                                    --validation-minutes 2
+                            """
+                            break
+
+                        case 'gradual':
+                        default:
+                            echo "Performing gradual traffic switch to ${env.TARGET_COLOR}..."
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage 10 \\
+                                    --validation-minutes 3
+                            """
+                            break
+                    }
+                }
+            }
+        }
+
+        stage('Post-Switch Validation') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Monitor for 10 minutes after traffic switch
+                    echo "Monitoring application performance for 10 minutes..."
+
+                    sh """
+                        # Monitor CloudWatch metrics
+                        for i in {1..10}; do
+                            echo "Monitoring minute \$i/10..."
+
+                            # Check error rates
+                            ERROR_COUNT=\$(aws cloudwatch get-metric-statistics \\
+                                --namespace AWS/ApplicationELB \\
+                                --metric-name HTTPCode_Target_5XX_Count \\
+                                --dimensions Name=LoadBalancer,Value=${params.ENVIRONMENT}-${env.APPLICATION_NAME}-alb \\
+                                --start-time \$(date -u -d '2 minutes ago' +%Y-%m-%dT%H:%M:%S) \\
+                                --end-time \$(date -u +%Y-%m-%dT%H:%M:%S) \\
+                                --period 60 \\
+                                --statistics Sum \\
+                                --query 'Datapoints[0].Sum' --output text 2>/dev/null || echo "0")
+
+                            echo "5XX errors in last minute: \${ERROR_COUNT:-0}"
+
+                            # Check response time
+                            RESPONSE_TIME=\$(aws cloudwatch get-metric-statistics \\
+                                --namespace AWS/ApplicationELB \\
+                                --metric-name TargetResponseTime \\
+                                --dimensions Name=LoadBalancer,Value=${params.ENVIRONMENT}-${env.APPLICATION_NAME}-alb \\
+                                --start-time \$(date -u -d '2 minutes ago' +%Y-%m-%dT%H:%M:%S) \\
+                                --end-time \$(date -u +%Y-%m-%dT%H:%M:%S) \\
+                                --period 60 \\
+                                --statistics Average \\
+                                --query 'Datapoints[0].Average' --output text 2>/dev/null || echo "0")
+
+                            echo "Average response time: \${RESPONSE_TIME:-0}s"
+
+                            sleep 60
+                        done
+                    """
+                }
+            }
+        }
+
+        stage('Cleanup Old Environment') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Cleanup confirmation for production
+                    if (params.ENVIRONMENT == 'prod') {
+                        input message: "Traffic switch successful. Clean up ${env.CURRENT_COLOR} environment?",
+                              ok: 'Cleanup'
+                    }
+
+                    echo "Cleaning up ${env.CURRENT_COLOR} environment..."
+
+                    dir('sceptre') {
+                        sh """
+                            # Delete old environment
+                            uv run sceptre delete ${params.ENVIRONMENT}/ec2-${env.CURRENT_COLOR} --yes || true
+
+                            # Clean up old AMIs (keep last 5 versions)
+                            aws ec2 describe-images \\
+                                --owners self \\
+                                --filters "Name=tag:Project,Values=${env.PROJECT_CODE}" \\
+                                          "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                --query 'sort_by(Images, &CreationDate)[:-5].[ImageId]' \\
+                                --output text | xargs -r -n1 aws ec2 deregister-image --image-id
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Archive deployment artifacts
+            archiveArtifacts artifacts: 'sceptre/config/**/*.yaml', allowEmptyArchive: true
+
+            // Clean up workspace
+            cleanWs()
+        }
+
+        success {
+            script {
+                def message = """
+                ✅ Blue-Green Immutable Deployment Successful!
+
+                Environment: ${params.ENVIRONMENT}
+                Deployment Type: ${params.DEPLOYMENT_TYPE}
+                Traffic Strategy: ${params.TRAFFIC_STRATEGY}
+                From: ${env.CURRENT_COLOR} → To: ${env.TARGET_COLOR}
+                New AMI: ${env.NEW_AMI_ID ?: 'N/A (Dry Run)'}
+                Version: ${env.AMI_VERSION}
+                Build: ${env.BUILD_NUMBER}
+                Duration: ${currentBuild.durationString}
+                """
+
+                echo message
+
+                // Update build description
+                currentBuild.description = "${params.DEPLOYMENT_TYPE} deployment to ${env.TARGET_COLOR}"
+            }
+        }
+
+        failure {
+            script {
+                def message = """
+                ❌ Blue-Green Deployment Failed!
+
+                Environment: ${params.ENVIRONMENT}
+                Deployment Type: ${params.DEPLOYMENT_TYPE}
+                Target: ${env.TARGET_COLOR}
+                Build: ${env.BUILD_NUMBER}
+                """
+
+                echo message
+
+                // Automatic rollback
+                if (!params.DRY_RUN && env.TARGET_COLOR) {
+                    echo "Performing automatic rollback..."
+                    sh """
+                        python3 scripts/blue_green_traffic_manager.py \\
+                            --environment ${params.ENVIRONMENT} \\
+                            --application ${env.APPLICATION_NAME} \\
+                            --action rollback
+                    """
+
+                    // Cleanup failed environment
+                    dir('sceptre') {
+                        sh """
+                            uv run sceptre delete ${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR} --yes || true
+                        """
+                    }
+                }
+            }
+        }
+
+        unstable {
+            script {
+                echo "⚠️ Blue-Green Deployment completed with warnings"
+            }
+        }
+    }
+}

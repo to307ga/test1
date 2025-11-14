@@ -1,0 +1,282 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC Aurora MySQL - Database for Gitea and applications'
+
+Parameters:
+  # Network Configuration
+  VPCId:
+    Type: String
+    Description: VPC ID for Aurora cluster
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Description: List of private subnet IDs for Aurora placement
+
+  EC2SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: EC2 instance security group ID (for Aurora access)
+
+  # Database Configuration
+  DatabaseName:
+    Type: String
+    Default: poc_gitea
+    Description: Initial database name
+
+  MasterUsername:
+    Type: String
+    Default: admin
+    Description: Master username for Aurora cluster
+
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 128
+    Description: Master password for Aurora cluster (will be stored in Secrets Manager)
+
+  # Cluster Configuration
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.medium
+    AllowedValues:
+      - db.t4g.medium
+      - db.r6g.large
+      - db.r6g.xlarge
+    Description: Aurora instance class
+
+  BackupRetentionPeriod:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 35
+    Description: Backup retention period in days
+
+  # Environment
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name
+
+Resources:
+  # Aurora Security Group
+  AuroraSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Aurora DB access from EC2
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2SecurityGroupId
+      Tags:
+        - Key: Name
+          Value: poc-aurora-sg
+
+  # DB Subnet Group
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub '${AWS::StackName}-subnet-group'
+      DBSubnetGroupDescription: Subnet group for POC Aurora cluster
+      SubnetIds: !Ref PrivateSubnets
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-subnet-group'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Secrets Manager for Database Credentials
+  DatabaseSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${AWS::StackName}/aurora/master'
+      Description: Master credentials for Aurora cluster
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "${MasterUsername}"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-database-secret'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Aurora Cluster Parameter Group
+  ClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      DBClusterParameterGroupName: !Sub '${AWS::StackName}-cluster-params'
+      Description: Parameter group for POC Aurora cluster
+      Family: aurora-mysql8.0
+      Parameters:
+        innodb_buffer_pool_size: '{DBInstanceClassMemory*3/4}'
+        max_connections: 1000
+        slow_query_log: 1
+        long_query_time: 5
+        log_queries_not_using_indexes: 1
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cluster-params'
+
+  # Aurora DB Parameter Group
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      DBParameterGroupName: !Sub '${AWS::StackName}-db-params'
+      Description: Parameter group for POC Aurora instances
+      Family: aurora-mysql8.0
+      Parameters:
+        innodb_print_all_deadlocks: 1
+        general_log: 1
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-db-params'
+
+  # Aurora Cluster
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Sub '${AWS::StackName}-cluster'
+      Engine: aurora-mysql
+      EngineVersion: '8.0.mysql_aurora.3.10.1'
+      DatabaseName: !Ref DatabaseName
+      MasterUsername: !Ref MasterUsername
+      ManageMasterUserPassword: true
+      MasterUserSecret:
+        SecretArn: !Ref DatabaseSecret
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref AuroraSecurityGroup
+      DBClusterParameterGroupName: !Ref ClusterParameterGroup
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      EnableCloudwatchLogsExports:
+        - error
+        - general
+        - slowquery
+      DeletionProtection: false  # POC環境なのでfalse
+      StorageEncrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cluster'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Aurora Writer Instance
+  AuroraWriterInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub '${AWS::StackName}-writer'
+      DBClusterIdentifier: !Ref AuroraCluster
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: aurora-mysql
+      DBParameterGroupName: !Ref DBParameterGroup
+      EnablePerformanceInsights: true
+      PerformanceInsightsRetentionPeriod: 7
+      MonitoringInterval: 60
+      MonitoringRoleArn: !GetAtt EnhancedMonitoringRole.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-writer'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Aurora Reader Instance (for read scaling)
+  AuroraReaderInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub '${AWS::StackName}-reader'
+      DBClusterIdentifier: !Ref AuroraCluster
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: aurora-mysql
+      DBParameterGroupName: !Ref DBParameterGroup
+      EnablePerformanceInsights: true
+      PerformanceInsightsRetentionPeriod: 7
+      MonitoringInterval: 60
+      MonitoringRoleArn: !GetAtt EnhancedMonitoringRole.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-reader'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Enhanced Monitoring Role
+  EnhancedMonitoringRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-enhanced-monitoring-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: monitoring.rds.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-enhanced-monitoring-role'
+
+  # CloudWatch Log Groups
+  ErrorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/rds/cluster/${AWS::StackName}-cluster/error'
+      RetentionInDays: 14
+
+  GeneralLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/rds/cluster/${AWS::StackName}-cluster/general'
+      RetentionInDays: 7
+
+  SlowQueryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/rds/cluster/${AWS::StackName}-cluster/slowquery'
+      RetentionInDays: 14
+
+Outputs:
+  AuroraSecurityGroupId:
+    Description: Aurora Security Group ID
+    Value: !Ref AuroraSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-aurora-sg-id'
+  ClusterIdentifier:
+    Description: Aurora Cluster Identifier
+    Value: !Ref AuroraCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-cluster-id'
+
+  ClusterEndpoint:
+    Description: Aurora Cluster Writer Endpoint
+    Value: !GetAtt AuroraCluster.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-writer-endpoint'
+
+  ClusterReadEndpoint:
+    Description: Aurora Cluster Reader Endpoint
+    Value: !GetAtt AuroraCluster.ReadEndpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-reader-endpoint'
+
+  DatabaseName:
+    Description: Database Name
+    Value: !Ref DatabaseName
+    Export:
+      Name: !Sub '${AWS::StackName}-database-name'
+
+  DatabaseSecretArn:
+    Description: Database Secret ARN
+    Value: !Ref DatabaseSecret
+    Export:
+      Name: !Sub '${AWS::StackName}-secret-arn'
+
+  DatabasePort:
+    Description: Database Port
+    Value: !GetAtt AuroraCluster.Endpoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-port'

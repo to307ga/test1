@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda function to trigger Jenkins Docker build from Gitea webhook'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name for resource tagging
+
+  CodeBuildProjectName:
+    Type: String
+    Description: CodeBuild project name to trigger
+
+Resources:
+  # Lambda Execution Role
+  BuildTriggerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-build-trigger-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource:
+                  - !Sub 'arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${CodeBuildProjectName}'
+        - PolicyName: LogsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+  # Lambda Function
+  BuildTriggerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-jenkins-build-trigger'
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt BuildTriggerLambdaRole.Arn
+      Timeout: 60
+      Environment:
+        Variables:
+          CODEBUILD_PROJECT_NAME: !Ref CodeBuildProjectName
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+
+          # Setup logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              codebuild = boto3.client('codebuild')
+              project_name = os.environ['CODEBUILD_PROJECT_NAME']
+
+              try:
+                  # Parse webhook payload
+                  if 'body' in event:
+                      body = json.loads(event['body']) if isinstance(event['body'], str) else event['body']
+                  else:
+                      body = event
+
+                  # Extract repository and commit information
+                  repository = body.get('repository', {})
+                  repo_name = repository.get('name', 'unknown')
+                  repo_url = repository.get('clone_url', repository.get('html_url', ''))
+
+                  # Get commit information
+                  commits = body.get('commits', [])
+                  if commits:
+                      latest_commit = commits[-1]
+                      commit_hash = latest_commit.get('id', 'latest')
+                      commit_message = latest_commit.get('message', 'Manual trigger')
+                      author = latest_commit.get('author', {}).get('name', 'Unknown')
+                  else:
+                      commit_hash = 'latest'
+                      commit_message = 'Manual trigger'
+                      author = 'Unknown'
+
+                  logger.info(f"Triggering build for repository: {repo_name}")
+                  logger.info(f"Commit: {commit_hash[:7]} by {author}")
+                  logger.info(f"Message: {commit_message}")
+
+                  # Start CodeBuild project
+                  # Note: Do not pass sourceVersion for S3-based builds
+                  response = codebuild.start_build(
+                      projectName=project_name,
+                      environmentVariablesOverride=[
+                          {
+                              'name': 'COMMIT_HASH',
+                              'value': commit_hash[:7]
+                          },
+                          {
+                              'name': 'COMMIT_MESSAGE',
+                              'value': commit_message
+                          },
+                          {
+                              'name': 'REPOSITORY_URL',
+                              'value': repo_url
+                          }
+                      ]
+                  )
+
+                  build_id = response['build']['id']
+                  logger.info(f"Build started: {build_id}")
+
+                  return {
+                      'statusCode': 200,
+                      'headers': {
+                          'Content-Type': 'application/json'
+                      },
+                      'body': json.dumps({
+                          'message': 'Build triggered successfully',
+                          'buildId': build_id,
+                          'projectName': project_name,
+                          'commitHash': commit_hash[:7]
+                      })
+                  }
+
+              except Exception as e:
+                  logger.error(f"Error triggering build: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'headers': {
+                          'Content-Type': 'application/json'
+                      },
+                      'body': json.dumps({
+                          'error': 'Failed to trigger build',
+                          'message': str(e)
+                      })
+                  }
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: jenkins-build
+        - Key: ManagedBy
+          Value: sceptre
+
+  # API Gateway for webhook endpoint
+  BuildTriggerApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${Environment}-jenkins-build-trigger-api'
+      Description: API Gateway for Jenkins build trigger webhook
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: jenkins-build
+        - Key: ManagedBy
+          Value: sceptre
+
+  # API Gateway Resource
+  WebhookResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref BuildTriggerApi
+      ParentId: !GetAtt BuildTriggerApi.RootResourceId
+      PathPart: webhook
+
+  # API Gateway Method
+  WebhookMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref BuildTriggerApi
+      ResourceId: !Ref WebhookResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BuildTriggerFunction.Arn}/invocations'
+
+  # Lambda Permission for API Gateway
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BuildTriggerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BuildTriggerApi}/*/POST/webhook'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: WebhookMethod
+    Properties:
+      RestApiId: !Ref BuildTriggerApi
+      StageName: prod
+
+Outputs:
+  WebhookUrl:
+    Description: Webhook URL for Gitea repository
+    Value: !Sub 'https://${BuildTriggerApi}.execute-api.${AWS::Region}.amazonaws.com/prod/webhook'
+    Export:
+      Name: !Sub '${Environment}-jenkins-build-webhook-url'
+
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt BuildTriggerFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-jenkins-build-lambda-arn'
+
+  ApiGatewayId:
+    Description: API Gateway ID
+    Value: !Ref BuildTriggerApi
+    Export:
+      Name: !Sub '${Environment}-jenkins-build-api-id'

@@ -1,0 +1,20 @@
+template_path: alb.yaml
+dependencies:
+  - poc/vpc.yaml
+  - poc/alb-securitygroup.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  PrivateSubnets: !split
+    - ','
+    - !stack_output poc/vpc.yaml::PrivateSubnets
+  ALBSecurityGroupId: !stack_output poc/alb-securitygroup.yaml::ALBSecurityGroupId
+
+  # Application Configuration
+  ApplicationName: poc-web
+  Environment: poc
+
+tags:
+  Name: poc-alb
+  Environment: poc
+  Application: poc-web

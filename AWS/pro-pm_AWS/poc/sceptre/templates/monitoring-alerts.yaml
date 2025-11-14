@@ -1,0 +1,569 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Comprehensive Monitoring and Alerting for ProxySQL + Aurora + Laravel Stack'
+
+Parameters:
+  # Environment Configuration
+  Environment:
+    Type: String
+    Default: poc
+    AllowedValues:
+      - dev
+      - stg
+      - poc
+      - prod
+    Description: Environment name
+
+  ApplicationName:
+    Type: String
+    Default: poc-web
+    Description: Application name for resource naming
+
+  # Aurora Configuration
+  AuroraClusterIdentifier:
+    Type: String
+    Default: poc-aurora-mysql
+    Description: Aurora cluster identifier to monitor
+
+  # EC2 Configuration
+  EC2InstanceIds:
+    Type: CommaDelimitedList
+    Description: List of EC2 instance IDs running ProxySQL and Laravel
+
+  # Notification Configuration
+  AlertEmail:
+    Type: String
+    Description: Email address for alert notifications
+    AllowedPattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+
+  AlertPhoneNumber:
+    Type: String
+    Default: ""
+    Description: Phone number for critical alerts (optional)
+
+  # Monitoring Thresholds
+  AuroraCPUThreshold:
+    Type: Number
+    Default: 80
+    MinValue: 1
+    MaxValue: 100
+    Description: Aurora CPU utilization threshold (%)
+
+  AuroraConnectionThreshold:
+    Type: Number
+    Default: 80
+    MinValue: 1
+    MaxValue: 100
+    Description: Aurora connection utilization threshold (%)
+
+  ProxySQLConnectionThreshold:
+    Type: Number
+    Default: 1800
+    MinValue: 100
+    MaxValue: 2000
+    Description: ProxySQL max connections threshold
+
+  LaravelResponseTimeThreshold:
+    Type: Number
+    Default: 5000
+    MinValue: 1000
+    MaxValue: 30000
+    Description: Laravel response time threshold (ms)
+
+Conditions:
+  HasPhoneNumber: !Not [!Equals [!Ref AlertPhoneNumber, ""]]
+  IsProduction: !Equals [!Ref Environment, 'prod']
+
+Resources:
+  # SNS Topic for Alerts
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Environment}-${ApplicationName}-alerts'
+      DisplayName: !Sub '${ApplicationName} ${Environment} Alerts'
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-alerts'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref ApplicationName
+
+  # SNS Email Subscription
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref AlertTopic
+      Endpoint: !Ref AlertEmail
+
+  # SNS SMS Subscription (conditional)
+  SMSSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasPhoneNumber
+    Properties:
+      Protocol: sms
+      TopicArn: !Ref AlertTopic
+      Endpoint: !Ref AlertPhoneNumber
+
+  # CloudWatch Dashboard
+  MonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${Environment}-${ApplicationName}-monitoring'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/RDS", "CPUUtilization", "DBClusterIdentifier", "${AuroraClusterIdentifier}" ],
+                  [ ".", "DatabaseConnections", ".", "." ],
+                  [ ".", "FreeableMemory", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "ap-northeast-1",
+                "title": "Aurora Cluster Metrics",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "ProxySQL/${Environment}", "TotalConnections", "Environment", "${Environment}", "Cluster", "${AuroraClusterIdentifier}" ],
+                  [ ".", "ActiveConnections", ".", ".", ".", "." ],
+                  [ ".", "OnlineBackends", ".", ".", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "ap-northeast-1",
+                "title": "ProxySQL Metrics",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "Laravel/${Environment}", "DatabaseStatus", "Environment", "${Environment}" ],
+                  [ ".", "HealthCheckStatus", ".", "." ],
+                  [ ".", "ResponseTime", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "ap-northeast-1",
+                "title": "Laravel Application Metrics",
+                "period": 300,
+                "stat": "Average"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/EC2", "CPUUtilization", "InstanceId", "${AWS::StackName}" ],
+                  [ ".", "NetworkIn", ".", "." ],
+                  [ ".", "NetworkOut", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "ap-northeast-1",
+                "title": "EC2 Instance Metrics",
+                "period": 300,
+                "stat": "Average"
+              }
+            }
+          ]
+        }
+
+  # Aurora CPU Utilization Alarm
+  AuroraCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-aurora-cpu-high'
+      AlarmDescription: 'Aurora cluster CPU utilization is high'
+      MetricName: CPUUtilization
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref AuroraCPUThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBClusterIdentifier
+          Value: !Ref AuroraClusterIdentifier
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-aurora-cpu-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Aurora Connection Count Alarm
+  AuroraConnectionAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-aurora-connections-high'
+      AlarmDescription: 'Aurora cluster connection count is high'
+      MetricName: DatabaseConnections
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref AuroraConnectionThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: DBClusterIdentifier
+          Value: !Ref AuroraClusterIdentifier
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-aurora-connections-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Aurora Free Memory Alarm
+  AuroraMemoryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-aurora-memory-low'
+      AlarmDescription: 'Aurora cluster free memory is low'
+      MetricName: FreeableMemory
+      Namespace: AWS/RDS
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 1073741824  # 1GB in bytes
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: DBClusterIdentifier
+          Value: !Ref AuroraClusterIdentifier
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-aurora-memory-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ProxySQL Connection Alarm
+  ProxySQLConnectionAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-proxysql-connections-high'
+      AlarmDescription: 'ProxySQL total connections are high'
+      MetricName: TotalConnections
+      Namespace: !Sub 'ProxySQL/${Environment}'
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref ProxySQLConnectionThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+        - Name: Cluster
+          Value: !Ref AuroraClusterIdentifier
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-proxysql-connections-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ProxySQL Backend Offline Alarm
+  ProxySQLBackendAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-proxysql-backends-offline'
+      AlarmDescription: 'ProxySQL backend servers are offline'
+      MetricName: OnlineBackends
+      Namespace: !Sub 'ProxySQL/${Environment}'
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+        - Name: Cluster
+          Value: !Ref AuroraClusterIdentifier
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+      TreatMissingData: breaching
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-proxysql-backends-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Laravel Database Status Alarm
+  LaravelDatabaseAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-laravel-database-down'
+      AlarmDescription: 'Laravel database connectivity is down'
+      MetricName: DatabaseStatus
+      Namespace: !Sub 'Laravel/${Environment}'
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0.5
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+      TreatMissingData: breaching
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-laravel-database-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Laravel Health Check Alarm
+  LaravelHealthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-laravel-health-failed'
+      AlarmDescription: 'Laravel health check is failing'
+      MetricName: HealthCheckStatus
+      Namespace: !Sub 'Laravel/${Environment}'
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0.5
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+      AlarmActions:
+        - !Ref AlertTopic
+      OKActions:
+        - !Ref AlertTopic
+      TreatMissingData: breaching
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-laravel-health-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Laravel Response Time Alarm
+  LaravelResponseTimeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-laravel-response-slow'
+      AlarmDescription: 'Laravel response time is slow'
+      MetricName: ResponseTime
+      Namespace: !Sub 'Laravel/${Environment}'
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: !Ref LaravelResponseTimeThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: Environment
+          Value: !Ref Environment
+      AlarmActions:
+        - !Ref AlertTopic
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-laravel-response-alarm'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # EC2 CPU Utilization Alarms (for each instance)
+  EC2CPUAlarmLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-${ApplicationName}-create-ec2-alarms'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt EC2AlarmLambdaRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import cfnresponse
+
+          def lambda_handler(event, context):
+              try:
+                  if event['RequestType'] == 'Delete':
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      return
+
+                  cloudwatch = boto3.client('cloudwatch')
+                  sns_topic_arn = event['ResourceProperties']['SNSTopicArn']
+                  instance_ids = event['ResourceProperties']['InstanceIds']
+                  environment = event['ResourceProperties']['Environment']
+                  application_name = event['ResourceProperties']['ApplicationName']
+
+                  for instance_id in instance_ids:
+                      alarm_name = f'{environment}-{application_name}-ec2-{instance_id}-cpu-high'
+
+                      cloudwatch.put_metric_alarm(
+                          AlarmName=alarm_name,
+                          ComparisonOperator='GreaterThanThreshold',
+                          EvaluationPeriods=2,
+                          MetricName='CPUUtilization',
+                          Namespace='AWS/EC2',
+                          Period=300,
+                          Statistic='Average',
+                          Threshold=80.0,
+                          ActionsEnabled=True,
+                          AlarmActions=[sns_topic_arn],
+                          OKActions=[sns_topic_arn],
+                          AlarmDescription=f'EC2 instance {instance_id} CPU utilization is high',
+                          Dimensions=[
+                              {
+                                  'Name': 'InstanceId',
+                                  'Value': instance_id
+                              }
+                          ]
+                      )
+
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
+
+  EC2AlarmLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CloudWatchAlarmPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
+                Resource: '*'
+
+  EC2AlarmCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt EC2CPUAlarmLambda.Arn
+      SNSTopicArn: !Ref AlertTopic
+      InstanceIds: !Ref EC2InstanceIds
+      Environment: !Ref Environment
+      ApplicationName: !Ref ApplicationName
+
+  # CloudWatch Log Groups for Application Logs
+  ProxySQLLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/ec2/${Environment}/${ApplicationName}/proxysql'
+      RetentionInDays: !If [IsProduction, 30, 7]
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-proxysql-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  LaravelLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/ec2/${Environment}/${ApplicationName}/laravel'
+      RetentionInDays: !If [IsProduction, 30, 7]
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-laravel-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  # SNS Topic
+  AlertTopicArn:
+    Description: SNS topic ARN for alerts
+    Value: !Ref AlertTopic
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alert-topic-arn'
+
+  # Dashboard
+  DashboardURL:
+    Description: CloudWatch dashboard URL
+    Value: !Sub 'https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${Environment}-${ApplicationName}-monitoring'
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-dashboard-url'
+
+  # Log Groups
+  ProxySQLLogGroupName:
+    Description: ProxySQL log group name
+    Value: !Ref ProxySQLLogGroup
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-proxysql-log-group'
+
+  LaravelLogGroupName:
+    Description: Laravel log group name
+    Value: !Ref LaravelLogGroup
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-laravel-log-group'
+
+  # Alarm Names
+  AlarmSummary:
+    Description: Summary of created alarms
+    Value: !Sub |
+      Aurora Alarms:
+      - ${Environment}-${ApplicationName}-aurora-cpu-high
+      - ${Environment}-${ApplicationName}-aurora-connections-high
+      - ${Environment}-${ApplicationName}-aurora-memory-low
+
+      ProxySQL Alarms:
+      - ${Environment}-${ApplicationName}-proxysql-connections-high
+      - ${Environment}-${ApplicationName}-proxysql-backends-offline
+
+      Laravel Alarms:
+      - ${Environment}-${ApplicationName}-laravel-database-down
+      - ${Environment}-${ApplicationName}-laravel-health-failed
+      - ${Environment}-${ApplicationName}-laravel-response-slow
+
+      EC2 Alarms: Created dynamically for each instance

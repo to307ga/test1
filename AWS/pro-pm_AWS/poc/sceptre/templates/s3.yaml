@@ -1,0 +1,106 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC S3 Buckets - Log storage with versioning and lifecycle'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name for resource naming
+
+  BucketNamePrefix:
+    Type: String
+    Default: poc-logs
+    Description: Prefix for S3 bucket names
+
+Resources:
+  # Primary logs bucket
+  LogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketNamePrefix}-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: LogsLifecycle
+            Status: Enabled
+            ExpirationInDays: 90
+            NoncurrentVersionExpirationInDays: 30
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+          - Id: TransitionToGlacier
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 60
+                StorageClass: GLACIER
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      # NotificationConfiguration removed - CloudWatch Logs integration requires additional setup
+      Tags:
+        - Key: Name
+          Value: !Sub '${BucketNamePrefix}-bucket'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Backup bucket for cross-region replication
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketNamePrefix}-backup-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: BackupLifecycle
+            Status: Enabled
+            ExpirationInDays: 365
+            NoncurrentVersionExpirationInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub '${BucketNamePrefix}-backup-bucket'
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  LogsBucketName:
+    Description: Primary logs bucket name
+    Value: !Ref LogsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-logs-bucket-name'
+
+  LogsBucketArn:
+    Description: Primary logs bucket ARN
+    Value: !GetAtt LogsBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-logs-bucket-arn'
+
+  BackupBucketName:
+    Description: Backup bucket name
+    Value: !Ref BackupBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-backup-bucket-name'
+
+  BackupBucketArn:
+    Description: Backup bucket ARN
+    Value: !GetAtt BackupBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-backup-bucket-arn'

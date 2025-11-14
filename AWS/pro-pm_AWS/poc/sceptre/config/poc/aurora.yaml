@@ -1,0 +1,28 @@
+template_path: aurora.yaml
+dependencies:
+  - poc/vpc.yaml
+  - poc/securitygroup.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  PrivateSubnets: !split
+    - ','
+    - !stack_output poc/vpc.yaml::PrivateSubnets
+  EC2SecurityGroupId: !stack_output poc/ec2.yaml::EC2SecurityGroupId
+
+  # Database Configuration
+  DatabaseName: poc_gitea
+  MasterUsername: admin
+  MasterUserPassword: TempPassword123!  # 実際はSecrets Managerが自動生成
+
+  # Instance Configuration
+  DBInstanceClass: db.t4g.medium
+  BackupRetentionPeriod: 7
+
+  # Environment
+  Environment: poc
+
+tags:
+  Name: poc-aurora-mysql
+  Environment: poc
+  Application: gitea

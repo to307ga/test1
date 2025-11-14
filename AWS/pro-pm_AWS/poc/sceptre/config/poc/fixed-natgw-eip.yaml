@@ -1,0 +1,4 @@
+template_path: fixed-natgw-eip.yaml
+
+tags:
+  Name: poc-nat-eip-poc

@@ -1,0 +1,16 @@
+# Sceptre configuration file
+# Global settings for all environments
+
+template_encoding: utf-8
+
+# Project code used in stack naming
+# Stack names will be: {project_code}-{StackGroup}-{TemplateName}
+project_code: jenkins-gitea
+
+region: ap-northeast-1
+
+# Stack tags applied to all stacks and resources
+# Use this for cost allocation tags
+stack_tags:
+  system_name: jenkins-gitea-platform
+  ManagedBy: sceptre

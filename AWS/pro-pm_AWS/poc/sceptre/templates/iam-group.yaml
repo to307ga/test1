@@ -1,0 +1,489 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC IAM Groups - Admin, PowerUser, Viewer with role-based access control'
+
+Parameters:
+  ProjectCode:
+    Type: String
+    Default: poc
+    Description: Project code for resource naming
+
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name
+
+  CreateUsers:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Whether to create IAM users (true/false)
+
+Conditions:
+  ShouldCreateUsers: !Equals [!Ref CreateUsers, 'true']
+
+Resources:
+  # IAM Groups
+  AdminGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub '${ProjectCode}-admin-group-${Environment}'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      Policies:
+        - PolicyName: EnforceMFA
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AllowViewAccountInfo
+                Effect: Allow
+                Action:
+                  - iam:GetAccountPasswordPolicy
+                  - iam:GetAccountSummary
+                  - iam:ListVirtualMFADevices
+                  - iam:ListAccountAliases
+                Resource: "*"
+              - Sid: AllowManageOwnPasswords
+                Effect: Allow
+                Action:
+                  - iam:ChangePassword
+                  - iam:GetUser
+                Resource: 
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:user/*"
+              - Sid: AllowManageOwnMFA
+                Effect: Allow
+                Action:
+                  - iam:CreateVirtualMFADevice
+                  - iam:DeleteVirtualMFADevice
+                  - iam:EnableMFADevice
+                  - iam:ListMFADevices
+                  - iam:ResyncMFADevice
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:mfa/*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:user/*"
+              - Sid: DenyAllExceptUnlessSignedInWithMFA
+                Effect: Deny
+                NotAction:
+                  - iam:CreateVirtualMFADevice
+                  - iam:EnableMFADevice
+                  - iam:GetUser
+                  - iam:ListMFADevices
+                  - iam:ListVirtualMFADevices
+                  - iam:ResyncMFADevice
+                  - sts:GetSessionToken
+                Resource: "*"
+                Condition:
+                  BoolIfExists:
+                    aws:MultiFactorAuthPresent: "false"
+                  StringNotEquals:
+                    aws:username: "ansible_user"
+
+  PowerUserGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub '${ProjectCode}-poweruser-group-${Environment}'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/PowerUserAccess
+      Policies:
+        - PolicyName: SSMSessionManager
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:StartSession
+                Resource:
+                  - !Sub 'arn:aws:ec2:*:${AWS::AccountId}:instance/*'
+                Condition:
+                  StringEquals:
+                    'aws:ResourceTag/Environment': !Ref Environment
+              - Effect: Allow
+                Action:
+                  - ssm:StartSession
+                Resource:
+                  - !Sub 'arn:aws:ssm:*:${AWS::AccountId}:document/AWS-StartInteractiveCommand'
+                  - !Sub 'arn:aws:ssm:*:${AWS::AccountId}:document/AWS-StartPortForwardingSession'
+              - Effect: Allow
+                Action:
+                  - ssm:TerminateSession
+                  - ssm:ResumeSession
+                Resource:
+                  - !Sub 'arn:aws:ssm:*:${AWS::AccountId}:session/*'
+        - PolicyName: DenyIAMChanges
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Deny
+                Action:
+                  - iam:*
+                Resource: "*"
+                Condition:
+                  StringNotEquals:
+                    'aws:RequestedRegion': 'deny-all-iam'
+
+  ViewerGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub '${ProjectCode}-viewer-group-${Environment}'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyName: DenySSMSessions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Deny
+                Action:
+                  - ssm:StartSession
+                Resource: "*"
+        - PolicyName: DenySecretsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Deny
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: "*"
+                Condition:
+                  StringLike:
+                    'aws:ResourceTag/Sensitive': 'true'
+
+  # IAM Roles for AssumeRole
+  AdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-admin-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                'aws:PrincipalTag/Department': 'Admin'
+              Bool:
+                'aws:MultiFactorAuthPresent': 'true'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-admin-role-${Environment}'
+
+  PowerUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-poweruser-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                'aws:PrincipalTag/Department': 'PowerUser'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/PowerUserAccess
+      Policies:
+        - PolicyName: SSMSessionManager
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:StartSession
+                  - ssm:TerminateSession
+                  - ssm:ResumeSession
+                  - ssm:DescribeSessions
+                  - ssm:GetConnectionStatus
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-poweruser-role-${Environment}'
+
+  ViewerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-viewer-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                'aws:PrincipalTag/Department': 'Viewer'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-viewer-role-${Environment}'
+
+  # ECS Task Execution Role
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-ecs-task-execution-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: 
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectCode}-*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-ecs-task-execution-role-${Environment}'
+
+  # ECS Task Role (for application containers)
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectCode}-ecs-task-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ParameterStoreAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource:
+                  - !Sub 'arn:aws:ssm:*:${AWS::AccountId}:parameter/${ProjectCode}/*'
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub 'arn:aws:secretsmanager:*:${AWS::AccountId}:secret:${ProjectCode}/*'
+                  - !Sub 'arn:aws:secretsmanager:*:${AWS::AccountId}:secret:ansible/*'
+        - PolicyName: SSMSessionManager
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:StartSession
+                  - ssm:SendCommand
+                  - ssm:ListCommandInvocations
+                  - ssm:DescribeInstanceInformation
+                  - ssm:TerminateSession
+                  - ssm:ResumeSession
+                  - ssm:DescribeSessions
+                  - ssm:GetConnectionStatus
+                Resource:
+                  - "*"
+              - Effect: Allow
+                Action:
+                  - ssm:StartSession
+                Resource:
+                  - !Sub 'arn:aws:ssm:*:${AWS::AccountId}:document/SSM-SessionManagerRunShell'
+                  - !Sub 'arn:aws:ssm:*::document/AWS-StartSSHSession'
+                  - !Sub 'arn:aws:ssm:*::document/AWS-StartPortForwardingSession'
+        - PolicyName: EC2ReadAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeTags
+                  - ec2:DescribeRegions
+                Resource: "*"
+        - PolicyName: S3AccessForSSM
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:DeleteObject
+                  - s3:GetEncryptionConfiguration
+                  - s3:ListBucket
+                Resource:
+                  - 'arn:aws:s3:::*'
+                  - 'arn:aws:s3:::*/*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-ecs-task-role-${Environment}'
+
+  # IAM Users (Optional)
+  AdminUser:
+    Type: AWS::IAM::User
+    Condition: ShouldCreateUsers
+    Properties:
+      UserName: !Sub '${ProjectCode}-admin-user-${Environment}'
+      Groups:
+        - !Ref AdminGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-admin-user-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Department
+          Value: Admin
+
+  AnsibleUser:
+    Type: AWS::IAM::User
+    Condition: ShouldCreateUsers
+    Properties:
+      UserName: ansible_user
+      Groups:
+        - !Ref AdminGroup
+      Policies:
+        - PolicyName: BypassMFARequirement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+                Condition:
+                  Bool:
+                    'aws:MultiFactorAuthPresent': 'false'
+      Tags:
+        - Key: Name
+          Value: ansible_user
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Department
+          Value: Admin
+        - Key: Purpose
+          Value: Automation
+
+  PowerUser:
+    Type: AWS::IAM::User
+    Condition: ShouldCreateUsers
+    Properties:
+      UserName: !Sub '${ProjectCode}-poweruser-${Environment}'
+      Groups:
+        - !Ref PowerUserGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-poweruser-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Department
+          Value: PowerUser
+
+  ViewerUser:
+    Type: AWS::IAM::User
+    Condition: ShouldCreateUsers
+    Properties:
+      UserName: !Sub '${ProjectCode}-viewer-user-${Environment}'
+      Groups:
+        - !Ref ViewerGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectCode}-viewer-user-${Environment}'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Department
+          Value: Viewer
+
+Outputs:
+  AdminGroupName:
+    Description: Admin Group Name
+    Value: !Ref AdminGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-admin-group-name'
+
+  PowerUserGroupName:
+    Description: PowerUser Group Name
+    Value: !Ref PowerUserGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-poweruser-group-name'
+
+  ViewerGroupName:
+    Description: Viewer Group Name
+    Value: !Ref ViewerGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-viewer-group-name'
+
+  AdminRoleArn:
+    Description: Admin Role ARN
+    Value: !GetAtt AdminRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-admin-role-arn'
+
+  PowerUserRoleArn:
+    Description: PowerUser Role ARN
+    Value: !GetAtt PowerUserRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-poweruser-role-arn'
+
+  ViewerRoleArn:
+    Description: Viewer Role ARN
+    Value: !GetAtt ViewerRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-viewer-role-arn'
+
+  ECSTaskExecutionRoleArn:
+    Description: ECS Task Execution Role ARN
+    Value: !GetAtt ECSTaskExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ecs-task-execution-role-arn'
+
+  ECSTaskRoleArn:
+    Description: ECS Task Role ARN
+    Value: !GetAtt ECSTaskRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ecs-task-role-arn'
+
+  # User Outputs (conditional)
+  AdminUserName:
+    Condition: ShouldCreateUsers
+    Description: Admin User Name
+    Value: !Ref AdminUser
+    Export:
+      Name: !Sub '${AWS::StackName}-admin-user-name'
+
+  AnsibleUserName:
+    Condition: ShouldCreateUsers
+    Description: Ansible User Name
+    Value: !Ref AnsibleUser
+    Export:
+      Name: !Sub '${AWS::StackName}-ansible-user-name'
+
+  PowerUserName:
+    Condition: ShouldCreateUsers
+    Description: PowerUser Name
+    Value: !Ref PowerUser
+    Export:
+      Name: !Sub '${AWS::StackName}-poweruser-name'
+
+  ViewerUserName:
+    Condition: ShouldCreateUsers
+    Description: Viewer User Name
+    Value: !Ref ViewerUser
+    Export:
+      Name: !Sub '${AWS::StackName}-viewer-user-name'

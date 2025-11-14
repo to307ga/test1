@@ -1,0 +1,45 @@
+template:
+  path: ssm-patch-management.yaml
+
+parameters:
+  # 基本設定
+  Environment: poc
+
+  # パッチ適用スケジュール設定
+  MaintenanceWindowSchedule: 'cron(0 2 ? * SUN *)'  # 毎週日曜日 2:00 AM UTC (11:00 JST)
+  MaintenanceWindowDuration: 4                       # 4時間の実行枠
+  MaintenanceWindowCutoff: 1                         # 1時間前に新タスク停止
+
+  # セキュリティレベル別適用タイミング（日数）
+  CriticalPatchApprovalDays: 0    # Critical: 即座適用
+  ImportantPatchApprovalDays: 0   # Important: 即座適用
+  MediumPatchApprovalDays: 7      # Medium: 1週間後
+  LowPatchApprovalDays: 7         # Low: 1週間後
+
+  # パッチ適用オプション
+  PatchingTimeoutMinutes: 120     # 2時間のタイムアウト
+  RebootOption: RebootIfNeeded    # 必要時のみ再起動
+
+  # 機能向上パッチ設定（セキュリティ重視の場合は false のまま）
+  IncludeEnhancements: 'false'    # Enhancement patches（新機能・機能改善）
+  IncludeRecommended: 'false'     # Recommended patches（推奨アップデート）
+  EnhancementPatchApprovalDays: 30  # Enhancement: 1ヶ月後（慎重に）
+  RecommendedPatchApprovalDays: 14  # Recommended: 2週間後
+
+  # メジャーバージョンアップ制御（本番環境では true 推奨）
+  BlockMajorVersionUpgrades: 'true'
+  MajorVersionBlockList:
+    # メジャーバージョンアップをブロック（直感的な設定）
+    - 'python4*'          # Python 4.x系（将来のメジャーアップ）
+    - 'python5*'          # Python 5.x系（将来のメジャーアップ）
+    - 'httpd-3*'          # Apache 3.x系（将来のメジャーアップ）
+    - 'nginx-2*'          # Nginx 2.x系（将来のメジャーアップ）
+    - 'mysql-9*'          # MySQL 9.x系（将来のメジャーアップ）
+    - 'php-9*'            # PHP 9.x系（将来のメジャーアップ）
+    - 'nodejs-2[0-9]*'    # Node.js 20.x以降（LTS考慮）
+
+  # 通知設定（メールアドレスを指定する場合）
+  # NotificationEmail: 'admin@example.com'
+
+# No dependencies on other stacks (independent service)
+dependencies: []

@@ -1,0 +1,347 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC ECS Fargate - Jenkins CI/CD Server'
+
+Parameters:
+  # Network Configuration
+  VPCId:
+    Type: String
+    Description: VPC ID for ECS tasks
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Description: List of private subnet IDs for ECS tasks
+
+  SecurityGroupId:
+    Type: String
+    Description: Security group ID for Jenkins containers
+
+  # ECS Configuration
+  TaskCpu:
+    Type: Number
+    Default: 2048
+    AllowedValues: [256, 512, 1024, 2048, 4096]
+    Description: CPU units for Jenkins task (2048 = 2 vCPU)
+
+  TaskMemory:
+    Type: Number
+    Default: 4096
+    AllowedValues: [512, 1024, 2048, 3072, 4096, 5120, 6144, 7168, 8192]
+    Description: Memory (MB) for Jenkins task
+
+  DesiredCount:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 1
+    Description: Number of Jenkins tasks to run (single master)
+
+  # Application Configuration
+  JenkinsImageUri:
+    Type: String
+    Default: 'jenkins/jenkins:lts'
+    Description: Jenkins container image URI (ECR or Docker Hub)
+
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name
+
+Resources:
+  # ECS Cluster (can be shared with Gitea)
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub '${AWS::StackName}-cluster'
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cluster'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # EFS File System for Jenkins Home
+  JenkinsEFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+      ThroughputMode: provisioned
+      ProvisionedThroughputInMibps: 10
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-jenkins-home'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # EFS Mount Targets
+  EFSMountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref JenkinsEFS
+      SubnetId: !Select [0, !Ref PrivateSubnets]
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  EFSMountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref JenkinsEFS
+      SubnetId: !Select [1, !Ref PrivateSubnets]
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  EFSMountTarget3:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref JenkinsEFS
+      SubnetId: !Select [2, !Ref PrivateSubnets]
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  # Security Group for EFS
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Jenkins EFS
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref SecurityGroupId
+          Description: NFS from Jenkins containers
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-efs-sg'
+
+  # CloudWatch Log Group
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${AWS::StackName}/jenkins'
+      RetentionInDays: 30
+
+  # Secrets Manager for Jenkins Admin Password
+  # JCasC無効化中は使用しないためコメントアウト（JCasC有効化時に併せて有効化）
+  # JenkinsAdminSecret:
+  #   Type: AWS::SecretsManager::Secret
+  #   Properties:
+  #     Name: !Sub '${AWS::StackName}/jenkins/admin'
+  #     Description: Jenkins admin user credentials
+  #     GenerateSecretString:
+  #       SecretStringTemplate: '{"username": "admin"}'
+  #       GenerateStringKey: 'password'
+  #       PasswordLength: 16
+  #       ExcludeCharacters: '"@/\'
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub '${AWS::StackName}-jenkins-admin'
+
+  # ECS Task Definition
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${AWS::StackName}-jenkins'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !ImportValue 'poc-poc-iam-group-ecs-task-execution-role-arn'
+      TaskRoleArn: !ImportValue 'poc-poc-iam-group-ecs-task-role-arn'
+      Volumes:
+        - Name: jenkins-home
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref JenkinsEFS
+            RootDirectory: /
+            TransitEncryption: ENABLED
+      ContainerDefinitions:
+        - Name: jenkins
+          Image: !Ref JenkinsImageUri
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          Environment:
+            - Name: TZ
+              Value: Asia/Tokyo
+            - Name: JENKINS_OPTS
+              Value: '--httpPort=8080'
+            - Name: JAVA_OPTS
+              Value: '-Xmx2g -Djenkins.install.runSetupWizard=false -Dhudson.model.DirectoryBrowserSupport.CSP="sandbox allow-scripts allow-same-origin; default-src ''self''; script-src ''self'' ''unsafe-inline'' ''unsafe-eval''; style-src ''self'' ''unsafe-inline''; img-src ''self'' data:;" -Dhudson.security.csrf.DefaultCrumbIssuer.EXCLUDE_SESSION_ID=true'
+            # CASC設定を無効化（EFSとの切り分け用　既存環境からのマイグレが複雑になるので無効化する）
+            # - Name: CASC_JENKINS_CONFIG
+            #   Value: '/var/jenkins_home/casc_configs'
+          # Secrets Manager認証情報（JCasC無効化中は不要のためコメントアウト）
+          # Secrets:
+          #   - Name: JENKINS_ADMIN_ID
+          #     ValueFrom: !Sub '${JenkinsAdminSecret}:username::'
+          #   - Name: JENKINS_ADMIN_PASSWORD
+          #     ValueFrom: !Sub '${JenkinsAdminSecret}:password::'
+          # EFSマウントを再有効化（CASC設定は引き続き無効）
+          MountPoints:
+            - SourceVolume: jenkins-home
+              ContainerPath: /var/jenkins_home
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: jenkins
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'curl -f http://localhost:8080/login || exit 1'
+            Interval: 30
+            Timeout: 10
+            Retries: 3
+            StartPeriod: 120
+          User: '0:0'  # Run as root for initial setup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-jenkins-task'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ECS Service
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - EFSMountTarget1
+      - EFSMountTarget2
+      - EFSMountTarget3
+      - Listener  # ALB Listenerの完了を待機
+    Properties:
+      ServiceName: !Sub '${AWS::StackName}-jenkins'
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      LoadBalancers:
+        - TargetGroupArn: !Ref TargetGroup
+          ContainerName: jenkins
+          ContainerPort: 8080
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref SecurityGroupId
+          Subnets: !Ref PrivateSubnets
+          AssignPublicIp: DISABLED
+      HealthCheckGracePeriodSeconds: 600
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-jenkins-service'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Application Load Balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${AWS::StackName}-alb'
+      Type: application
+      Scheme: internal
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets: !Split [',', !ImportValue 'poc-private-subnets']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ALB Security Group
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Jenkins ALB
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # - IpProtocol: tcp
+        #   FromPort: 80
+        #   ToPort: 80
+        #   CidrIp: 0.0.0.0/0
+        #   Description: HTTP from Internet
+        # - IpProtocol: tcp
+        #   FromPort: 443
+        #   ToPort: 443
+        #   CidrIp: 0.0.0.0/0
+        #   Description: HTTPS from Internet
+        - IpProtocol: tcp
+          FromPort: 8081
+          ToPort: 8081
+          CidrIp: 10.0.0.0/16
+          Description: HTTP from VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb-sg'
+
+  # Target Group
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${AWS::StackName}-tg'
+      Port: 8080
+      Protocol: HTTP
+      VpcId: !Ref VPCId
+      TargetType: ip
+      HealthCheckPath: /login
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: '200,403'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-tg'
+
+  # ALB Listener
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 8081
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+Outputs:
+  ClusterName:
+    Description: ECS Cluster Name
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-cluster-name'
+
+  ServiceName:
+    Description: ECS Service Name
+    Value: !Ref Service
+    Export:
+      Name: !Sub '${AWS::StackName}-service-name'
+
+  LoadBalancerDNS:
+    Description: Application Load Balancer DNS Name
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Sub '${AWS::StackName}-alb-dns'
+
+  JenkinsURL:
+    Description: Jenkins Web Interface URL
+    Value: !Sub 'http://${LoadBalancer.DNSName}:8081'
+    Export:
+      Name: !Sub '${AWS::StackName}-jenkins-url'
+
+  EFSFileSystemId:
+    Description: EFS File System ID for Jenkins home
+    Value: !Ref JenkinsEFS
+    Export:
+      Name: !Sub '${AWS::StackName}-efs-id'
+
+  # AdminSecretArn:
+  #   Description: Jenkins Admin Secret ARN (JCasC無効化中はコメントアウト)
+  #   Value: !Ref JenkinsAdminSecret
+  #   Export:
+  #     Name: !Sub '${AWS::StackName}-admin-secret-arn'

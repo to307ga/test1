@@ -1,0 +1,15 @@
+template_path: alb-securitygroup.yaml
+dependencies:
+  - poc/vpc.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  VPCCidr: !stack_output poc/vpc.yaml::VpcCidr
+  AllowedCidrBlocks:
+    - "10.0.0.0/16"
+  Environment: poc
+
+tags:
+  Name: poc-alb-sg
+  Environment: poc
+  Purpose: ALB

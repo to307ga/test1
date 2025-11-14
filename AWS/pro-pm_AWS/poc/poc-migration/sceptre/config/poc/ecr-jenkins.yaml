@@ -1,0 +1,17 @@
+template:
+  type: file
+  path: ecr-jenkins.yaml
+
+parameters:
+  Environment: poc
+  RepositoryName: jenkins-custom
+  ImageTagMutability: MUTABLE
+  ScanOnPush: 'true'
+
+  # Lifecycle Policy Configuration
+  LifecyclePolicyProfile: development  # development, staging, production
+  ProductionImageCount: 10
+  DevelopmentImageCount: 5
+  DateBasedImageCount: 20
+  UntaggedImageRetentionDays: 1
+  TemporaryImageRetentionDays: 7

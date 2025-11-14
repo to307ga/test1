@@ -1,0 +1,491 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC Systems Manager - Patch Management Automation'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name
+
+  # パッチ適用スケジュール設定
+  MaintenanceWindowSchedule:
+    Type: String
+    Default: 'cron(0 2 ? * SUN *)'
+    Description: 'Maintenance window schedule (cron format: min hour day month dayofweek year)'
+    AllowedPattern: '^cron\([0-9A-Za-z\-\*\/\,\s\?]+\)$'
+    ConstraintDescription: 'Must be valid cron expression like: cron(0 2 ? * SUN *)'
+
+  MaintenanceWindowDuration:
+    Type: Number
+    Default: 4
+    MinValue: 2
+    MaxValue: 24
+    Description: 'Maintenance window duration in hours'
+
+  MaintenanceWindowCutoff:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 23
+    Description: 'Hours before the end of maintenance window to stop scheduling new tasks'
+
+  # セキュリティレベル別適用タイミング
+  CriticalPatchApprovalDays:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 30
+    Description: 'Days to wait before auto-approving Critical severity patches (0=immediate)'
+
+  ImportantPatchApprovalDays:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 30
+    Description: 'Days to wait before auto-approving Important severity patches (0=immediate)'
+
+  MediumPatchApprovalDays:
+    Type: Number
+    Default: 7
+    MinValue: 0
+    MaxValue: 90
+    Description: 'Days to wait before auto-approving Medium severity patches'
+
+  LowPatchApprovalDays:
+    Type: Number
+    Default: 7
+    MinValue: 0
+    MaxValue: 90
+    Description: 'Days to wait before auto-approving Low severity patches'
+
+  # パッチ適用設定
+  PatchingTimeoutMinutes:
+    Type: Number
+    Default: 120
+    MinValue: 60
+    MaxValue: 480
+    Description: Timeout for patching operations (minutes)
+
+  RebootOption:
+    Type: String
+    Default: RebootIfNeeded
+    AllowedValues:
+      - RebootIfNeeded
+      - NoReboot
+    Description: 'Reboot behavior after patch installation'
+
+  # パッチ種別設定
+  IncludeEnhancements:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Include Enhancement patches (new features and improvements)'
+
+  IncludeRecommended:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Include Recommended patches (general improvements)'
+
+  EnhancementPatchApprovalDays:
+    Type: Number
+    Default: 30
+    MinValue: 0
+    MaxValue: 365
+    Description: 'Days to wait before auto-approving Enhancement patches'
+
+  RecommendedPatchApprovalDays:
+    Type: Number
+    Default: 14
+    MinValue: 0
+    MaxValue: 365
+    Description: 'Days to wait before auto-approving Recommended patches'
+
+  # メジャーバージョンアップ制御
+  BlockMajorVersionUpgrades:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: 'Block major version upgrades (e.g., Python 3.11.x → 3.12.x, Apache 2.4.x → 2.5.x)'
+
+  MajorVersionBlockList:
+    Type: CommaDelimitedList
+    Default: 'python4*,python5*,httpd-3*,nginx-2*,mysql-9*,php-9*,nodejs-2[0-9]*'
+    Description: 'Comma-separated list of package patterns to block for major version upgrades'
+
+  # 通知設定
+  NotificationEmail:
+    Type: String
+    Default: ''
+    Description: 'Email address for patch management notifications (optional)'
+    AllowedPattern: '^$|^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+
+Conditions:
+  HasNotificationEmail: !Not [!Equals [!Ref NotificationEmail, '']]
+  IncludeEnhancementPatches: !Equals [!Ref IncludeEnhancements, 'true']
+  IncludeRecommendedPatches: !Equals [!Ref IncludeRecommended, 'true']
+  BlockMajorVersionUpgrades: !Equals [!Ref BlockMajorVersionUpgrades, 'true']
+
+Resources:
+  # Patch Baseline for Amazon Linux 2023
+  PatchBaseline:
+    Type: AWS::SSM::PatchBaseline
+    Properties:
+      Name: !Sub '${AWS::StackName}-amazon-linux-2023'
+      Description: 'Patch baseline for Amazon Linux 2023 instances'
+      OperatingSystem: AMAZON_LINUX_2023
+      PatchGroups:
+        - !Sub '${Environment}-ec2-instances'
+      ApprovalRules:
+        PatchRules:
+          - PatchFilterGroup:
+              PatchFilters:
+                - Key: CLASSIFICATION
+                  Values:
+                    - Security
+                - Key: SEVERITY
+                  Values:
+                    - Critical
+            ApproveAfterDays: !Ref CriticalPatchApprovalDays
+            ComplianceLevel: CRITICAL
+            EnableNonSecurity: false
+          - PatchFilterGroup:
+              PatchFilters:
+                - Key: CLASSIFICATION
+                  Values:
+                    - Security
+                    - Bugfix
+                - Key: SEVERITY
+                  Values:
+                    - Important
+            ApproveAfterDays: !Ref ImportantPatchApprovalDays
+            ComplianceLevel: HIGH
+            EnableNonSecurity: false
+          - PatchFilterGroup:
+              PatchFilters:
+                - Key: CLASSIFICATION
+                  Values:
+                    - Security
+                    - Bugfix
+                - Key: SEVERITY
+                  Values:
+                    - Medium
+            ApproveAfterDays: !Ref MediumPatchApprovalDays
+            ComplianceLevel: MEDIUM
+            EnableNonSecurity: true
+          - PatchFilterGroup:
+              PatchFilters:
+                - Key: CLASSIFICATION
+                  Values:
+                    - Bugfix
+                - Key: SEVERITY
+                  Values:
+                    - Low
+            ApproveAfterDays: !Ref LowPatchApprovalDays
+            ComplianceLevel: LOW
+            EnableNonSecurity: true
+      ApprovedPatchesComplianceLevel: HIGH
+      ApprovedPatchesEnableNonSecurity: true
+      RejectedPatches: !If
+        - BlockMajorVersionUpgrades
+        - !Ref MajorVersionBlockList
+        - []
+      RejectedPatchesAction: BLOCK
+      Sources: []
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-patch-baseline'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Enhanced Patch Baseline (includes Enhancement and Recommended patches)
+  EnhancedPatchBaseline:
+    Type: AWS::SSM::PatchBaseline
+    Condition: IncludeEnhancementPatches
+    Properties:
+      Name: !Sub '${AWS::StackName}-enhanced-amazon-linux-2023'
+      Description: 'Enhanced patch baseline including Enhancement and Recommended patches'
+      OperatingSystem: AMAZON_LINUX_2023
+      PatchGroups:
+        - !Sub '${Environment}-ec2-instances-enhanced'
+      ApprovalRules:
+        PatchRules:
+          - PatchFilterGroup:
+              PatchFilters:
+                - Key: CLASSIFICATION
+                  Values:
+                    - Enhancement
+            ApproveAfterDays: !Ref EnhancementPatchApprovalDays
+            ComplianceLevel: INFORMATIONAL
+            EnableNonSecurity: true
+          - PatchFilterGroup:
+              PatchFilters:
+                - Key: CLASSIFICATION
+                  Values:
+                    - Recommended
+            ApproveAfterDays: !Ref RecommendedPatchApprovalDays
+            ComplianceLevel: INFORMATIONAL
+            EnableNonSecurity: true
+      ApprovedPatchesComplianceLevel: INFORMATIONAL
+      ApprovedPatchesEnableNonSecurity: true
+      RejectedPatches: []
+      RejectedPatchesAction: ALLOW_AS_DEPENDENCY
+      Sources: []
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-enhanced-patch-baseline'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # SNS Topic for notifications
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-patch-notifications'
+      DisplayName: 'POC Patch Management Notifications'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-notifications'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # SNS Subscription for email notifications (conditional)
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasNotificationEmail
+    Properties:
+      TopicArn: !Ref NotificationTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  # IAM Service Role for Maintenance Window
+  MaintenanceWindowRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-maintenance-window-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ssm.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonSSMMaintenanceWindowRole
+        - arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
+      Policies:
+        - PolicyName: SNSPublishPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref NotificationTopic
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-maintenance-window-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Maintenance Window
+  MaintenanceWindow:
+    Type: AWS::SSM::MaintenanceWindow
+    Properties:
+      Name: !Sub '${AWS::StackName}-patch-window'
+      Description: !Sub 'Scheduled maintenance window for patching EC2 instances - ${MaintenanceWindowSchedule}'
+      Schedule: !Ref MaintenanceWindowSchedule
+      Duration: !Ref MaintenanceWindowDuration
+      Cutoff: !Ref MaintenanceWindowCutoff
+      AllowUnassociatedTargets: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-patch-window'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Maintenance Window Target (EC2 instances with patch group tag)
+  MaintenanceWindowTarget:
+    Type: AWS::SSM::MaintenanceWindowTarget
+    Properties:
+      WindowId: !Ref MaintenanceWindow
+      ResourceType: INSTANCE
+      Targets:
+        - Key: tag:PatchGroup
+          Values:
+            - !Sub '${Environment}-ec2-instances'
+      Name: !Sub '${AWS::StackName}-ec2-targets'
+      Description: 'Target EC2 instances for patching'
+
+  # Maintenance Window Task - Patch Installation
+  PatchInstallTask:
+    Type: AWS::SSM::MaintenanceWindowTask
+    Properties:
+      WindowId: !Ref MaintenanceWindow
+      Targets:
+        - Key: WindowTargetIds
+          Values:
+            - !Ref MaintenanceWindowTarget
+      TaskType: RUN_COMMAND
+      TaskArn: 'AWS-RunPatchBaseline'
+      ServiceRoleArn: !GetAtt MaintenanceWindowRole.Arn
+      MaxConcurrency: '1'
+      MaxErrors: '1'
+      Priority: 1
+      Name: !Sub '${AWS::StackName}-patch-install'
+      Description: 'Install patches on EC2 instances'
+      TaskInvocationParameters:
+        MaintenanceWindowRunCommandParameters:
+          Comment: 'Patch installation via Systems Manager'
+          ServiceRoleArn: !GetAtt MaintenanceWindowRole.Arn
+          Parameters:
+            Operation:
+              - Install
+            RebootOption:
+              - !Ref RebootOption
+          NotificationConfig:
+            NotificationArn: !Ref NotificationTopic
+            NotificationEvents:
+              - Success
+              - Failed
+          CloudWatchOutputConfig:
+            CloudWatchLogGroupName: !Sub '/aws/ssm/${AWS::StackName}'
+            CloudWatchOutputEnabled: true
+          OutputS3BucketName: !Ref PatchingLogsBucket
+          OutputS3KeyPrefix: 'patch-install-logs/'
+          TimeoutSeconds: 7200
+
+  # S3 Bucket for patching logs
+  PatchingLogsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-patching-logs-${AWS::AccountId}'
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldLogs
+            Status: Enabled
+            ExpirationInDays: 90
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-patching-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CloudWatch Dashboard for patch compliance
+  PatchComplianceDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${AWS::StackName}-patch-compliance'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/SSM-RunCommand", "CommandsSucceeded" ],
+                  [ ".", "CommandsFailed" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Patch Command Results",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/SSM/PatchCompliance", "NonCompliantInstances" ],
+                  [ ".", "CompliantInstances" ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Patch Compliance Status",
+                "period": 3600
+              }
+            }
+          ]
+        }
+
+  # Association for patch compliance scanning (disabled for initial setup)
+  # PatchComplianceAssociation:
+  #   Type: AWS::SSM::Association
+  #   Properties:
+  #     Name: AWS-GatherSoftwareInventory
+  #     AssociationName: !Sub '${AWS::StackName}-inventory-collection'
+  #     Targets:
+  #       - Key: tag:PatchGroup
+  #         Values:
+  #           - !Sub '${Environment}-ec2-instances'
+  #     ScheduleExpression: 'rate(1 day)'
+  #     ComplianceSeverity: MEDIUM
+  #     MaxConcurrency: '50%'
+  #     MaxErrors: '1'
+
+Outputs:
+  PatchBaselineId:
+    Description: Patch Baseline ID
+    Value: !Ref PatchBaseline
+    Export:
+      Name: !Sub '${AWS::StackName}-patch-baseline-id'
+
+  MaintenanceWindowId:
+    Description: Maintenance Window ID
+    Value: !Ref MaintenanceWindow
+    Export:
+      Name: !Sub '${AWS::StackName}-maintenance-window-id'
+
+  NotificationTopicArn:
+    Description: SNS Topic ARN for notifications
+    Value: !Ref NotificationTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-notification-topic-arn'
+
+  PatchingLogsBucket:
+    Description: S3 Bucket for patching logs
+    Value: !Ref PatchingLogsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-logs-bucket'
+
+  PatchGroup:
+    Description: Patch Group name for EC2 instances
+    Value: !Sub '${Environment}-ec2-instances'
+    Export:
+      Name: !Sub '${AWS::StackName}-patch-group'
+
+  DashboardURL:
+    Description: CloudWatch Dashboard URL
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${AWS::StackName}-patch-compliance'
+    Export:
+      Name: !Sub '${AWS::StackName}-dashboard-url'

@@ -1,0 +1,9 @@
+template:
+  path: s3.yaml
+
+parameters:
+  Environment: poc
+  BucketNamePrefix: poc-logs
+
+tags:
+  Name: poc-s3-buckets-poc

@@ -1,0 +1,16 @@
+template:
+  path: ecs-jenkins.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  PrivateSubnets: !stack_output poc/vpc.yaml::PrivateSubnets
+  SecurityGroupId: !stack_output poc/securitygroup.yaml::JenkinsSecurityGroupId
+  # ECRカスタムJenkinsイメージを使用（最新のlatestタグ - 19:57版）
+  JenkinsImageUri: 910230630316.dkr.ecr.ap-northeast-1.amazonaws.com/poc-jenkins-custom:latest
+  Environment: poc
+
+dependencies:
+  - poc/vpc.yaml
+  - poc/securitygroup.yaml
+  - poc/iam-group.yaml
+  - poc/ecr-jenkins.yaml

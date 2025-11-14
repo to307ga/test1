@@ -1,0 +1,245 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ECR Repository for Jenkins Custom Image'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name for resource tagging
+
+  RepositoryName:
+    Type: String
+    Default: jenkins-custom
+    Description: ECR repository name for Jenkins custom image
+
+  ImageTagMutability:
+    Type: String
+    Default: MUTABLE
+    AllowedValues:
+      - MUTABLE
+      - IMMUTABLE
+    Description: Image tag mutability setting
+
+  ScanOnPush:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable image scanning on push
+
+  # Lifecycle Policy Parameters
+  ProductionImageCount:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    MaxValue: 100
+    Description: Number of production images to keep (v*, release* tags)
+
+  DevelopmentImageCount:
+    Type: Number
+    Default: 5
+    MinValue: 1
+    MaxValue: 50
+    Description: Number of development images to keep (dev*, feature*, latest tags)
+
+  DateBasedImageCount:
+    Type: Number
+    Default: 20
+    MinValue: 1
+    MaxValue: 100
+    Description: Number of date-based build images to keep (YYYY* tags)
+
+  UntaggedImageRetentionDays:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 30
+    Description: Days to keep untagged images before deletion
+
+  TemporaryImageRetentionDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 30
+    Description: Days to keep temporary images (temp*, branch*, pr*, test* tags)
+
+  LifecyclePolicyProfile:
+    Type: String
+    Default: development
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Predefined lifecycle policy profile
+
+Mappings:
+  LifecyclePolicyProfiles:
+    development:
+      ProductionPrefixes: '"v","release"'
+      DevelopmentPrefixes: '"dev","feature","latest"'
+      DateBasedPrefixes: '"202"'
+      TemporaryPrefixes: '"temp","branch","pr","test"'
+    staging:
+      ProductionPrefixes: '"v","release","stable"'
+      DevelopmentPrefixes: '"dev","feature","latest","staging"'
+      DateBasedPrefixes: '"202"'
+      TemporaryPrefixes: '"temp","branch","pr","test","hotfix"'
+    production:
+      ProductionPrefixes: '"v","release","stable","prod"'
+      DevelopmentPrefixes: '"latest"'
+      DateBasedPrefixes: '"202"'
+      TemporaryPrefixes: '"temp","hotfix"'
+
+Resources:
+  # ECR Repository for Jenkins Custom Image
+  JenkinsECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub '${Environment}-${RepositoryName}'
+      ImageTagMutability: !Ref ImageTagMutability
+      ImageScanningConfiguration:
+        ScanOnPush: !Ref ScanOnPush
+      RepositoryPolicyText:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowPullFromECS
+            Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:BatchCheckLayerAvailability
+          - Sid: AllowCodeBuildAccess
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:BatchCheckLayerAvailability
+              - ecr:PutImage
+              - ecr:InitiateLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:CompleteLayerUpload
+              - ecr:GetAuthorizationToken
+      LifecyclePolicy:
+        LifecyclePolicyText: !Sub
+          - |
+            {
+              "rules": [
+                {
+                  "rulePriority": 1,
+                  "description": "Keep production images",
+                  "selection": {
+                    "tagStatus": "tagged",
+                    "tagPrefixList": [${ProductionPrefixes}],
+                    "countType": "imageCountMoreThan",
+                    "countNumber": ${ProductionImageCount}
+                  },
+                  "action": {
+                    "type": "expire"
+                  }
+                },
+                {
+                  "rulePriority": 2,
+                  "description": "Keep development images",
+                  "selection": {
+                    "tagStatus": "tagged",
+                    "tagPrefixList": [${DevelopmentPrefixes}],
+                    "countType": "imageCountMoreThan",
+                    "countNumber": ${DevelopmentImageCount}
+                  },
+                  "action": {
+                    "type": "expire"
+                  }
+                },
+                {
+                  "rulePriority": 3,
+                  "description": "Keep date-based build images",
+                  "selection": {
+                    "tagStatus": "tagged",
+                    "tagPrefixList": [${DateBasedPrefixes}],
+                    "countType": "imageCountMoreThan",
+                    "countNumber": ${DateBasedImageCount}
+                  },
+                  "action": {
+                    "type": "expire"
+                  }
+                },
+                {
+                  "rulePriority": 4,
+                  "description": "Delete untagged images",
+                  "selection": {
+                    "tagStatus": "untagged",
+                    "countType": "sinceImagePushed",
+                    "countUnit": "days",
+                    "countNumber": ${UntaggedImageRetentionDays}
+                  },
+                  "action": {
+                    "type": "expire"
+                  }
+                },
+                {
+                  "rulePriority": 5,
+                  "description": "Keep temporary images for limited time",
+                  "selection": {
+                    "tagStatus": "tagged",
+                    "tagPrefixList": [${TemporaryPrefixes}],
+                    "countType": "sinceImagePushed",
+                    "countUnit": "days",
+                    "countNumber": ${TemporaryImageRetentionDays}
+                  },
+                  "action": {
+                    "type": "expire"
+                  }
+                }
+              ]
+            }
+          - ProductionPrefixes: !FindInMap [LifecyclePolicyProfiles, !Ref LifecyclePolicyProfile, ProductionPrefixes]
+            DevelopmentPrefixes: !FindInMap [LifecyclePolicyProfiles, !Ref LifecyclePolicyProfile, DevelopmentPrefixes]
+            DateBasedPrefixes: !FindInMap [LifecyclePolicyProfiles, !Ref LifecyclePolicyProfile, DateBasedPrefixes]
+            TemporaryPrefixes: !FindInMap [LifecyclePolicyProfiles, !Ref LifecyclePolicyProfile, TemporaryPrefixes]
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: jenkins
+        - Key: ManagedBy
+          Value: sceptre
+
+Outputs:
+  ECRRepositoryURI:
+    Description: Jenkins ECR Repository URI
+    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${JenkinsECRRepository}'
+    Export:
+      Name: !Sub '${Environment}-jenkins-ecr-uri'
+
+  ECRRepositoryArn:
+    Description: Jenkins ECR Repository ARN
+    Value: !GetAtt JenkinsECRRepository.Arn
+    Export:
+      Name: !Sub '${Environment}-jenkins-ecr-arn'
+
+  ECRRepositoryName:
+    Description: Jenkins ECR Repository Name
+    Value: !Ref JenkinsECRRepository
+    Export:
+      Name: !Sub '${Environment}-jenkins-ecr-name'
+
+  LifecyclePolicyProfile:
+    Description: Current lifecycle policy profile
+    Value: !Ref LifecyclePolicyProfile
+    Export:
+      Name: !Sub '${Environment}-jenkins-ecr-lifecycle-profile'
+
+  LifecyclePolicySettings:
+    Description: Current lifecycle policy settings
+    Value: !Sub
+      - 'Profile: ${LifecyclePolicyProfile}, Production: ${ProductionImageCount}, Development: ${DevelopmentImageCount}, DateBased: ${DateBasedImageCount}, UntaggedRetention: ${UntaggedImageRetentionDays}d, TemporaryRetention: ${TemporaryImageRetentionDays}d'
+      - {}
+    Export:
+      Name: !Sub '${Environment}-jenkins-ecr-lifecycle-settings'

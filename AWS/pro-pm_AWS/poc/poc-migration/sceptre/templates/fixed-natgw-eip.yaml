@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC Fixed NAT Gateway EIPs - For stable outbound communication'
+
+Resources:
+  # Elastic IPs for NAT Gateways (3 AZs)
+  NatGatewayEIPAZ1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat-eip-az1'
+
+  NatGatewayEIPAZ2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat-eip-az2'
+
+  NatGatewayEIPAZ3:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-nat-eip-az3'
+
+Outputs:
+  NatGatewayEIPAZ1:
+    Description: NAT Gateway EIP for AZ1
+    Value: !GetAtt NatGatewayEIPAZ1.AllocationId
+    Export:
+      Name: !Sub '${AWS::StackName}-eip-az1-allocation-id'
+
+  NatGatewayEIPAZ2:
+    Description: NAT Gateway EIP for AZ2
+    Value: !GetAtt NatGatewayEIPAZ2.AllocationId
+    Export:
+      Name: !Sub '${AWS::StackName}-eip-az2-allocation-id'
+
+  NatGatewayEIPAZ3:
+    Description: NAT Gateway EIP for AZ3
+    Value: !GetAtt NatGatewayEIPAZ3.AllocationId
+    Export:
+      Name: !Sub '${AWS::StackName}-eip-az3-allocation-id'
+
+  NatGatewayEIPAZ1PublicIP:
+    Description: NAT Gateway Public IP for AZ1
+    Value: !Ref NatGatewayEIPAZ1
+    Export:
+      Name: !Sub '${AWS::StackName}-eip-az1-public-ip'
+
+  NatGatewayEIPAZ2PublicIP:
+    Description: NAT Gateway Public IP for AZ2
+    Value: !Ref NatGatewayEIPAZ2
+    Export:
+      Name: !Sub '${AWS::StackName}-eip-az2-public-ip'
+
+  NatGatewayEIPAZ3PublicIP:
+    Description: NAT Gateway Public IP for AZ3
+    Value: !Ref NatGatewayEIPAZ3
+    Export:
+      Name: !Sub '${AWS::StackName}-eip-az3-public-ip'

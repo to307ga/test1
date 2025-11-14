@@ -1,0 +1,52 @@
+template_path: ecs.yaml
+dependencies:
+  - vpc.yaml
+  - securitygroup.yaml
+  - iam-group.yaml
+
+parameters:
+  # ECS Cluster
+  ClusterName: poc-ecs-poc
+
+  # Jenkins Service Configuration
+  JenkinsServiceName: poc-jenkins-poc
+  JenkinsTaskDefinitionFamily: poc-jenkins-poc
+
+  # Gitea Service Configuration
+  GiteaServiceName: poc-gitea-poc
+  GiteaTaskDefinitionFamily: poc-gitea-poc
+
+  # Network Configuration (Public subnets for direct access)
+  SubnetIds:
+    - !stack_output vpc.yaml::PublicSubnetAZ1Id
+    - !stack_output vpc.yaml::PublicSubnetAZ2Id
+    - !stack_output vpc.yaml::PublicSubnetAZ3Id
+
+  # Security Groups
+  JenkinsSecurityGroupId: !stack_output securitygroup.yaml::JenkinsSecurityGroupId
+  GiteaSecurityGroupId: !stack_output securitygroup.yaml::GiteaSecurityGroupId
+
+  # Direct internet access (assign public IP to Fargate tasks)
+  AssignPublicIp: ENABLED
+
+  # IAM Roles
+  TaskExecutionRoleArn: !stack_output iam-group.yaml::ECSTaskExecutionRoleArn
+  TaskRoleArn: !stack_output iam-group.yaml::ECSTaskRoleArn
+
+  # Container Configuration
+  JenkinsImage: jenkins/jenkins:lts
+  JenkinsPort: 8080
+  JenkinsCPU: 1024
+  JenkinsMemory: 2048
+
+  GiteaImage: gitea/gitea:latest
+  GiteaPort: 3000
+  GiteaCPU: 512
+  GiteaMemory: 1024
+
+  # Database connection (Aurora)
+  DatabaseEndpoint: !stack_output aurora.yaml::DBClusterEndpoint
+  DatabaseName: application
+
+tags:
+  Name: poc-ecs-poc

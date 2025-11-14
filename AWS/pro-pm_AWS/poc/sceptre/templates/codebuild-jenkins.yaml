@@ -1,0 +1,276 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CodeBuild Project for Jenkins Docker Image Build'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name for resource tagging
+
+  ProjectName:
+    Type: String
+    Default: jenkins-docker-build
+    Description: CodeBuild project name
+
+  GiteaLoadBalancerDNS:
+    Type: String
+    Description: Gitea ALB DNS name
+
+  GiteaUsername:
+    Type: String
+    Default: poc
+    Description: Gitea username/organization
+
+  GiteaRepositoryName:
+    Type: String
+    Default: jenkins-docker
+    Description: Gitea repository name
+
+  DockerfilePath:
+    Type: String
+    Default: Dockerfile
+    Description: Path to Dockerfile in the repository
+
+  BuildContext:
+    Type: String
+    Default: .
+    Description: Build context directory relative to repository root
+
+  ECRRepositoryURI:
+    Type: String
+    Description: ECR Repository URI for pushing built images
+
+  HadolintIgnoredRules:
+    Type: CommaDelimitedList
+    Default: "DL3008"
+    Description: List of Hadolint rules to ignore during linting
+
+  TrivySeverityThreshold:
+    Type: String
+    Default: HIGH
+    AllowedValues: [UNKNOWN, LOW, MEDIUM, HIGH, CRITICAL]
+    Description: Minimum severity threshold for Trivy vulnerability scan
+
+Resources:
+  # CodeBuild Service Role
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-codebuild-jenkins-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      Policies:
+        - PolicyName: S3BuildSpecAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub 'arn:aws:s3:::poc-codebuild-buildspecs-${AWS::AccountId}/*'
+        - PolicyName: ECRAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:GetAuthorizationToken
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource: '*'
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:poc/gitea/codebuild-token*'
+        - PolicyName: VPCAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeDhcpOptions
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeVpcs
+                  - ec2:CreateNetworkInterfacePermission
+                Resource: '*'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: jenkins-build
+        - Key: ManagedBy
+          Value: sceptre
+
+  # Security Group for CodeBuild
+  CodeBuildSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-codebuild-jenkins-sg'
+      GroupDescription: Security group for Jenkins CodeBuild project
+      VpcId:
+        Fn::ImportValue: !Sub '${Environment}-vpc-id'
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP outbound for package downloads
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS outbound for package downloads
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 10.0.0.0/16
+          Description: Gitea access within VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-codebuild-jenkins-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: jenkins-build
+        - Key: ManagedBy
+          Value: sceptre
+
+  # CloudWatch Log Group for CodeBuild
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${Environment}-${ProjectName}'
+      RetentionInDays: 14
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: jenkins-build
+        - Key: ManagedBy
+          Value: sceptre
+
+  # CodeBuild Project
+  JenkinsDockerBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub '${Environment}-${ProjectName}'
+      Description: Build Jenkins Docker image and push to ECR
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:7.0
+        PrivilegedMode: true  # Required for Docker builds
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: ECR_REPOSITORY_URI
+            Value: !Ref ECRRepositoryURI
+          - Name: IMAGE_TAG
+            Value: latest
+          - Name: DOCKERFILE_PATH
+            Value: !Ref DockerfilePath
+          - Name: BUILD_CONTEXT
+            Value: !Ref BuildContext
+          - Name: GITEA_LOAD_BALANCER_DNS
+            Value: !Ref GiteaLoadBalancerDNS
+          - Name: GITEA_USERNAME
+            Value: !Ref GiteaUsername
+          - Name: GITEA_REPOSITORY_NAME
+            Value: !Ref GiteaRepositoryName
+          - Name: HADOLINT_IGNORED_RULES
+            Value: !Join [ " ", !Ref HadolintIgnoredRules ]
+          - Name: TRIVY_SEVERITY_THRESHOLD
+            Value: !Ref TrivySeverityThreshold
+      Source:
+        Type: S3
+        Location: !Sub 'poc-codebuild-buildspecs-${AWS::AccountId}/jenkins-docker/buildspec.yml'
+      VpcConfig:
+        VpcId:
+          Fn::ImportValue: !Sub '${Environment}-vpc-id'
+        Subnets:
+          - Fn::ImportValue: !Sub '${Environment}-private-subnet-1a-id'
+          - Fn::ImportValue: !Sub '${Environment}-private-subnet-1c-id'
+        SecurityGroupIds:
+          - !Ref CodeBuildSecurityGroup
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref CodeBuildLogGroup
+      TimeoutInMinutes: 60
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Service
+          Value: jenkins-build
+        - Key: ManagedBy
+          Value: sceptre
+
+  # CodeBuild Webhook (Manual trigger for now)
+  BuildTriggerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-codebuild-trigger-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource: !GetAtt JenkinsDockerBuildProject.Arn
+
+Outputs:
+  CodeBuildProjectName:
+    Description: CodeBuild project name for Jenkins Docker build
+    Value: !Ref JenkinsDockerBuildProject
+    Export:
+      Name: !Sub '${Environment}-jenkins-codebuild-project'
+
+  CodeBuildProjectArn:
+    Description: CodeBuild project ARN
+    Value: !GetAtt JenkinsDockerBuildProject.Arn
+    Export:
+      Name: !Sub '${Environment}-jenkins-codebuild-arn'
+
+  CodeBuildServiceRoleArn:
+    Description: CodeBuild service role ARN
+    Value: !GetAtt CodeBuildServiceRole.Arn
+    Export:
+      Name: !Sub '${Environment}-jenkins-codebuild-role-arn'

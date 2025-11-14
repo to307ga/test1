@@ -1,0 +1,27 @@
+[project]
+name = "test-ansible"
+version = "1.0.0"
+description = "Ansible playbooks for infrastructure configuration management"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # === Ansible Core ===
+    "ansible>=12.1.0",
+    
+    # === AWS統合 ===
+    "boto3>=1.40.21",
+    "botocore>=1.34.21",
+    "jmespath>=1.0.1",          # boto3のJSON/YAMLクエリ処理
+    
+    # === ユーティリティ ===
+    "pyyaml>=6.0.2",            # YAML処理
+]
+
+[project.optional-dependencies]
+dev = [
+    "ansible-lint>=6.22.0",
+    "yamllint>=1.33.0",
+]
+
+[tool.uv]
+managed = true

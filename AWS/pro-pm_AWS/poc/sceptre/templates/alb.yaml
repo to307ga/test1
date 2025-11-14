@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC ALB Template - Application Load Balancer with TCP health check for basic EC2 monitoring'
+
+Parameters:
+  # Network Configuration
+  VPCId:
+    Type: String
+    Description: VPC ID for ALB deployment
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Description: List of private subnet IDs for ALB placement
+
+  # Security Configuration
+  ALBSecurityGroupId:
+    Type: String
+    Description: Security group ID for ALB
+
+  # Application Configuration
+  ApplicationName:
+    Type: String
+    Default: poc-web
+    Description: Application name for tagging
+
+  Environment:
+    Type: String
+    Default: poc
+    AllowedValues:
+      - dev
+      - stg
+      - poc
+      - prod
+    Description: Environment name
+
+Resources:
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${Environment}-${ApplicationName}-alb'
+      Type: application
+      Scheme: internal
+      IpAddressType: ipv4
+      SecurityGroups:
+        - !Ref ALBSecurityGroupId
+      Subnets: !Ref PrivateSubnets
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-alb'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref ApplicationName
+
+  # Target Group with TCP health check (Stage 1: Basic OS level check)
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${Environment}-${ApplicationName}-tg'
+      Port: 22
+      Protocol: TCP
+      VpcId: !Ref VPCId
+      TargetType: instance
+
+      # Health Check Configuration - Stage 1: TCP SSH check only
+      HealthCheckEnabled: true
+      HealthCheckProtocol: TCP
+      HealthCheckPort: 22
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      HealthCheckTimeoutSeconds: 10
+
+      # Target Group Attributes
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '300'
+        - Key: stickiness.enabled
+          Value: 'false'
+
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-tg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref ApplicationName
+        - Key: HealthCheckStage
+          Value: 'Stage1-TCP-SSH'
+
+  # Listener for ALB (HTTP for future use)
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: '503'
+            ContentType: 'text/html'
+            MessageBody: |
+              <!DOCTYPE html>
+              <html>
+              <head>
+                  <title>Service Unavailable</title>
+                  <style>
+                      body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+                      .message { background-color: #fff3cd; padding: 20px; border-radius: 5px; display: inline-block; }
+                  </style>
+              </head>
+              <body>
+                  <div class="message">
+                      <h1>Service Temporarily Unavailable</h1>
+                      <p>The application is being deployed. Please try again later.</p>
+                      <p><strong>Environment:</strong> POC</p>
+                      <p><strong>Stage:</strong> Infrastructure Setup Phase</p>
+                  </div>
+              </body>
+              </html>
+
+  # CloudWatch Log Group for ALB access logs (optional)
+  ALBAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/alb/${Environment}-${ApplicationName}'
+      RetentionInDays: 7
+
+Outputs:
+  LoadBalancerArn:
+    Description: ALB ARN
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-arn'
+
+  LoadBalancerDNSName:
+    Description: ALB DNS Name
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-dns'
+
+  LoadBalancerHostedZoneId:
+    Description: ALB Hosted Zone ID
+    Value: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-zone-id'
+
+  TargetGroupArn:
+    Description: Target Group ARN
+    Value: !Ref TargetGroup
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-tg-arn'
+
+  TargetGroupFullName:
+    Description: Target Group Full Name
+    Value: !GetAtt TargetGroup.TargetGroupFullName
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-tg-full-name'
+
+  HTTPListenerArn:
+    Description: HTTP Listener ARN
+    Value: !Ref HTTPListener
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-http-listener-arn'

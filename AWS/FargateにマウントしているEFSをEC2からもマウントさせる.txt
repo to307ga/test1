@@ -1,0 +1,30 @@
+
+# Step 1: EFS IDを確認
+echo "EFS ID: ${EFS_ID}"
+
+# Step 2: マウントターゲットを確認
+aws efs describe-mount-targets --file-system-id ${EFS_ID} --output table
+
+# Step 3: マウントターゲットIDを取得
+MOUNT_TARGET_ID=$(aws efs describe-mount-targets --file-system-id ${EFS_ID} --query 'MountTargets[0].MountTargetId' --output text)
+
+echo "Mount Target ID: ${MOUNT_TARGET_ID}"
+
+# Step 4: EFSセキュリティグループを取得
+EFS_SG=$(aws efs describe-mount-target-security-groups --mount-target-id ${MOUNT_TARGET_ID} --query 'SecurityGroups[0]' --output text)
+
+echo "EFS Security Group: ${EFS_SG}"
+# Step 5: EC2セキュリティグループを取得 
+EC2_SG=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=pochub-002" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text) && echo "EC2 Security Group: ${EC2_SG}"
+
+# Step 6: EFSセキュリティグループのルールにTCP 2049 from pochub-002のSGを追加
+aws ec2 authorize-security-group-ingress --group-id ${EFS_SG} --protocol tcp --port 2049 --source-group ${EC2_SG} --region ap-northeast-1
+ 
+一時的にマウント
+EFS ID: fs-04d7d333b0491a320
+sudo mount -t efs -o tls ${EFS_ID}:/ /mnt/jenkins-home && df -h | grep jenkins-home
+
+マウントを永続化するなら
+echo "${EFS_ID}:/ /mnt/jenkins-home efs _netdev,tls,iam 0 0" | sudo tee -a /etc/fstab
+
+

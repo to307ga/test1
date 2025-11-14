@@ -1,0 +1,772 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['poc', 'dev', 'staging', 'prod'],
+            description: 'Target environment for deployment'
+        )
+        choice(
+            name: 'DEPLOYMENT_TYPE',
+            choices: ['patch', 'application', 'full'],
+            description: 'Type of deployment: patch (OS/middleware updates), application (app updates), full (both)'
+        )
+        choice(
+            name: 'TRAFFIC_STRATEGY',
+            choices: ['gradual', 'immediate', 'canary', 'ip-canary'],
+            description: 'Traffic switching strategy for Blue-Green deployment'
+        )
+        booleanParam(
+            name: 'AUTO_PROCEED',
+            defaultValue: false,
+            description: 'Auto-proceed through gradual deployment steps without manual confirmation'
+        )
+        booleanParam(
+            name: 'METRIC_VALIDATION',
+            defaultValue: true,
+            description: 'Enable CloudWatch metrics validation between steps'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip application tests and validation'
+        )
+        booleanParam(
+            name: 'DRY_RUN',
+            defaultValue: false,
+            description: 'Perform a dry run without actual deployment'
+        )
+        string(
+            name: 'AMI_VERSION',
+            defaultValue: '',
+            description: 'Custom AMI version (leave empty for auto-generated timestamp)'
+        )
+        string(
+            name: 'CANARY_PERCENTAGE',
+            defaultValue: '10',
+            description: 'Initial traffic percentage for canary deployment (1-50)'
+        )
+        string(
+            name: 'CANARY_IPS',
+            defaultValue: '',
+            description: 'Comma-separated IP addresses for IP-based canary (e.g., 192.168.1.100,10.0.1.50/32)'
+        )
+        string(
+            name: 'SHIFT_PERCENTAGE',
+            defaultValue: '10',
+            description: 'Traffic shift percentage per step for gradual deployment (5-50)'
+        )
+        string(
+            name: 'VALIDATION_MINUTES',
+            defaultValue: '5',
+            description: 'Validation wait time in minutes between gradual steps (1-30)'
+        )
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'ap-northeast-1'
+        PROJECT_CODE = 'poc'
+        APPLICATION_NAME = 'poc-web'
+        PACKER_LOG = '1'
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
+        ANSIBLE_STDOUT_CALLBACK = 'yaml'
+
+        // Office fixed IP for testing (example)
+        OFFICE_IP = '203.0.113.0/24'  // Replace with actual office IP
+        JENKINS_IP = '10.0.1.100/32'  // Replace with Jenkins server IP
+    }
+
+    stages {
+        stage('Preparation') {
+            steps {
+                script {
+                    // Set AMI version if not provided
+                    if (params.AMI_VERSION == '') {
+                        env.AMI_VERSION = new Date().format('yyyyMMdd-HHmmss')
+                    } else {
+                        env.AMI_VERSION = params.AMI_VERSION
+                    }
+
+                    // Determine deployment color
+                    env.CURRENT_COLOR = sh(
+                        script: """
+                            python3 -c "
+import boto3
+try:
+    cf = boto3.client('cloudformation', region_name='${AWS_DEFAULT_REGION}')
+    stack_name = '${params.ENVIRONMENT}-${APPLICATION_NAME}-alb-blue-green'
+    response = cf.describe_stacks(StackName=stack_name)
+    outputs = {o['OutputKey']: o['OutputValue'] for o in response['Stacks'][0].get('Outputs', [])}
+    blue_weight = int(outputs.get('BlueTrafficWeight', 100))
+    current_color = 'blue' if blue_weight > 50 else 'green'
+    print(current_color)
+except:
+    print('blue')  # Default to blue if stack doesn't exist
+"
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    env.TARGET_COLOR = env.CURRENT_COLOR == 'blue' ? 'green' : 'blue'
+
+                    // Parse canary IPs
+                    if (params.CANARY_IPS != '') {
+                        env.CANARY_IP_LIST = params.CANARY_IPS.split(',').collect { it.trim() }.join(' ')
+                    } else {
+                        // Default to office and Jenkins IPs
+                        env.CANARY_IP_LIST = "${env.OFFICE_IP} ${env.JENKINS_IP}"
+                    }
+
+                    // Display build information
+                    echo """
+                    ===== Advanced Blue-Green Immutable Deployment Pipeline =====
+                    Environment: ${params.ENVIRONMENT}
+                    Deployment Type: ${params.DEPLOYMENT_TYPE}
+                    Traffic Strategy: ${params.TRAFFIC_STRATEGY}
+                    AMI Version: ${env.AMI_VERSION}
+                    Current Color: ${env.CURRENT_COLOR}
+                    Target Color: ${env.TARGET_COLOR}
+                    Auto Proceed: ${params.AUTO_PROCEED}
+                    Metric Validation: ${params.METRIC_VALIDATION}
+                    Shift Percentage: ${params.SHIFT_PERCENTAGE}%
+                    Validation Minutes: ${params.VALIDATION_MINUTES}
+                    Canary IPs: ${env.CANARY_IP_LIST}
+                    Skip Tests: ${params.SKIP_TESTS}
+                    Dry Run: ${params.DRY_RUN}
+                    =============================================================
+                    """
+                }
+
+                // Clean workspace and checkout code
+                cleanWs()
+                checkout scm
+
+                // Validate Packer template
+                dir('packer') {
+                    sh 'packer validate golden-ami.pkr.hcl'
+                }
+            }
+        }
+
+        stage('AMI Build') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Checkout Ansible playbooks from Gitea
+                    dir('ansible-playbooks') {
+                        git branch: 'main',
+                            url: 'http://gitea/tomo/ansible-playbooks.git',
+                            credentialsId: 'gitea-credentials'
+                    }
+
+                    dir('packer') {
+                        // Build Golden AMI with Packer
+                        sh """
+                            packer build \\
+                                -var 'environment=${params.ENVIRONMENT}' \\
+                                -var 'project_code=${env.PROJECT_CODE}' \\
+                                -var 'ami_version=${env.AMI_VERSION}' \\
+                                -var 'deployment_color=${env.TARGET_COLOR}' \\
+                                golden-ami.pkr.hcl
+                        """
+
+                        // Extract AMI ID from manifest
+                        script {
+                            def manifest = readJSON file: 'manifest.json'
+                            env.NEW_AMI_ID = manifest.builds[0].artifact_id.split(':')[1]
+                            echo "New AMI created: ${env.NEW_AMI_ID}"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    // Archive Packer logs and manifest
+                    archiveArtifacts artifacts: 'packer/manifest.json', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'packer/packer.log', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Infrastructure Deployment') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    dir('sceptre') {
+                        // Update Target environment configuration with new AMI
+                        sh """
+                            # Update Target Color environment configuration
+                            sed -i 's/ImageId:.*/ImageId: ${env.NEW_AMI_ID}/' config/${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR}.yaml
+
+                            # Deploy Target Color environment
+                            echo "Deploying ${env.TARGET_COLOR} environment..."
+                            uv run sceptre create ${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR} --yes || \\
+                            uv run sceptre update ${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR} --yes
+                        """
+
+                        // Wait for instances to be ready
+                        sh """
+                            echo "Waiting for ${env.TARGET_COLOR} environment instances to be ready..."
+                            sleep 120
+
+                            # Verify instances are running
+                            aws ec2 describe-instances \\
+                                --filters "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                          "Name=tag:DeploymentColor,Values=${env.TARGET_COLOR}" \\
+                                          "Name=instance-state-name,Values=running" \\
+                                --query 'Reservations[].Instances[].{InstanceId:InstanceId,State:State.Name}' \\
+                                --output table
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Laravel Application Deployment') {
+            when {
+                allOf {
+                    not { params.DRY_RUN }
+                    anyOf {
+                        equals expected: 'application', actual: params.DEPLOYMENT_TYPE
+                        equals expected: 'full', actual: params.DEPLOYMENT_TYPE
+                    }
+                }
+            }
+            steps {
+                script {
+                    echo "Deploying Laravel application to ${env.TARGET_COLOR} environment..."
+
+                    // Deploy Laravel application using Ansible to Target Color environment
+                    sh """
+                        # Get Target Color environment instances
+                        aws ec2 describe-instances \\
+                            --filters "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                      "Name=tag:DeploymentColor,Values=${env.TARGET_COLOR}" \\
+                                      "Name=instance-state-name,Values=running" \\
+                            --query 'Reservations[].Instances[].InstanceId' \\
+                            --output text > target_instances.txt
+
+                        # Create dynamic inventory for Ansible
+                        mkdir -p inventory
+                        echo "[${env.TARGET_COLOR}_servers]" > inventory/${env.TARGET_COLOR}_hosts
+                        for instance in \$(cat target_instances.txt); do
+                            echo "\$instance ansible_connection=aws_ssm" >> inventory/${env.TARGET_COLOR}_hosts
+                        done
+
+                        # Deploy Laravel application to Target Color environment
+                        ansible-playbook -i inventory/${env.TARGET_COLOR}_hosts \\
+                            ansible-playbooks/deploy-laravel-application.yml \\
+                            --extra-vars "environment=${params.ENVIRONMENT}" \\
+                            --extra-vars "deployment_color=${env.TARGET_COLOR}" \\
+                            --extra-vars "deployment_type=${params.DEPLOYMENT_TYPE}" \\
+                            --extra-vars "ami_version=${env.AMI_VERSION}" \\
+                            --tags "deploy,configuration,laravel-setup"
+                    """
+                }
+            }
+        }
+
+        stage('Laravel Application Validation') {
+            when {
+                allOf {
+                    not { params.DRY_RUN }
+                    not { params.SKIP_TESTS }
+                }
+            }
+            parallel {
+                stage('Comprehensive Laravel Validation') {
+                    steps {
+                        script {
+                            echo "Running comprehensive Laravel application validation..."
+
+                            sh """
+                                # Run Laravel application validation playbook
+                                ansible-playbook -i inventory/${env.TARGET_COLOR}_hosts \\
+                                    ansible-playbooks/validate-laravel-application.yml \\
+                                    --extra-vars "environment=${params.ENVIRONMENT}" \\
+                                    --extra-vars "deployment_color=${env.TARGET_COLOR}" \\
+                                    --extra-vars "ami_version=${env.AMI_VERSION}"
+                            """
+                        }
+                    }
+                }
+
+                stage('Load Balancer Health Check') {
+                    steps {
+                        script {
+                            echo "Checking Load Balancer Target Group health..."
+
+                            sh """
+                                # Wait for Load Balancer Target Group to be healthy
+                                for i in {1..20}; do
+                                    HEALTHY_COUNT=\$(aws elbv2 describe-target-health \\
+                                        --target-group-arn \$(aws elbv2 describe-target-groups \\
+                                            --names ${params.ENVIRONMENT}-${env.APPLICATION_NAME}-${env.TARGET_COLOR}-tg \\
+                                            --query 'TargetGroups[0].TargetGroupArn' --output text) \\
+                                        --query 'length(TargetHealthDescriptions[?TargetHealth.State==`healthy`])' \\
+                                        --output text)
+
+                                    TOTAL_COUNT=\$(aws elbv2 describe-target-health \\
+                                        --target-group-arn \$(aws elbv2 describe-target-groups \\
+                                            --names ${params.ENVIRONMENT}-${env.APPLICATION_NAME}-${env.TARGET_COLOR}-tg \\
+                                            --query 'TargetGroups[0].TargetGroupArn' --output text) \\
+                                        --query 'length(TargetHealthDescriptions)' \\
+                                        --output text)
+
+                                    echo "Health check attempt \$i: \$HEALTHY_COUNT/\$TOTAL_COUNT targets healthy"
+
+                                    if [ "\$HEALTHY_COUNT" -eq "\$TOTAL_COUNT" ] && [ "\$TOTAL_COUNT" -gt "0" ]; then
+                                        echo "All targets are healthy!"
+                                        break
+                                    fi
+
+                                    if [ \$i -eq 20 ]; then
+                                        echo "Health check timeout: Not all targets are healthy"
+                                        exit 1
+                                    fi
+
+                                    sleep 30
+                                done
+                            """
+                        }
+                    }
+                }
+
+                stage('E2E Testing with Playwright') {
+                    steps {
+                        script {
+                            echo "Running Playwright E2E tests against ${env.TARGET_COLOR} environment..."
+
+                            sh """
+                                # Get ALB DNS name for testing
+                                ALB_DNS=\$(aws elbv2 describe-load-balancers \\
+                                    --names ${params.ENVIRONMENT}-${env.APPLICATION_NAME}-alb \\
+                                    --query 'LoadBalancers[0].DNSName' --output text)
+
+                                echo "Testing against ALB: \$ALB_DNS"
+
+                                # Install Playwright dependencies if not already installed
+                                pip3 install playwright pytest-playwright requests
+                                playwright install chromium --with-deps
+
+                                # Set environment variables for E2E tests
+                                export BASE_URL="http://\$ALB_DNS"
+                                export ENVIRONMENT="${params.ENVIRONMENT}"
+                                export TARGET_COLOR="${env.TARGET_COLOR}"
+
+                                # Run E2E tests against the application
+                                python3 tests/e2e/test_blue_green_deployment.py \\
+                                    --base-url "http://\$ALB_DNS" \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --headless
+
+                                # Also run with pytest for JUnit output
+                                pytest tests/e2e/ \\
+                                    --browser chromium \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --base-url "http://\$ALB_DNS" \\
+                                    --junit-xml=laravel-e2e-test-results.xml \\
+                                    --capture=no \\
+                                    -v
+                            """
+                        }
+                    }
+                    post {
+                        always {
+                            // Publish E2E test results
+                            publishTestResults testResultsPattern: 'laravel-e2e-test-results.xml'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('IP-Based Canary Setup') {
+            when {
+                allOf {
+                    not { params.DRY_RUN }
+                    equals expected: 'ip-canary', actual: params.TRAFFIC_STRATEGY
+                }
+            }
+            steps {
+                script {
+                    echo "Setting up IP-based canary deployment for testing..."
+
+                    sh """
+                        # Create IP-based canary rule
+                        CANARY_RULE_ARN=\$(python3 scripts/advanced_blue_green_traffic_manager.py \\
+                            --environment ${params.ENVIRONMENT} \\
+                            --application ${env.APPLICATION_NAME} \\
+                            --action canary-ip \\
+                            --target ${env.TARGET_COLOR} \\
+                            --canary-ips ${env.CANARY_IP_LIST} | grep "Canary rule created:" | cut -d' ' -f4)
+
+                        echo "CANARY_RULE_ARN=\$CANARY_RULE_ARN" > canary_rule.env
+
+                        echo "IP-based canary deployment setup complete"
+                        echo "Testing can now be performed from: ${env.CANARY_IP_LIST}"
+                        echo "Canary rule ARN: \$CANARY_RULE_ARN"
+                    """
+
+                    // Load canary rule ARN for later cleanup
+                    script {
+                        def canaryEnv = readFile('canary_rule.env').trim()
+                        env.CANARY_RULE_ARN = canaryEnv.split('=')[1]
+                    }
+                }
+            }
+        }
+
+        stage('Canary Validation & E2E Testing') {
+            when {
+                allOf {
+                    not { params.DRY_RUN }
+                    equals expected: 'ip-canary', actual: params.TRAFFIC_STRATEGY
+                    not { params.SKIP_TESTS }
+                }
+            }
+            steps {
+                script {
+                    echo "Performing E2E testing via IP-based canary deployment..."
+
+                    // Run Playwright E2E tests against canary environment
+                    sh """
+                        # Install Playwright dependencies if not already installed
+                        pip install playwright pytest-playwright requests
+                        playwright install chromium
+
+                        # Run E2E tests against canary environment
+                        python3 -m pytest tests/e2e/ \\
+                            --browser chromium \\
+                            --environment ${params.ENVIRONMENT} \\
+                            --target ${env.TARGET_COLOR} \\
+                            --base-url http://\$(aws elbv2 describe-load-balancers \\
+                                --names ${params.ENVIRONMENT}-${env.APPLICATION_NAME}-alb \\
+                                --query 'LoadBalancers[0].DNSName' --output text) \\
+                            --junit-xml=canary-test-results.xml \\
+                            --capture=no \\
+                            -v
+                    """
+                }
+            }
+            post {
+                always {
+                    // Publish test results
+                    publishTestResults testResultsPattern: 'canary-test-results.xml'
+                }
+            }
+        }
+
+        stage('Traffic Switch Decision') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Confirmation prompt for production or after canary testing
+                    if (params.ENVIRONMENT == 'prod' || params.TRAFFIC_STRATEGY == 'ip-canary') {
+                        input message: "Proceed with traffic switch to ${env.TARGET_COLOR} environment?",
+                              ok: 'Proceed',
+                              submitterParameter: 'APPROVER'
+                    }
+
+                    echo "Approved by: ${env.APPROVER ?: 'Auto-approved (non-prod)'}"
+                }
+            }
+        }
+
+        stage('Blue-Green Traffic Switch') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    def trafficScript = "scripts/advanced_blue_green_traffic_manager.py"
+
+                    // Cleanup IP-based canary rule if exists
+                    if (env.CANARY_RULE_ARN) {
+                        sh """
+                            echo "Cleaning up IP-based canary rule..."
+                            python3 ${trafficScript} \\
+                                --environment ${params.ENVIRONMENT} \\
+                                --application ${env.APPLICATION_NAME} \\
+                                --action cleanup-rule \\
+                                --rule-arn ${env.CANARY_RULE_ARN}
+                        """
+                    }
+
+                    switch(params.TRAFFIC_STRATEGY) {
+                        case 'immediate':
+                            echo "Performing immediate traffic switch to ${env.TARGET_COLOR}..."
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage 100 \\
+                                    --validation-minutes 1 \\
+                                    --auto-proceed
+                            """
+                            break
+
+                        case 'canary':
+                            echo "Performing canary deployment with ${params.CANARY_PERCENTAGE}% traffic..."
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage ${params.CANARY_PERCENTAGE} \\
+                                    --validation-minutes ${params.VALIDATION_MINUTES} \\
+                                    ${params.AUTO_PROCEED ? '--auto-proceed' : ''} \\
+                                    ${params.METRIC_VALIDATION ? '--metric-validation' : ''}
+                            """
+
+                            // Manual approval for full switch after canary (unless auto-proceed)
+                            if (!params.AUTO_PROCEED) {
+                                input message: "Canary deployment successful. Proceed with full traffic switch?",
+                                      ok: 'Proceed'
+                            }
+
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage 100 \\
+                                    --validation-minutes 2 \\
+                                    --auto-proceed \\
+                                    ${params.METRIC_VALIDATION ? '--metric-validation' : ''}
+                            """
+                            break
+
+                        case 'gradual':
+                        case 'ip-canary':
+                        default:
+                            echo "Performing gradual traffic switch to ${env.TARGET_COLOR}..."
+                            sh """
+                                python3 ${trafficScript} \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --application ${env.APPLICATION_NAME} \\
+                                    --action shift \\
+                                    --target ${env.TARGET_COLOR} \\
+                                    --percentage ${params.SHIFT_PERCENTAGE} \\
+                                    --validation-minutes ${params.VALIDATION_MINUTES} \\
+                                    ${params.AUTO_PROCEED ? '--auto-proceed' : ''} \\
+                                    ${params.METRIC_VALIDATION ? '--metric-validation' : ''}
+                            """
+                            break
+                    }
+                }
+            }
+        }
+
+        stage('Post-Switch Validation') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Monitor for configurable time after traffic switch
+                    def monitorMinutes = params.ENVIRONMENT == 'prod' ? 15 : 10
+                    echo "Monitoring application performance for ${monitorMinutes} minutes..."
+
+                    sh """
+                        # Extended monitoring with comprehensive metrics
+                        for i in \$(seq 1 ${monitorMinutes}); do
+                            echo "Monitoring minute \$i/${monitorMinutes}..."
+
+                            # Check error rates
+                            ERROR_COUNT=\$(aws cloudwatch get-metric-statistics \\
+                                --namespace AWS/ApplicationELB \\
+                                --metric-name HTTPCode_Target_5XX_Count \\
+                                --dimensions Name=LoadBalancer,Value=${params.ENVIRONMENT}-${env.APPLICATION_NAME}-alb \\
+                                --start-time \$(date -u -d '2 minutes ago' +%Y-%m-%dT%H:%M:%S) \\
+                                --end-time \$(date -u +%Y-%m-%dT%H:%M:%S) \\
+                                --period 60 \\
+                                --statistics Sum \\
+                                --query 'Datapoints[0].Sum' --output text 2>/dev/null || echo "0")
+
+                            # Check response time
+                            RESPONSE_TIME=\$(aws cloudwatch get-metric-statistics \\
+                                --namespace AWS/ApplicationELB \\
+                                --metric-name TargetResponseTime \\
+                                --dimensions Name=LoadBalancer,Value=${params.ENVIRONMENT}-${env.APPLICATION_NAME}-alb \\
+                                --start-time \$(date -u -d '2 minutes ago' +%Y-%m-%dT%H:%M:%S) \\
+                                --end-time \$(date -u +%Y-%m-%dT%H:%M:%S) \\
+                                --period 60 \\
+                                --statistics Average \\
+                                --query 'Datapoints[0].Average' --output text 2>/dev/null || echo "0")
+
+                            # Check request count
+                            REQUEST_COUNT=\$(aws cloudwatch get-metric-statistics \\
+                                --namespace AWS/ApplicationELB \\
+                                --metric-name RequestCount \\
+                                --dimensions Name=LoadBalancer,Value=${params.ENVIRONMENT}-${env.APPLICATION_NAME}-alb \\
+                                --start-time \$(date -u -d '2 minutes ago' +%Y-%m-%dT%H:%M:%S) \\
+                                --end-time \$(date -u +%Y-%m-%dT%H:%M:%S) \\
+                                --period 60 \\
+                                --statistics Sum \\
+                                --query 'Datapoints[0].Sum' --output text 2>/dev/null || echo "0")
+
+                            echo "Metrics: Errors=\${ERROR_COUNT:-0}, ResponseTime=\${RESPONSE_TIME:-0}s, Requests=\${REQUEST_COUNT:-0}"
+
+                            # Alert on high error rate
+                            if [ "\${ERROR_COUNT:-0}" -gt "10" ]; then
+                                echo "⚠️ WARNING: High error count detected: \${ERROR_COUNT}"
+                            fi
+
+                            sleep 60
+                        done
+
+                        echo "✅ Post-switch monitoring completed successfully"
+                    """
+                }
+            }
+        }
+
+        stage('Cleanup Old Environment') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Cleanup confirmation for production
+                    if (params.ENVIRONMENT == 'prod') {
+                        input message: "Traffic switch successful. Clean up ${env.CURRENT_COLOR} environment?",
+                              ok: 'Cleanup'
+                    }
+
+                    echo "Cleaning up ${env.CURRENT_COLOR} environment..."
+
+                    dir('sceptre') {
+                        sh """
+                            # Delete old environment
+                            uv run sceptre delete ${params.ENVIRONMENT}/ec2-${env.CURRENT_COLOR} --yes || true
+
+                            # Clean up old AMIs (keep last 5 versions)
+                            aws ec2 describe-images \\
+                                --owners self \\
+                                --filters "Name=tag:Project,Values=${env.PROJECT_CODE}" \\
+                                          "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                --query 'sort_by(Images, &CreationDate)[:-5].[ImageId]' \\
+                                --output text | xargs -r -n1 aws ec2 deregister-image --image-id || true
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Archive deployment artifacts
+            archiveArtifacts artifacts: 'sceptre/config/**/*.yaml', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'canary_rule.env', allowEmptyArchive: true
+
+            // Cleanup any remaining canary rules
+            script {
+                if (env.CANARY_RULE_ARN) {
+                    sh """
+                        python3 scripts/advanced_blue_green_traffic_manager.py \\
+                            --environment ${params.ENVIRONMENT} \\
+                            --application ${env.APPLICATION_NAME} \\
+                            --action cleanup-rule \\
+                            --rule-arn ${env.CANARY_RULE_ARN} || true
+                    """
+                }
+            }
+
+            // Clean up workspace
+            cleanWs()
+        }
+
+        success {
+            script {
+                def message = """
+                ✅ Advanced Blue-Green Immutable Deployment Successful!
+
+                Environment: ${params.ENVIRONMENT}
+                Deployment Type: ${params.DEPLOYMENT_TYPE}
+                Traffic Strategy: ${params.TRAFFIC_STRATEGY}
+                From: ${env.CURRENT_COLOR} → To: ${env.TARGET_COLOR}
+                Auto Proceed: ${params.AUTO_PROCEED}
+                Metric Validation: ${params.METRIC_VALIDATION}
+                New AMI: ${env.NEW_AMI_ID ?: 'N/A (Dry Run)'}
+                Version: ${env.AMI_VERSION}
+                Build: ${env.BUILD_NUMBER}
+                Duration: ${currentBuild.durationString}
+                Approver: ${env.APPROVER ?: 'Auto-approved'}
+                """
+
+                echo message
+
+                // Update build description
+                currentBuild.description = "${params.DEPLOYMENT_TYPE} deployment to ${env.TARGET_COLOR} (${params.TRAFFIC_STRATEGY})"
+            }
+        }
+
+        failure {
+            script {
+                def message = """
+                ❌ Advanced Blue-Green Deployment Failed!
+
+                Environment: ${params.ENVIRONMENT}
+                Deployment Type: ${params.DEPLOYMENT_TYPE}
+                Traffic Strategy: ${params.TRAFFIC_STRATEGY}
+                Target: ${env.TARGET_COLOR}
+                Build: ${env.BUILD_NUMBER}
+                """
+
+                echo message
+
+                // Automatic rollback
+                if (!params.DRY_RUN && env.TARGET_COLOR) {
+                    echo "Performing automatic rollback..."
+
+                    // Cleanup canary rule if exists
+                    if (env.CANARY_RULE_ARN) {
+                        sh """
+                            python3 scripts/advanced_blue_green_traffic_manager.py \\
+                                --environment ${params.ENVIRONMENT} \\
+                                --application ${env.APPLICATION_NAME} \\
+                                --action cleanup-rule \\
+                                --rule-arn ${env.CANARY_RULE_ARN} || true
+                        """
+                    }
+
+                    // Emergency rollback
+                    sh """
+                        python3 scripts/advanced_blue_green_traffic_manager.py \\
+                            --environment ${params.ENVIRONMENT} \\
+                            --application ${env.APPLICATION_NAME} \\
+                            --action rollback
+                    """
+
+                    // Cleanup failed environment
+                    dir('sceptre') {
+                        sh """
+                            uv run sceptre delete ${params.ENVIRONMENT}/ec2-${env.TARGET_COLOR} --yes || true
+                        """
+                    }
+                }
+            }
+        }
+
+        unstable {
+            script {
+                echo "⚠️ Advanced Blue-Green Deployment completed with warnings"
+            }
+        }
+    }
+}

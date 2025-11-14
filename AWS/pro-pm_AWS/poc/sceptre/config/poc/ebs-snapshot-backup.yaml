@@ -1,0 +1,14 @@
+template:
+  type: file
+  path: ebs-snapshot-backup.yaml
+
+parameters:
+  Environment: poc
+  RetentionDays: 30
+  BackupSchedule: "cron(45 1 ? * SUN *)"  # 15 minutes before patch window at 2:00 AM
+
+tags:
+  Environment: poc
+  Project: POC
+  Purpose: EBSSnapshotBackup
+  CostCenter: poc-infrastructure

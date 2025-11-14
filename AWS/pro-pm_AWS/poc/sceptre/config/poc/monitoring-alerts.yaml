@@ -1,0 +1,37 @@
+template:
+  type: file
+  path: monitoring-alerts.yaml
+
+parameters:
+  # Environment Configuration
+  Environment: poc
+  ApplicationName: poc-web
+
+  # Aurora Configuration
+  AuroraClusterIdentifier: poc-poc-aurora-cluster
+
+  # EC2 Configuration - Actual Instance IDs
+  EC2InstanceIds:
+    - i-0cb639645f102ca9f  # pochub-001
+    - i-065ed6d447f001a4c  # pochub-002
+    - i-07d40f48ccc409da0  # pochub-003
+
+  # Notification Configuration
+  AlertEmail: tomonaga@mx2.mesh.ne.jp  # 実際のメールアドレスに置き換えてください
+  AlertPhoneNumber: ""  # SMS通知が必要な場合は電話番号を設定
+
+  # Monitoring Thresholds
+  AuroraCPUThreshold: 80
+  AuroraConnectionThreshold: 80
+  ProxySQLConnectionThreshold: 1800
+  LaravelResponseTimeThreshold: 5000
+
+# Dependencies
+dependencies:
+  - poc/aurora.yaml
+
+tags:
+  Environment: poc
+  Application: poc-web
+  Component: monitoring
+  ManagedBy: sceptre

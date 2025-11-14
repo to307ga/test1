@@ -1,0 +1,493 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC VPC Template - Complete 3AZ Configuration with Public/Private Subnets, NAT Gateways, and VPC Endpoints'
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: CIDR block for VPC
+  
+  PublicSubnet1Cidr:
+    Type: String
+    Default: '10.0.1.0/24'
+    Description: CIDR block for Public Subnet in AZ-1a
+  
+  PublicSubnet2Cidr:
+    Type: String
+    Default: '10.0.2.0/24'
+    Description: CIDR block for Public Subnet in AZ-1c
+  
+  PublicSubnet3Cidr:
+    Type: String
+    Default: '10.0.3.0/24'
+    Description: CIDR block for Public Subnet in AZ-1d
+  
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: '10.0.11.0/24'
+    Description: CIDR block for Private Subnet in AZ-1a
+  
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: '10.0.12.0/24'
+    Description: CIDR block for Private Subnet in AZ-1c
+  
+  PrivateSubnet3Cidr:
+    Type: String
+    Default: '10.0.13.0/24'
+    Description: CIDR block for Private Subnet in AZ-1d
+  
+  EnableVpcEndpoints:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Enable VPC Endpoints for SSM
+
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name for resource tagging
+
+Resources:
+  # VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-vpc'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-igw'
+        - Key: Environment
+          Value: !Ref Environment
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # Public Subnets
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-northeast-1a
+      CidrBlock: !Ref PublicSubnet1Cidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-public-subnet-1a'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-northeast-1c
+      CidrBlock: !Ref PublicSubnet2Cidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-public-subnet-1c'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-northeast-1d
+      CidrBlock: !Ref PublicSubnet3Cidr
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-public-subnet-1d'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Private Subnets
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-northeast-1a
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-subnet-1a'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-northeast-1c
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-subnet-1c'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: ap-northeast-1d
+      CidrBlock: !Ref PrivateSubnet3Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-subnet-1d'
+        - Key: Environment
+          Value: !Ref Environment
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: 
+        Fn::ImportValue: !Sub '${Environment}-poc-fixed-natgw-eip-eip-az1-allocation-id'
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-natgw-1a'
+        - Key: Environment
+          Value: !Ref Environment
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: 
+        Fn::ImportValue: !Sub '${Environment}-poc-fixed-natgw-eip-eip-az2-allocation-id'
+      SubnetId: !Ref PublicSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-natgw-1c'
+        - Key: Environment
+          Value: !Ref Environment
+
+  NatGateway3:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: 
+        Fn::ImportValue: !Sub '${Environment}-poc-fixed-natgw-eip-eip-az3-allocation-id'
+      SubnetId: !Ref PublicSubnet3
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-natgw-1d'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Route Tables
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-public-rt'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-rt-1a'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-rt-1c'
+        - Key: Environment
+          Value: !Ref Environment
+
+  PrivateRouteTable3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-private-rt-1d'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Routes
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  DefaultPrivateRoute3:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway3
+
+  # Route Table Associations
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PublicSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet3
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      SubnetId: !Ref PrivateSubnet3
+
+  # Security Group for VPC Endpoints
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: EnableVpcEndpointsCondition
+    Properties:
+      GroupDescription: Security group for VPC endpoints
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VpcCidr
+          Description: HTTPS from VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-vpc-endpoint-sg'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # VPC Endpoints for SSM
+  SSMEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: EnableVpcEndpointsCondition
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssm'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+        - !Ref PrivateSubnet3
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - ssm:UpdateInstanceInformation
+              - ssm:SendCommand
+              - ssm:ListCommands
+              - ssm:ListCommandInvocations
+              - ssm:DescribeInstanceInformation
+              - ssm:GetDeployablePatchSnapshotForInstance
+              - ssm:GetDefaultPatchBaseline
+              - ssm:GetManifest
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:GetParameterHistory
+              - ssm:GetParametersByPath
+              - ssm:PutInventory
+              - ssm:PutComplianceItems
+              - ssm:PutConfigurePackageResult
+              - ssm:UpdateAssociationStatus
+              - ssm:UpdateInstanceAssociationStatus
+            Resource: '*'
+
+  SSMMessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: EnableVpcEndpointsCondition
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssmmessages'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+        - !Ref PrivateSubnet3
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  EC2MessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: EnableVpcEndpointsCondition
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ec2messages'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+        - !Ref PrivateSubnet3
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # S3 Gateway Endpoint
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: EnableVpcEndpointsCondition
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable1
+        - !Ref PrivateRouteTable2
+        - !Ref PrivateRouteTable3
+
+Conditions:
+  EnableVpcEndpointsCondition: !Equals [!Ref EnableVpcEndpoints, 'true']
+
+Outputs:
+  VpcId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${Environment}-vpc-id'
+
+  VpcCidr:
+    Description: VPC CIDR Block
+    Value: !Ref VpcCidr
+    Export:
+      Name: !Sub '${Environment}-vpc-cidr'
+
+  PublicSubnet1Id:
+    Description: Public Subnet 1 ID (AZ-1a)
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub '${Environment}-public-subnet-1a-id'
+
+  PublicSubnet2Id:
+    Description: Public Subnet 2 ID (AZ-1c)
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub '${Environment}-public-subnet-1c-id'
+
+  PublicSubnet3Id:
+    Description: Public Subnet 3 ID (AZ-1d)
+    Value: !Ref PublicSubnet3
+    Export:
+      Name: !Sub '${Environment}-public-subnet-1d-id'
+
+  PrivateSubnet1Id:
+    Description: Private Subnet 1 ID (AZ-1a)
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub '${Environment}-private-subnet-1a-id'
+
+  PrivateSubnet2Id:
+    Description: Private Subnet 2 ID (AZ-1c)
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub '${Environment}-private-subnet-1c-id'
+
+  PrivateSubnet3Id:
+    Description: Private Subnet 3 ID (AZ-1d)
+    Value: !Ref PrivateSubnet3
+    Export:
+      Name: !Sub '${Environment}-private-subnet-1d-id'
+
+  PublicSubnets:
+    Description: List of Public Subnet IDs
+    Value: !Join [',', [!Ref PublicSubnet1, !Ref PublicSubnet2, !Ref PublicSubnet3]]
+    Export:
+      Name: !Sub '${Environment}-public-subnets'
+
+  PrivateSubnets:
+    Description: List of Private Subnet IDs
+    Value: !Join [',', [!Ref PrivateSubnet1, !Ref PrivateSubnet2, !Ref PrivateSubnet3]]
+    Export:
+      Name: !Sub '${Environment}-private-subnets'
+
+  InternetGatewayId:
+    Description: Internet Gateway ID
+    Value: !Ref InternetGateway
+    Export:
+      Name: !Sub '${Environment}-igw-id'
+
+  NatGateway1Id:
+    Description: NAT Gateway 1 ID (AZ-1a)
+    Value: !Ref NatGateway1
+    Export:
+      Name: !Sub '${Environment}-natgw-1a-id'
+
+  NatGateway2Id:
+    Description: NAT Gateway 2 ID (AZ-1c)
+    Value: !Ref NatGateway2
+    Export:
+      Name: !Sub '${Environment}-natgw-1c-id'
+
+  NatGateway3Id:
+    Description: NAT Gateway 3 ID (AZ-1d)
+    Value: !Ref NatGateway3
+    Export:
+      Name: !Sub '${Environment}-natgw-1d-id'
+
+  PrivateRouteTableIds:
+    Description: List of Private Route Table IDs
+    Value: !Join [',', [!Ref PrivateRouteTable1, !Ref PrivateRouteTable2, !Ref PrivateRouteTable3]]
+    Export:
+      Name: !Sub '${Environment}-private-route-table-ids'

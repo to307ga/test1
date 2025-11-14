@@ -1,0 +1,239 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC Security Groups - EC2, Jenkins, Gitea, SSM communication rules'
+
+Parameters:
+  VPCId:
+    Type: String
+    Description: VPC ID where security groups will be created
+
+  VPCCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: VPC CIDR block for internal communication
+
+  AllowedCidrBlocks:
+    Type: CommaDelimitedList
+    Default: '0.0.0.0/0'
+    Description: CIDR blocks allowed to access web services (comma-delimited)
+
+  # ALB Security Group ID (for EC2 to allow ALB traffic)
+  ALBSecurityGroupId:
+    Type: String
+    Default: ""
+    Description: ALB Security Group ID (leave empty if ALB not deployed yet)
+
+Conditions:
+  HasALBSecurityGroup: !Not [!Equals [!Ref ALBSecurityGroupId, ""]]
+
+Resources:
+  # Security Group for EC2 instances (Web servers)
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for POC EC2 web servers
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # HTTP access from internet (direct access, no load balancer)
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP from Internet
+        # HTTPS access from internet (direct access, no load balancer)
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS from Internet
+        # Internal VPC communication
+        - IpProtocol: -1
+          CidrIp: !Ref VPCCidr
+          Description: All traffic from VPC
+      SecurityGroupEgress:
+        # Allow all outbound traffic for updates and communication
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-ec2-sg'
+
+  # Security Group Rule to allow ALB access to EC2 (HTTP - for future web application)
+  ALBToEC2HTTPRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasALBSecurityGroup
+    Properties:
+      GroupId: !Ref EC2SecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      SourceSecurityGroupId: !Ref ALBSecurityGroupId
+      Description: HTTP access from ALB
+
+  # Security Group Rule to allow ALB access to EC2 (HTTPS - for future web application)
+  ALBToEC2HTTPSRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasALBSecurityGroup
+    Properties:
+      GroupId: !Ref EC2SecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref ALBSecurityGroupId
+      Description: HTTPS access from ALB
+
+  # Security Group for ECS Fargate (Jenkins)
+  JenkinsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Jenkins on ECS Fargate
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # Jenkins web interface (direct access, no load balancer)
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+          Description: Jenkins web interface from Internet
+        # Internal VPC communication
+        - IpProtocol: -1
+          CidrIp: !Ref VPCCidr
+          Description: All traffic from VPC
+      SecurityGroupEgress:
+        # Allow all outbound traffic
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-jenkins-sg'
+
+  # Security Group for ECS Fargate (Gitea)
+  GiteaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Gitea on ECS Fargate
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # Gitea web interface (direct access, no load balancer)
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+          Description: Gitea web interface from Internet
+        # Internal VPC communication
+        - IpProtocol: -1
+          CidrIp: !Ref VPCCidr
+          Description: All traffic from VPC
+      SecurityGroupEgress:
+        # Allow all outbound traffic
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-gitea-sg'
+
+  # Security Group for Aurora MySQL
+  AuroraSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Aurora MySQL cluster
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # MySQL/Aurora access from VPC only
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !Ref VPCCidr
+          Description: MySQL from VPC
+        # Allow access from EC2 security group
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2SecurityGroup
+          Description: MySQL from EC2 instances
+        # Allow access from Jenkins security group
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref JenkinsSecurityGroup
+          Description: MySQL from Jenkins
+        # Allow access from Gitea security group
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref GiteaSecurityGroup
+          Description: MySQL from Gitea
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-aurora-sg'
+
+  # Security Group for VPC Endpoints (SSM)
+  VPCEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for VPC Endpoints (SSM)
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # HTTPS access from VPC for SSM endpoints
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VPCCidr
+          Description: HTTPS from VPC for SSM endpoints
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-vpc-endpoint-sg'
+
+  # Security Group for internal communication (optional)
+  InternalSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for internal service communication
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # Allow all internal communication within VPC
+        - IpProtocol: -1
+          CidrIp: !Ref VPCCidr
+          Description: All internal VPC communication
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-internal-sg'
+
+Outputs:
+  EC2SecurityGroupId:
+    Description: EC2 Security Group ID
+    Value: !Ref EC2SecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ec2-security-group-id'
+
+  JenkinsSecurityGroupId:
+    Description: Jenkins Security Group ID
+    Value: !Ref JenkinsSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-jenkins-security-group-id'
+
+  GiteaSecurityGroupId:
+    Description: Gitea Security Group ID
+    Value: !Ref GiteaSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-gitea-security-group-id'
+
+  AuroraSecurityGroupId:
+    Description: Aurora Security Group ID
+    Value: !Ref AuroraSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-aurora-security-group-id'
+
+  VPCEndpointSecurityGroupId:
+    Description: VPC Endpoint Security Group ID
+    Value: !Ref VPCEndpointSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-vpc-endpoint-security-group-id'
+
+  InternalSecurityGroupId:
+    Description: Internal Security Group ID
+    Value: !Ref InternalSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-internal-security-group-id'

@@ -1,0 +1,13 @@
+template:
+  path: vpc-endpoints.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  PrivateSubnets: !stack_output poc/vpc.yaml::PrivateSubnets
+  SecurityGroupId: !stack_output poc/securitygroup.yaml::JenkinsSecurityGroupId
+  EC2SecurityGroupId: !stack_output poc/securitygroup.yaml::EC2SecurityGroupId
+  Environment: {{ environment }}
+
+dependencies:
+  - poc/vpc.yaml
+  - poc/securitygroup.yaml

@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC ALB Security Groups - Load balancer security rules'
+
+Parameters:
+  VPCId:
+    Type: String
+    Description: VPC ID where security groups will be created
+
+  VPCCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: VPC CIDR block for internal communication
+
+  AllowedCidrBlocks:
+    Type: CommaDelimitedList
+    Default: '10.0.0.0/16'
+    Description: CIDR blocks allowed to access ALB (comma-delimited)
+
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name for resource tagging
+
+Resources:
+  # Security Group for ALB
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-alb-sg'
+      GroupDescription: Security group for Application Load Balancer
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # HTTP access from allowed CIDR blocks
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Select [0, !Ref AllowedCidrBlocks]
+          Description: HTTP access from primary CIDR
+        # HTTPS access from allowed CIDR blocks (for future use)
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Select [0, !Ref AllowedCidrBlocks]
+          Description: HTTPS access from primary CIDR (future use)
+      SecurityGroupEgress:
+        # Allow all outbound traffic to VPC
+        - IpProtocol: -1
+          CidrIp: !Ref VPCCidr
+          Description: All traffic to VPC
+        # Allow HTTPS to internet for health checks and external APIs
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS to internet
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-alb-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: ALB
+
+Outputs:
+  ALBSecurityGroupId:
+    Description: ALB Security Group ID
+    Value: !Ref ALBSecurityGroup
+    Export:
+      Name: !Sub '${Environment}-alb-sg-id'
+
+  ALBSecurityGroupArn:
+    Description: ALB Security Group ARN
+    Value: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${ALBSecurityGroup}'
+    Export:
+      Name: !Sub '${Environment}-alb-sg-arn'

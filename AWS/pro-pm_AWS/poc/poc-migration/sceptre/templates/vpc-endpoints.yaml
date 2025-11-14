@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'VPC Interface Endpoints for SSM (S3 Gateway Endpoint already exists in VPC stack)'
+
+Parameters:
+  VPCId:
+    Type: String
+    Description: VPC ID
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Description: List of private subnet IDs
+
+  SecurityGroupId:
+    Type: String
+    Description: Security group ID for Jenkins (application security group)
+
+  EC2SecurityGroupId:
+    Type: String
+    Description: Security group ID for EC2 instances
+
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name
+
+Resources:
+  # Security Group for Interface Endpoints
+  InterfaceEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-interface-endpoints-sg'
+      GroupDescription: Security group for VPC Interface Endpoints
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref SecurityGroupId
+          Description: HTTPS from Jenkins security group
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref EC2SecurityGroupId
+          Description: HTTPS from EC2 instances security group
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-interface-endpoints-sg'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # SSM Interface Endpoint (Systems Manager本体)
+  SSMInterfaceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPCId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssm'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref PrivateSubnets
+      SecurityGroupIds:
+        - !Ref InterfaceEndpointSecurityGroup
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+
+  # SSM Messages Interface Endpoint (Session Manager通信用)
+  SSMMessagesInterfaceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPCId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ssmmessages'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref PrivateSubnets
+      SecurityGroupIds:
+        - !Ref InterfaceEndpointSecurityGroup
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+
+  # EC2 Messages Interface Endpoint (SSM Agent通信用)
+  EC2MessagesInterfaceEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPCId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ec2messages'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref PrivateSubnets
+      SecurityGroupIds:
+        - !Ref InterfaceEndpointSecurityGroup
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+
+Outputs:
+  SSMInterfaceEndpointId:
+    Description: SSM Interface Endpoint ID
+    Value: !Ref SSMInterfaceEndpoint
+    Export:
+      Name: !Sub '${AWS::StackName}-ssm-endpoint-id'
+
+  SSMMessagesInterfaceEndpointId:
+    Description: SSM Messages Interface Endpoint ID
+    Value: !Ref SSMMessagesInterfaceEndpoint
+    Export:
+      Name: !Sub '${AWS::StackName}-ssmmessages-endpoint-id'
+
+  EC2MessagesInterfaceEndpointId:
+    Description: EC2 Messages Interface Endpoint ID
+    Value: !Ref EC2MessagesInterfaceEndpoint
+    Export:
+      Name: !Sub '${AWS::StackName}-ec2messages-endpoint-id'
+
+  InterfaceEndpointSecurityGroupId:
+    Description: Security Group ID for Interface Endpoints
+    Value: !Ref InterfaceEndpointSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-interface-sg-id'

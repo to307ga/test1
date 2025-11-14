@@ -1,0 +1,352 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC ECS Fargate - Gitea Git Repository Server'
+
+Parameters:
+  # Network Configuration
+  VPCId:
+    Type: String
+    Description: VPC ID for ECS tasks
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Description: List of private subnet IDs for ECS tasks
+
+  SecurityGroupId:
+    Type: String
+    Description: Security group ID for Gitea containers
+
+  # Database Configuration (Optional - for future Aurora integration)
+  DatabaseEndpoint:
+    Type: String
+    Default: 'localhost'
+    Description: Aurora database writer endpoint (use localhost for SQLite)
+
+  DatabaseSecretArn:
+    Type: String
+    Default: 'arn:aws:secretsmanager:ap-northeast-1:000000000000:secret:dummy'
+    Description: ARN of the database secret in Secrets Manager (dummy for SQLite)
+
+  DatabaseName:
+    Type: String
+    Default: 'gitea'
+    Description: Database name (not used with SQLite)
+
+  DatabaseUser:
+    Type: String
+    Default: 'gitea'
+    Description: Database user (not used with SQLite)
+
+  # ECS Configuration
+  TaskCpu:
+    Type: Number
+    Default: 1024
+    AllowedValues: [256, 512, 1024, 2048, 4096]
+    Description: CPU units for Gitea task (1024 = 1 vCPU)
+
+  TaskMemory:
+    Type: Number
+    Default: 2048
+    AllowedValues: [512, 1024, 2048, 3072, 4096, 5120, 6144, 7168, 8192]
+    Description: Memory (MB) for Gitea task
+
+  DesiredCount:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 3
+    Description: Number of Gitea tasks to run
+
+  # Application Configuration
+  GiteaImageUri:
+    Type: String
+    Default: 'gitea/gitea:latest'
+    Description: Gitea container image URI (ECR or Docker Hub)
+
+  Environment:
+    Type: String
+    Default: poc
+    Description: Environment name
+
+Resources:
+  # ECS Cluster
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub '${AWS::StackName}-cluster'
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-cluster'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # EFS File System for Gitea Data
+  GiteaEFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+      ThroughputMode: provisioned
+      ProvisionedThroughputInMibps: 10
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-gitea-data'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # EFS Mount Targets
+  EFSMountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref GiteaEFS
+      SubnetId: !Select [0, !Ref PrivateSubnets]
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  EFSMountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref GiteaEFS
+      SubnetId: !Select [1, !Ref PrivateSubnets]
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  EFSMountTarget3:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref GiteaEFS
+      SubnetId: !Select [2, !Ref PrivateSubnets]
+      SecurityGroups:
+        - !Ref EFSSecurityGroup
+
+  # Security Group for EFS
+  EFSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Gitea EFS
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref SecurityGroupId
+          Description: NFS from Gitea containers
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-efs-sg'
+
+  # CloudWatch Log Group
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${AWS::StackName}/gitea'
+      RetentionInDays: 14
+
+  # ECS Task Definition
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${AWS::StackName}-gitea'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !ImportValue 'poc-poc-iam-group-ecs-task-execution-role-arn'
+      TaskRoleArn: !ImportValue 'poc-poc-iam-group-ecs-task-role-arn'
+      Volumes:
+        - Name: gitea-data
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref GiteaEFS
+            RootDirectory: /
+            TransitEncryption: ENABLED
+      ContainerDefinitions:
+        - Name: gitea
+          Image: !Ref GiteaImageUri
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+            - ContainerPort: 22
+              Protocol: tcp
+          Environment:
+              - Name: GITEA__database__DB_TYPE
+                Value: sqlite3
+              - Name: GITEA__database__PATH
+                Value: /data/gitea/gitea.db
+              - Name: GITEA__database__HOST
+                Value: !Ref DatabaseEndpoint
+              - Name: GITEA__database__NAME
+                Value: !Ref DatabaseName
+              - Name: GITEA__database__USER
+                Value: !Ref DatabaseUser
+              - Name: GITEA__server__ROOT_URL
+                Value: !Sub "http://${LoadBalancer.DNSName}/"
+              - Name: GITEA__server__START_SSH_SERVER
+                Value: "false"
+              - Name: GITEA__server__DISABLE_SSH
+                Value: "true"
+              - Name: GITEA__security__INSTALL_LOCK
+                Value: "true"
+          MountPoints:
+            - SourceVolume: gitea-data
+              ContainerPath: /data
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: gitea
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - 'curl -f http://localhost:3000/api/healthz || exit 1'
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 120
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-gitea-task'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ECS Service
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - EFSMountTarget1
+      - EFSMountTarget2
+      - EFSMountTarget3
+      - Listener  # ALB Listenerの完了を待機
+    Properties:
+      ServiceName: !Sub '${AWS::StackName}-gitea'
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      LoadBalancers:
+        - TargetGroupArn: !Ref TargetGroup
+          ContainerName: gitea
+          ContainerPort: 3000
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref SecurityGroupId
+          Subnets: !Ref PrivateSubnets
+          AssignPublicIp: DISABLED
+      HealthCheckGracePeriodSeconds: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-gitea-service'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Application Load Balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${AWS::StackName}-alb'
+      Type: application
+      Scheme: internal
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets: !Split [',', !ImportValue 'poc-private-subnets']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ALB Security Group
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Gitea ALB
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        # - IpProtocol: tcp
+        #   FromPort: 80
+        #   ToPort: 80
+        #   CidrIp: 0.0.0.0/0
+        #   Description: HTTP from Internet
+        # - IpProtocol: tcp
+        #   FromPort: 22
+        #   ToPort: 22
+        #   CidrIp: 0.0.0.0/0
+        #   Description: SSH Git from Internet
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.0.0.0/16
+          Description: HTTP from VPC
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 10.0.0.0/16
+          Description: SSH Git from VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb-sg'
+
+  # Target Group
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${AWS::StackName}-tg'
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref VPCId
+      TargetType: ip
+      HealthCheckPath: /api/healthz
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-tg'
+
+  # ALB Listener
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+Outputs:
+  ClusterName:
+    Description: ECS Cluster Name
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-cluster-name'
+
+  ServiceName:
+    Description: ECS Service Name
+    Value: !Ref Service
+    Export:
+      Name: !Sub '${AWS::StackName}-service-name'
+
+  LoadBalancerDNS:
+    Description: Application Load Balancer DNS Name
+    Value: !GetAtt LoadBalancer.DNSName
+    Export:
+      Name: !Sub '${AWS::StackName}-alb-dns'
+
+  GiteaURL:
+    Description: Gitea Web Interface URL
+    Value: !Sub 'http://${LoadBalancer.DNSName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-gitea-url'
+
+  EFSFileSystemId:
+    Description: EFS File System ID for Gitea data
+    Value: !Ref GiteaEFS
+    Export:
+      Name: !Sub '${AWS::StackName}-efs-id'

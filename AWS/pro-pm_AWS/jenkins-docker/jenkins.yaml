@@ -1,0 +1,413 @@
+# Jenkins Configuration as Code (JCasC) 設定ファイル
+# オンプレ環境(dev.yaml)からの設定を統合し、AWS+Ansible環境用に最適化
+# 現在はJCaSC無効化している為このファイルは読み込まれません。
+
+jenkins:
+  # 基本設定（オンプレ環境から継承）
+  mode: NORMAL
+  numExecutors: 5
+  quietPeriod: 5
+  scmCheckoutRetryCount: 0
+  slaveAgentPort: 50000
+  disableRememberMe: false
+  
+  # システムメッセージ
+  systemMessage: |
+    Jenkins POC環境 (AWS移行版)
+    - Ansible + AWS CLI v2 + SSM対応
+    - EC2自動化パイプライン用設定済み
+    - オンプレ環境から移行済み設定を含む
+
+  # セキュリティレルム設定（オンプレ環境のユーザーを環境変数化）
+  securityRealm:
+    local:
+      allowsSignup: false
+      enableCaptcha: false
+      users:
+        - id: "admin"
+          name: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin123}"
+          properties:
+            - "apiToken"
+            - "consoleUrlProvider"
+            - "myView"
+            - preferredProvider:
+                providerId: "default"
+            - "theme"
+            - "timezone"
+            - "experimentalFlags"
+            - mailer:
+                emailAddress: "${ADMIN_EMAIL:-admin@poc.local}"
+        - id: "developer"
+          name: "developer"
+          password: "${JENKINS_DEV_PASSWORD:-dev123}"
+          properties:
+            - "apiToken"
+            - "consoleUrlProvider"
+            - "myView"
+            - mailer:
+                emailAddress: "${DEV_EMAIL:-developer@poc.local}"
+
+  # 認可戦略（オンプレ環境を参考に調整）
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:admin"
+        - "Overall/Read:authenticated"
+        - "Job/Build:authenticated"
+        - "Job/Cancel:authenticated"
+        - "Job/Read:authenticated"
+        - "Job/Workspace:authenticated"
+        - "Run/Replay:authenticated"
+        - "Run/Update:authenticated"
+
+  # CSRF保護（オンプレ環境から継承）
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: true
+
+  # マークアップフォーマッター（オンプレ環境から継承）
+  markupFormatter:
+    rawHtml:
+      disableSyntaxHighlighting: false
+
+  # ノードモニタリング（オンプレ環境から継承）
+  nodeMonitors:
+    - "architecture"
+    - "clock"
+    - diskSpace:
+        freeSpaceThreshold: "1GiB"
+        freeSpaceWarningThreshold: "2GiB"
+    - "swapSpace"
+    - tmpSpace:
+        freeSpaceThreshold: "1GiB"
+        freeSpaceWarningThreshold: "2GiB"
+    - "responseTime"
+
+  # リモートセキュリティ
+  remotingSecurity:
+    enabled: true
+
+  # エージェントプロトコル
+  agentProtocols:
+    - "JNLP4-connect"
+    - "Ping"
+
+  # アップデートセンター
+  updateCenter:
+    sites:
+      - id: "default"
+        url: "https://updates.jenkins.io/update-center.json"
+
+  # ノード設定
+  nodes:
+    - permanent:
+        name: "main"
+        remoteFS: "/var/jenkins_home"
+        launcher:
+          jnlp:
+            workDirSettings:
+              disabled: false
+              internalDir: "remoting"
+
+  # グローバルライブラリ設定（オンプレ環境から継承）
+  globalLibraries:
+    libraries:
+      - name: "shared-library"
+        defaultVersion: "main"
+        retriever:
+          modernSCM:
+            libraryPath: "./"
+            scm:
+              git:
+                credentialsId: "git"
+                remote: "https://container.wbo110.goo.ne.jp/repo/nttr/jenkins-shared-library"
+                traits:
+                  - "gitBranchDiscovery"
+        implicit: false
+        allowVersionOverride: true
+
+# 認証情報管理（オンプレ環境から継承＋AWS拡張）
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          # Git認証情報（オンプレ環境から継承・環境変数化）
+        - id: "git-credentials"
+          description: "Git認証情報（Git操作用）"
+          scope: GLOBAL
+          usernamePassword:
+            scope: GLOBAL
+            id: "git-credentials"
+            username: "${GIT_USERNAME:-git}"
+            password: "${GIT_PASSWORD:-jenkins1106}"          # AWS認証情報（新規追加）
+          - aws:
+              scope: GLOBAL
+              id: "aws-credentials"
+              accessKey: "${AWS_ACCESS_KEY_ID:-jenkins1106}"
+              secretKey: "${AWS_SECRET_ACCESS_KEY:-jenkins1106}"
+              description: "AWS Account Access"
+          
+          # SSH キー（オンプレ環境gooscpキーを環境変数化）
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: "gooscp-ssh-key"
+              username: "gooscp"
+              privateKeySource:
+                directEntry:
+                  privateKeySource:
+              directEntry:
+                privateKey: "${GOOSCP_SSH_PRIVATE_KEY:-jenkins1106}"
+              description: "gooscp SSH Access Key"
+          
+          # EC2アクセス用SSH キー（新規追加）
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: "ec2-ssh-key"
+              username: "ec2-user"
+              privateKeySource:
+                directEntry:
+                  privateKeySource:
+              directEntry:
+                privateKey: "${EC2_SSH_PRIVATE_KEY:-jenkins1106}"
+              description: "EC2 SSH Access Key"
+
+          # テスト用アカウント情報（オンプレ環境から継承・環境変数化）
+          - usernamePassword:
+              scope: GLOBAL
+              id: "DACCOUNT"
+              username: "${E2E_DACCOUNT_USER:-e2e.test.auto@gmail.com}"
+              password: "${E2E_DACCOUNT_PASS:-jenkins1106}"
+              description: "e2e-test用dアカウント情報"
+          
+          - usernamePassword:
+              scope: GLOBAL
+              id: "GOOID_NEW"
+              username: "${E2E_GOOID_NEW_USER:-e2e.test.auto+test001@gmail.com}"
+              password: "${E2E_GOOID_NEW_PASS:-jenkins1106}"
+              description: "e2e-test用GOOIDアカウント（新）"
+          
+          - usernamePassword:
+              scope: GLOBAL
+              id: "GOOID_OLD"
+              username: "${E2E_GOOID_OLD_USER:-e2e-test-auto_test901}"
+              password: "${E2E_GOOID_OLD_PASS:-jenkins1106}"
+              description: "e2e-test用GOOIDアカウント（旧）"
+
+# ツール設定（オンプレ環境から継承＋拡張）
+tool:
+  # Git設定（オンプレ環境から継承）
+  git:
+    installations:
+      - name: "Default"
+        home: "git"
+
+  # JDK設定（オンプレ環境から継承）
+  jdk:
+    installations:
+      - name: "java-1.8.0"
+        home: "/usr/lib/jvm/java-1.8.0"
+
+  # Maven設定（新規追加：自動インストール）
+  maven:
+    installations:
+      - name: "Maven-3.8"
+        properties:
+          - installSource:
+              installers:
+                - maven:
+                    id: "3.8.6"
+  
+  # Maven設定（オンプレ環境から継承）
+  mavenGlobalConfig:
+    globalSettingsProvider: "standard"
+    settingsProvider: "standard"
+
+  # Node.js設定（新規追加：自動インストール）
+  nodejs:
+    installations:
+      - name: "Node-18"
+        properties:
+          - installSource:
+              installers:
+                - nodeJSInstaller:
+                    id: "18.19.0"
+                    npmPackagesRefreshHours: 72
+
+# セキュリティ設定（オンプレ環境から継承＋拡張）
+security:
+  # APIトークン設定（オンプレ環境から継承）
+  apiToken:
+    creationOfLegacyTokenEnabled: false
+    tokenGenerationOnCreationEnabled: false
+    usageStatisticsEnabled: true
+
+  # Copy Artifact設定（オンプレ環境から継承）
+  copyartifact:
+    mode: PRODUCTION
+
+  # CPS設定（オンプレ環境から継承）
+  cps:
+    hideSandbox: false
+
+  # Git Hooks設定（オンプレ環境から継承）
+  gitHooks:
+    allowedOnAgents: false
+    allowedOnController: false
+
+  # Git Host Key設定（オンプレ環境から継承）
+  gitHostKeyVerificationConfiguration:
+    sshHostKeyVerificationStrategy: "knownHostsFileVerificationStrategy"
+
+  # スクリプト承認設定（オンプレ環境から継承）
+  scriptApproval:
+    forceSandbox: false
+    approvedSignatures:
+      - "method java.lang.String trim"
+      - "method java.util.Map get java.lang.Object"
+
+# 外観設定（オンプレ環境から継承＋拡張）
+appearance:
+  # テーマ設定（オンプレ環境から継承）
+  themeManager:
+    disableUserThemes: false
+    theme: "dark"
+
+  # Prism設定（オンプレ環境から継承）
+  prism:
+    theme: PRISM
+
+  # パイプライングラフ設定（オンプレ環境から継承）
+  pipelineGraphView:
+    showGraphOnBuildPage: false
+    showGraphOnJobPage: false
+
+# グローバル認証情報設定
+globalCredentialsConfiguration:
+  configuration:
+    providerFilter: "none"
+    typeFilter: "none"
+
+# システム設定（オンプレ環境から継承＋AWS拡張）
+unclassified:
+  # ロケーション設定（オンプレ環境から継承）
+  location:
+    adminAddress: "${ADMIN_EMAIL:-admin@poc.local}"
+    url: "${JENKINS_URL:-http://localhost:8080/}"
+
+  # ANSI Color設定（オンプレ環境から継承）
+  ansiColorBuildWrapper:
+    colorMaps:
+      - name: "xterm"
+        black: "#000000"
+        blackB: "#4C4C4C"
+        blue: "#1E90FF"
+        blueB: "#4682B4"
+        cyan: "#00CDCD"
+        cyanB: "#00FFFF"
+        green: "#00CD00"
+        greenB: "#00FF00"
+        magenta: "#CD00CD"
+        magentaB: "#FF00FF"
+        red: "#CD0000"
+        redB: "#FF0000"
+        white: "#E5E5E5"
+        whiteB: "#FFFFFF"
+        yellow: "#CDCD00"
+        yellowB: "#FFFF00"
+
+  # タイムスタンプ設定（オンプレ環境から継承）
+  timestamper:
+    allPipelines: false
+    elapsedTimeFormat: "'<b>'HH:mm:ss.S'</b> '"
+    systemTimeFormat: "'<b>'HH:mm:ss'</b> '"
+
+  # メール設定（オンプレ環境から継承）
+  email-ext:
+    adminRequiredForTemplateTesting: false
+    allowUnregisteredEnabled: false
+    charset: "UTF-8"
+    debugMode: false
+    defaultBody: |-
+      $PROJECT_NAME - Build # $BUILD_NUMBER - $BUILD_STATUS:
+      Check console output at $BUILD_URL to view the results.
+    defaultSubject: "$PROJECT_NAME - Build # $BUILD_NUMBER - $BUILD_STATUS!"
+    defaultContentType: "text/plain"
+    defaultTriggerIds:
+      - "hudson.plugins.emailext.plugins.trigger.FailureTrigger"
+    maxAttachmentSize: -1
+    precedenceBulk: false
+    watchingEnabled: false
+
+  # Gitea設定（オンプレ環境から継承）
+  giteaServers:
+    servers:
+      - displayName: "Gitea"
+        manageHooks: false
+        serverUrl: "https://container.wbo110.goo.ne.jp/repo"
+
+  # Git設定（オンプレ環境から継承）
+  scmGit:
+    addGitTagAction: false
+    allowSecondFetch: false
+    createAccountBasedOnEmail: false
+    disableGitToolChooser: false
+    hideCredentials: false
+    showEntireCommitSummaryInChanges: false
+    useExistingAccountWithSameEmail: false
+
+  # AWS設定（新規追加）
+  aws:
+    credentialsProvider: "profile"
+    region: "us-east-1"
+  
+  # Ansible設定（新規追加）
+  ansible:
+    installations:
+      - name: "Ansible"
+        home: "/usr/bin/ansible"
+  
+  # ビルド保持設定（オンプレ環境から継承・調整）
+  buildDiscarders:
+    configuredBuildDiscarders:
+      - "jobBuildDiscarder"
+
+  # ポーリング設定（オンプレ環境から継承）
+  pollSCM:
+    pollingThreadCount: 10
+
+  # JUnit設定（オンプレ環境から継承）
+  junitTestResultStorage:
+    storage: "file"
+  
+  # フィンガープリント設定（オンプレ環境から継承）
+  fingerprints:
+    fingerprintCleanupDisabled: false
+    storage: "file"
+
+# ジョブDSL設定（初期ジョブ作成用）
+jobs:
+  - script: |
+      folder('aws-automation') {
+          displayName('AWS自動化パイプライン')
+          description('EC2、Ansible、AWS CLI v2を使用した自動化ジョブ群')
+      }
+      
+      pipelineJob('aws-automation/ec2-setup') {
+          displayName('EC2セットアップパイプライン')
+          description('AnsibleとSSMを使用したEC2の自動セットアップ')
+          definition {
+              cpsScm {
+                  scm {
+                      git {
+                          remote {
+                              url('https://container.wbo110.goo.ne.jp/repo/nttr/playbook.git')
+                              credentials('git-credentials')
+                          }
+                          branch('*/main')
+                      }
+                  }
+                  scriptPath('Jenkinsfile')
+              }
+          }
+      }

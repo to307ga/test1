@@ -1,0 +1,28 @@
+---
+# すべてのホストに適用される変数
+
+# 環境名（environmentは予約語のため、別名を使用）
+env_name: poc
+
+# AWSリージョン
+aws_region: ap-northeast-1
+
+# 接続設定（SSM経由）
+ansible_connection: aws_ssm
+ansible_aws_ssm_region: "{{ aws_region }}"
+ansible_aws_ssm_bucket_name: "poc-poc-ansible-aws-ssm"
+ansible_aws_ssm_timeout: 60
+# Session Manager Pluginのパスを指定
+ansible_aws_ssm_plugin: /usr/local/bin/session-manager-plugin
+
+# シェル実行ファイルを明示的に指定
+ansible_shell_executable: /bin/bash
+
+# リモート一時ディレクトリを明示的に指定（固定パス）
+ansible_remote_tmp: /tmp/.ansible/tmp
+
+# Pythonインタプリタ
+ansible_python_interpreter: /usr/bin/python3
+
+# タイムゾーン
+timezone: Asia/Tokyo

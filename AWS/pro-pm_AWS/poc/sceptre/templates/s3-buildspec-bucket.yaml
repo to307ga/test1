@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 bucket for CodeBuild buildspec files'
+
+Resources:
+  BuildSpecBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'poc-codebuild-buildspecs-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+Outputs:
+  BucketName:
+    Description: 'S3 bucket name for buildspec files'
+    Value: !Ref BuildSpecBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+  BucketArn:
+    Description: 'S3 bucket ARN'
+    Value: !GetAtt BuildSpecBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketArn'

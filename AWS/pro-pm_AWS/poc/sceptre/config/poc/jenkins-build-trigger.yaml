@@ -1,0 +1,10 @@
+template:
+  type: file
+  path: jenkins-build-trigger.yaml
+
+parameters:
+  Environment: poc
+  CodeBuildProjectName: !stack_output poc/codebuild-jenkins.yaml::CodeBuildProjectName
+
+dependencies:
+  - poc/codebuild-jenkins.yaml

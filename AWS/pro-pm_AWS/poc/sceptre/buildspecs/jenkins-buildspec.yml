@@ -1,0 +1,86 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo Installing linting and security scanning tools...
+      - HADOLINT_URL=https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+      - curl -L $HADOLINT_URL -o /usr/local/bin/hadolint
+      - chmod +x /usr/local/bin/hadolint
+      - wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
+      - TRIVY_REPO="deb https://aquasecurity.github.io/trivy-repo/deb generic main"
+      - echo $TRIVY_REPO | tee /etc/apt/sources.list.d/trivy.list
+      - apt-get update
+      - apt-get install -y trivy
+      
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - ECR_PASSWORD=$(aws ecr get-login-password --region $AWS_DEFAULT_REGION)
+      - ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo $ECR_PASSWORD | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - REPOSITORY_URI=$ECR_REPOSITORY_URI
+      - BUILD_DATE=$(date +%Y%m%d-%H%M%S)
+      - IMAGE_TAG=$IMAGE_TAG
+      - echo "Build started on $(date)"
+      - echo "Build date - $BUILD_DATE"
+      - echo Cloning repository from Gitea...
+      - git clone http://$GITEA_LOAD_BALANCER_DNS/$GITEA_USERNAME/$GITEA_REPOSITORY_NAME.git /tmp/source
+      - cd /tmp/source
+      - COMMIT_SHORT=$(git rev-parse --short=7 HEAD)
+      - echo "Commit hash - $COMMIT_SHORT"
+      - echo "Repository structure:"
+      - find . -name "Dockerfile" -o -name "*.txt" -o -name "*.cfg" -o -name "*.sh" | head -20
+      - echo "Build context directory ($BUILD_CONTEXT) contents:"
+      - ls -la $BUILD_CONTEXT/ || echo "Build context directory not found"
+      
+  lint:
+    commands:
+      - echo Running Dockerfile linting...
+      - cd /tmp/source/$BUILD_CONTEXT
+      - echo "Dockerfile path - $DOCKERFILE_PATH"
+      - echo "Hadolint ignored rules - $HADOLINT_IGNORED_RULES"
+      - IGNORE_FLAGS=""
+      - for rule in $HADOLINT_IGNORED_RULES; do IGNORE_FLAGS="$IGNORE_FLAGS --ignore $rule"; done
+      - echo "Hadolint flags - $IGNORE_FLAGS"
+      - hadolint $IGNORE_FLAGS $DOCKERFILE_PATH || exit 1
+      - echo "Dockerfile linting passed!"
+      
+  build:
+    commands:
+      - echo Build started on $(date)
+      - echo Building the Docker image...
+      - cd /tmp/source/$BUILD_CONTEXT
+      - echo "Build context: $(pwd)"
+      - echo "Dockerfile path: $DOCKERFILE_PATH"
+      - ls -la
+      - docker build -t $REPOSITORY_URI:latest -f $DOCKERFILE_PATH .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$COMMIT_SHORT
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$BUILD_DATE
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$BUILD_DATE-$COMMIT_SHORT
+      
+  security_scan:
+    commands:
+      - echo Running security vulnerability scan...
+      - echo Updating Trivy vulnerability database...
+      - trivy image --download-db-only --no-progress
+      - echo "Scanning for vulnerabilities with severity threshold: $TRIVY_SEVERITY_THRESHOLD"
+      - trivy image --exit-code 1 --no-progress --severity $TRIVY_SEVERITY_THRESHOLD $REPOSITORY_URI:latest
+      - echo "Security scan passed!"
+      
+  post_build:
+    commands:
+      - echo Build completed on $(date)
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_URI:$COMMIT_SHORT
+      - docker push $REPOSITORY_URI:$BUILD_DATE
+      - docker push $REPOSITORY_URI:$BUILD_DATE-$COMMIT_SHORT
+      - echo "Images pushed with tags:"
+      - echo "- latest"
+      - echo "- $IMAGE_TAG"
+      - echo "- $COMMIT_SHORT"
+      - echo "- $BUILD_DATE"
+      - echo "- $BUILD_DATE-$COMMIT_SHORT"

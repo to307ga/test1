@@ -1,0 +1,165 @@
+pipeline {
+    agent any
+    
+    options {
+        ansiColor('xterm')
+    }
+    
+    environment {
+        // AWS Secrets Manager からvaultパスワードを取得するための環境変数
+        AWS_VAULT_SECRET_NAME = 'ansible/vault-password'
+        AWS_REGION = 'ap-northeast-1'
+        // Ansible の色付き出力を有効化
+        ANSIBLE_FORCE_COLOR = 'true'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out test-ansible repository...'
+                checkout scm
+            }
+        }
+        
+        stage('Debug: Check Ansible Environment') {
+            steps {
+                echo 'Checking Ansible version and installed collections...'
+                sh '''
+                    echo "=== Current User ==="
+                    whoami
+                    id
+                    
+                    echo ""
+                    echo "=== Ansible Version ==="
+                    ansible --version
+                    
+                    echo ""
+                    echo "=== Installed Collections ==="
+                    ansible-galaxy collection list
+                    
+                    echo ""
+                    echo "=== Python Packages ==="
+                    pip3 list | grep -i boto
+                    
+                    echo ""
+                    echo "=== Ansible Config ==="
+                    ansible-config dump --only-changed
+                    
+                    echo ""
+                    echo "=== AWS Authentication Test ==="
+                    aws sts get-caller-identity
+                    
+                    echo ""
+                    echo "=== Vault Password Script Test ==="
+                    echo "Testing vault-password-aws.sh with debug output..."
+                    bash -x /usr/local/bin/vault-password-aws.sh 2>&1 || echo "Script failed with exit code $?"
+                    
+                    echo ""
+                    echo "=== Vault Password Script Environment ==="
+                    echo "AWS_VAULT_SECRET_NAME: $AWS_VAULT_SECRET_NAME"
+                    echo "AWS_REGION: $AWS_REGION"
+                    
+                    echo ""
+                    echo "=== Test Secrets Manager Access Directly ==="
+                    aws secretsmanager get-secret-value \
+                      --secret-id ansible/vault-password \
+                      --region ap-northeast-1 \
+                      --query SecretString \
+                      --output text || echo "Direct access failed"
+                '''
+            }
+        }
+        
+        stage('Verify Inventory') {
+            steps {
+                echo 'Verifying dynamic inventory...'
+                sh '''
+                    ansible-inventory --graph
+                '''
+            }
+        }
+        
+        stage('Ping Test') {
+            steps {
+                echo 'Testing connectivity to EC2 instances...'
+                sh '''
+                    ansible all -m ping
+                '''
+            }
+        }
+        
+        stage('Dry Run') {
+            steps {
+                echo 'Running playbook in check mode (dry-run)...'
+                sh '''
+                    ansible-playbook playbooks/test1.yml \
+                      --check \
+                      --diff
+                '''
+            }
+        }
+        
+        stage('Approval') {
+            steps {
+                script {
+                    def userInput = input(
+                        id: 'userInput',
+                        message: 'Dry-runが完了しました。本番実行を続けますか？',
+                        parameters: [
+                            choice(
+                                choices: ['Yes', 'No'],
+                                description: 'Playbookを実行する場合は Yes を選択してください',
+                                name: 'Proceed'
+                            )
+                        ]
+                    )
+                    
+                    if (userInput == 'No') {
+                        error('User cancelled the deployment')
+                    }
+                    
+                    echo "User approved: ${userInput}"
+                }
+            }
+        }
+        
+        stage('Run Playbook') {
+            steps {
+                echo 'Running test1.yml playbook with Ansible Vault...'
+                sh '''
+                    ansible-playbook playbooks/test1.yml
+                '''
+            }
+        }
+        
+        stage('Verify Results') {
+            steps {
+                echo 'Verifying file creation on EC2 instances...'
+                sh '''
+                    echo "=== Checking files on all instances ==="
+                    
+                    # 各ホストでファイル内容を確認（inventory_hostname を使用）
+                    ansible all -m shell -a "cat /tmp/\$(hostname -s | cut -d'-' -f1-2)_ansible || cat /tmp/pochub-*_ansible 2>/dev/null | head -1" || true
+                    
+                    echo ""
+                    echo "=== Direct file content check ==="
+                    ansible pochub-001 -m shell -a "cat /tmp/pochub-001_ansible"
+                    ansible pochub-002 -m shell -a "cat /tmp/pochub-002_ansible"
+                    ansible pochub-003 -m shell -a "cat /tmp/pochub-003_ansible"
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Ansible playbook executed successfully!'
+        }
+        failure {
+            echo 'Ansible playbook execution failed.'
+        }
+        always {
+            echo 'Cleaning up...'
+        }
+    }
+}

@@ -1,0 +1,29 @@
+template_path: ec2.yaml
+dependencies:
+  - poc/vpc.yaml
+  - poc/securitygroup.yaml
+  - poc/alb.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  PrivateSubnets: !split
+    - ','
+    - !stack_output poc/vpc.yaml::PrivateSubnets
+  SecurityGroupId: !stack_output poc/securitygroup.yaml::EC2SecurityGroupId
+  TargetGroupArn: !stack_output poc/alb.yaml::TargetGroupArn
+
+  # Instance Configuration
+  InstanceType: t3.medium
+  KeyPairName: ""  # Empty - use SSM Session Manager instead
+
+  # Auto Scaling Configuration (fixed capacity)
+  DesiredCapacity: 3
+
+  # Application Configuration
+  ApplicationName: poc-web
+  Environment: poc
+
+tags:
+  Name: poc-ec2-instances
+  Environment: poc
+  Application: poc-web

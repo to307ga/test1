@@ -1,0 +1,28 @@
+---
+- name: Test Ansible Playbook with Vault
+  hosts: all
+  gather_facts: yes
+  vars_files:
+    - ../vars/secret.yml
+
+  tasks:
+    - name: Ping test
+      ansible.builtin.ping:
+      register: ping_result
+
+    - name: Display ping result
+      ansible.builtin.debug:
+        msg: "Ping successful for {{ inventory_hostname }}"
+      when: ping_result is succeeded
+
+    - name: Create file with secret message
+      ansible.builtin.copy:
+        content: "{{ secret_message }}"
+        dest: "/tmp/{{ inventory_hostname }}_ansible"
+        mode: '0644'
+      register: file_result
+
+    - name: Display file creation result
+      ansible.builtin.debug:
+        msg: "File created: /tmp/{{ inventory_hostname }}_ansible"
+      when: file_result is changed

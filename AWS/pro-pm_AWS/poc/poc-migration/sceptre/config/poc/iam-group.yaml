@@ -1,0 +1,11 @@
+template_path: iam-group.yaml
+
+parameters:
+  # IAM Groups as per POC requirements
+  ProjectCode: poc
+  Environment: poc
+  # IAMユーザーを作成する場合は 'true' に変更
+  CreateUsers: 'true'
+
+tags:
+  Name: poc-iam-groups-poc

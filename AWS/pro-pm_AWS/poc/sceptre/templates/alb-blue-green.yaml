@@ -1,0 +1,275 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'POC ALB Template - Blue-Green Deployment with Weighted Traffic Routing'
+
+Parameters:
+  # Network Configuration
+  VPCId:
+    Type: String
+    Description: VPC ID for ALB deployment
+
+  PrivateSubnets:
+    Type: CommaDelimitedList
+    Description: List of private subnet IDs for ALB placement
+
+  # Security Configuration
+  ALBSecurityGroupId:
+    Type: String
+    Description: Security group ID for ALB
+
+  # Application Configuration
+  ApplicationName:
+    Type: String
+    Default: poc-web
+    Description: Application name for tagging
+
+  Environment:
+    Type: String
+    Default: poc
+    AllowedValues:
+      - dev
+      - stg
+      - poc
+      - prod
+    Description: Environment name
+
+  # Blue-Green Traffic Management
+  BlueWeight:
+    Type: Number
+    Default: 100
+    MinValue: 0
+    MaxValue: 100
+    Description: Traffic percentage for Blue environment (0-100)
+
+  GreenWeight:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 100
+    Description: Traffic percentage for Green environment (0-100)
+
+  # Target Group Configuration
+  BlueTargetGroupArn:
+    Type: String
+    Default: ""
+    Description: Blue Target Group ARN (leave empty if not created yet)
+
+  GreenTargetGroupArn:
+    Type: String
+    Default: ""
+    Description: Green Target Group ARN (leave empty if not created yet)
+
+Conditions:
+  HasBlueTargetGroup: !Not [!Equals [!Ref BlueTargetGroupArn, ""]]
+  HasGreenTargetGroup: !Not [!Equals [!Ref GreenTargetGroupArn, ""]]
+  HasBothTargetGroups: !And [!Condition HasBlueTargetGroup, !Condition HasGreenTargetGroup]
+
+Resources:
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${Environment}-${ApplicationName}-alb'
+      Type: application
+      Scheme: internal
+      IpAddressType: ipv4
+      SecurityGroups:
+        - !Ref ALBSecurityGroupId
+      Subnets: !Ref PrivateSubnets
+      LoadBalancerAttributes:
+        - Key: access_logs.s3.enabled
+          Value: 'false'
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+        - Key: deletion_protection.enabled
+          Value: 'false'
+      Tags:
+        - Key: Name
+          Value: !Sub '${Environment}-${ApplicationName}-alb'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref ApplicationName
+        - Key: DeploymentType
+          Value: blue-green
+
+  # HTTP Listener with Blue-Green Routing
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - !If
+          - HasBothTargetGroups
+          - Type: forward
+            ForwardConfig:
+              TargetGroups:
+                - TargetGroupArn: !Ref BlueTargetGroupArn
+                  Weight: !Ref BlueWeight
+                - TargetGroupArn: !Ref GreenTargetGroupArn
+                  Weight: !Ref GreenWeight
+          - !If
+            - HasBlueTargetGroup
+            - Type: forward
+              TargetGroupArn: !Ref BlueTargetGroupArn
+            - !If
+              - HasGreenTargetGroup
+              - Type: forward
+                TargetGroupArn: !Ref GreenTargetGroupArn
+              - Type: fixed-response
+                FixedResponseConfig:
+                  StatusCode: '503'
+                  ContentType: 'text/html'
+                  MessageBody: |
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Service Unavailable</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+                            .message { background-color: #fff3cd; padding: 20px; border-radius: 5px; display: inline-block; }
+                            .deployment-info { background-color: #d1ecf1; padding: 15px; margin: 20px 0; border-radius: 5px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="message">
+                            <h1>Service Temporarily Unavailable</h1>
+                            <p>Blue-Green deployment in progress. Please try again later.</p>
+                            <div class="deployment-info">
+                                <p><strong>Environment:</strong> POC</p>
+                                <p><strong>Deployment Type:</strong> Blue-Green</p>
+                                <p><strong>Status:</strong> Waiting for target groups</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+
+  # Health Check Listener (for monitoring)
+  HealthCheckListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 8080
+      Protocol: HTTP
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: '200'
+            ContentType: 'application/json'
+            MessageBody: !Sub |
+              {
+                "status": "healthy",
+                "environment": "${Environment}",
+                "application": "${ApplicationName}",
+                "deployment_type": "blue-green",
+                "blue_weight": ${BlueWeight},
+                "green_weight": ${GreenWeight},
+                "timestamp": "{{timestamp}}"
+              }
+
+  # CloudWatch Log Group for ALB access logs
+  ALBAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/alb/${Environment}-${ApplicationName}'
+      RetentionInDays: 7
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref ApplicationName
+        - Key: DeploymentType
+          Value: blue-green
+
+  # CloudWatch Alarms for Blue-Green Monitoring
+  ALBTargetResponseTimeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-alb-response-time'
+      AlarmDescription: 'ALB target response time alarm for Blue-Green deployment'
+      MetricName: TargetResponseTime
+      Namespace: AWS/ApplicationELB
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5.0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
+      TreatMissingData: notBreaching
+
+  ALBUnhealthyHostCountAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Environment}-${ApplicationName}-alb-unhealthy-hosts'
+      AlarmDescription: 'ALB unhealthy host count alarm for Blue-Green deployment'
+      MetricName: UnHealthyHostCount
+      Namespace: AWS/ApplicationELB
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
+      TreatMissingData: notBreaching
+
+Outputs:
+  LoadBalancerArn:
+    Description: ALB ARN
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-arn'
+
+  LoadBalancerDNSName:
+    Description: ALB DNS Name
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-dns'
+
+  LoadBalancerHostedZoneId:
+    Description: ALB Hosted Zone ID
+    Value: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-zone-id'
+
+  LoadBalancerFullName:
+    Description: ALB Full Name for CloudWatch metrics
+    Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-full-name'
+
+  HTTPListenerArn:
+    Description: HTTP Listener ARN
+    Value: !Ref HTTPListener
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-http-listener-arn'
+
+  HealthCheckListenerArn:
+    Description: Health Check Listener ARN
+    Value: !Ref HealthCheckListener
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-health-listener-arn'
+
+  # Blue-Green Traffic Information
+  BlueTrafficWeight:
+    Description: Current Blue environment traffic weight
+    Value: !Ref BlueWeight
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-blue-weight'
+
+  GreenTrafficWeight:
+    Description: Current Green environment traffic weight
+    Value: !Ref GreenWeight
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-green-weight'
+
+  # Monitoring Information
+  ALBAccessLogGroup:
+    Description: ALB Access Log Group Name
+    Value: !Ref ALBAccessLogGroup
+    Export:
+      Name: !Sub '${Environment}-${ApplicationName}-alb-log-group'

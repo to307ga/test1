@@ -1,0 +1,2 @@
+template_path: s3-buildspec-bucket.yaml
+stack_name: poc-s3-buildspec-bucket

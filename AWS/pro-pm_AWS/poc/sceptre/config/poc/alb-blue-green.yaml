@@ -1,0 +1,28 @@
+template:
+  type: file
+  path: alb-blue-green.yaml
+
+parameters:
+  # Network Configuration
+  VPCId: !stack_output vpc.yaml::VPCId
+  PrivateSubnets: !stack_output vpc.yaml::PrivateSubnets
+  ALBSecurityGroupId: !stack_output alb-securitygroup.yaml::ALBSecurityGroupId
+
+  # Application Configuration
+  ApplicationName: poc-web
+  Environment: poc
+
+  # Blue-Green Traffic Configuration (初期状態: Blue 100%, Green 0%)
+  BlueWeight: 100
+  GreenWeight: 0
+
+  # Target Groups (初期状態は空、EC2スタックから設定される)
+  BlueTargetGroupArn: ""
+  GreenTargetGroupArn: ""
+
+tags:
+  Environment: poc
+  Project: poc
+  DeploymentType: blue-green
+  ManagedBy: sceptre
+  Component: load-balancer

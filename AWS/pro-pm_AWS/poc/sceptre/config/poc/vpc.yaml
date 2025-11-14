@@ -1,0 +1,24 @@
+template_path: vpc.yaml
+dependencies:
+  - poc/fixed-natgw-eip.yaml
+
+parameters:
+  # VPC configuration for POC
+  VpcCidr: 10.0.0.0/16
+
+  # 3AZ configuration
+  PublicSubnet1Cidr: 10.0.1.0/24
+  PrivateSubnet1Cidr: 10.0.11.0/24
+
+  PublicSubnet2Cidr: 10.0.2.0/24
+  PrivateSubnet2Cidr: 10.0.12.0/24
+
+  PublicSubnet3Cidr: 10.0.3.0/24
+  PrivateSubnet3Cidr: 10.0.13.0/24
+
+  # Environment and feature settings
+  Environment: poc
+  EnableVpcEndpoints: true
+
+tags:
+  Name: poc-vpc-poc

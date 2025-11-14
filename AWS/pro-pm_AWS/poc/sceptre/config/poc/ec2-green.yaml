@@ -1,0 +1,41 @@
+template:
+  type: file
+  path: ec2-blue-green.yaml
+
+parameters:
+  # Network Configuration
+  VPCId: !stack_output vpc.yaml::VPCId
+  PrivateSubnets: !stack_output vpc.yaml::PrivateSubnets
+  SecurityGroupId: !stack_output securitygroup.yaml::EC2SecurityGroupId
+
+  # Blue-Green Configuration
+  DeploymentColor: green
+
+  # Instance Configuration
+  InstanceType: t3.medium
+  ImageId: ami-0123456789abcdef0  # Will be updated by Jenkins with Golden AMI
+  KeyPairName: ""  # SSM Session Manager only
+
+  # Auto Scaling Configuration
+  MinCapacity: 1
+  MaxCapacity: 6
+  DesiredCapacity: 2
+
+  # Application Configuration
+  ApplicationName: poc-web
+  Environment: poc
+  ProjectCode: poc
+
+  # Load Balancer Configuration (from ELB stack)
+  LoadBalancerArn: !stack_output elb.yaml::LoadBalancerArn
+  LoadBalancerListenerArn: !stack_output elb.yaml::HTTPListenerArn
+  BlueTargetGroupArn: !stack_output ec2-blue.yaml::TargetGroupArn
+
+  # Immutable Deployment Configuration
+  AMIVersion: "latest"
+
+tags:
+  Environment: poc
+  Project: poc
+  DeploymentType: blue-green
+  ManagedBy: sceptre

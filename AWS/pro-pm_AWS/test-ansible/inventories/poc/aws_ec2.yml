@@ -1,0 +1,58 @@
+---
+# AWS EC2 動的インベントリプラグイン設定
+plugin: aws_ec2
+
+# リージョン
+regions:
+  - ap-northeast-1
+
+# フィルタ: 以下の条件を満たす稼働中のインスタンスのみ
+# - Name: pochub-001, pochub-002, pochub-003
+# - Environment: poc
+# - AvailabilityZone: ap-northeast-1a, ap-northeast-1c, ap-northeast-1d
+filters:
+  tag:Environment: poc
+  instance-state-name: running
+  # Nameタグでフィルタ（複数指定可能）
+  "tag:Name":
+    - pochub-001
+    - pochub-002
+    - pochub-003
+  # AvailabilityZoneでフィルタ
+  availability-zone:
+    - ap-northeast-1a
+    - ap-northeast-1c
+    - ap-northeast-1d
+
+# SSM接続プラグインを使用
+# ansible_connection: aws_ssm
+# ansible_aws_ssm_region: ap-northeast-1
+
+# Grouping by tags is disabled to avoid NoneType errors
+# keyed_groups:
+#   # Environment タグでグループ化
+#   - key: tags.Environment
+#     prefix: env
+#     separator: "_"
+#   
+#   # Name タグでグループ化
+#   - key: tags.Name
+#     prefix: name
+#     separator: "_"
+#   
+#   # インスタンスタイプでグループ化
+#   - key: instance_type
+#     prefix: instance_type
+#     separator: "_"
+
+# ホスト変数として設定 (Name tag for readability)
+hostnames:
+  - tag:Name
+
+# 変数の構成
+compose:
+  # SSM接続ではansible_hostにインスタンスIDを使用
+  ansible_host: instance_id
+  # SSM接続を使用
+  ansible_connection: aws_ssm
+  ansible_aws_ssm_region: ap-northeast-1

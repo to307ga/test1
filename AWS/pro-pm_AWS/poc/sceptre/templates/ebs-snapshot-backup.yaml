@@ -1,0 +1,431 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EBS Snapshot Backup for Patch Management - Pre-patch backup automation'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: poc
+    AllowedValues:
+      - dev
+      - stg
+      - poc
+      - prod
+    Description: Environment name
+
+  RetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 7
+    MaxValue: 90
+    Description: Number of days to retain snapshots
+
+  BackupSchedule:
+    Type: String
+    Default: "cron(45 1 ? * SUN *)"
+    Description: Backup schedule (15 minutes before patch window)
+
+Resources:
+  # IAM Role for Lambda function
+  SnapshotLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-snapshot-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: EBSSnapshotPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateSnapshot
+                  - ec2:CreateTags
+                  - ec2:DeleteSnapshot
+                  - ec2:DescribeInstances
+                  - ec2:DescribeSnapshots
+                  - ec2:DescribeVolumes
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  # Lambda function for creating EBS snapshots
+  SnapshotCreatorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-snapshot-creator'
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt SnapshotLambdaRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          RETENTION_DAYS: !Ref RetentionDays
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import os
+          from datetime import datetime, timedelta
+
+          def lambda_handler(event, context):
+              ec2 = boto3.client('ec2')
+              environment = os.environ['ENVIRONMENT']
+              retention_days = int(os.environ['RETENTION_DAYS'])
+
+              try:
+                  # Get all running instances with the specified environment tag
+                  instances_response = ec2.describe_instances(
+                      Filters=[
+                          {'Name': 'tag:Environment', 'Values': [environment]},
+                          {'Name': 'instance-state-name', 'Values': ['running']}
+                      ]
+                  )
+
+                  snapshots_created = []
+
+                  for reservation in instances_response['Reservations']:
+                      for instance in reservation['Instances']:
+                          instance_id = instance['InstanceId']
+                          instance_name = get_tag_value(instance.get('Tags', []), 'Name', instance_id)
+                          hostname = get_tag_value(instance.get('Tags', []), 'Hostname', instance_id)
+
+                          # Create snapshot for each EBS volume
+                          for bdm in instance.get('BlockDeviceMappings', []):
+                              if 'Ebs' in bdm:
+                                  volume_id = bdm['Ebs']['VolumeId']
+                                  device_name = bdm['DeviceName']
+
+                                  # Create snapshot
+                                  timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+                                  snapshot_description = (
+                                      f"Pre-patch backup of {hostname} ({instance_id}) "
+                                      f"volume {volume_id} device {device_name}"
+                                  )
+
+                                  snapshot_response = ec2.create_snapshot(
+                                      VolumeId=volume_id,
+                                      Description=snapshot_description
+                                  )
+
+                                  snapshot_id = snapshot_response['SnapshotId']
+
+                                  # Tag the snapshot
+                                  deletion_date = (datetime.now() + timedelta(days=retention_days)).strftime('%Y-%m-%d')
+
+                                  ec2.create_tags(
+                                      Resources=[snapshot_id],
+                                      Tags=[
+                                          {'Key': 'Name', 'Value': f"{hostname}-pre-patch-{timestamp}"},
+                                          {'Key': 'Environment', 'Value': environment},
+                                          {'Key': 'InstanceId', 'Value': instance_id},
+                                          {'Key': 'Hostname', 'Value': hostname},
+                                          {'Key': 'VolumeId', 'Value': volume_id},
+                                          {'Key': 'DeviceName', 'Value': device_name},
+                                          {'Key': 'BackupType', 'Value': 'PrePatch'},
+                                          {'Key': 'DeletionDate', 'Value': deletion_date},
+                                          {'Key': 'AutoCreated', 'Value': 'true'}
+                                      ]
+                                  )
+
+                                  snapshots_created.append({
+                                      'SnapshotId': snapshot_id,
+                                      'InstanceId': instance_id,
+                                      'Hostname': hostname,
+                                      'VolumeId': volume_id,
+                                      'DeviceName': device_name
+                                  })
+
+                                  print(f"Created snapshot {snapshot_id} for {hostname} volume {volume_id}")
+
+                  # Clean up old snapshots
+                  cleanup_old_snapshots(ec2, environment, retention_days)
+
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': f'Successfully created {len(snapshots_created)} snapshots',
+                          'snapshots': snapshots_created
+                      })
+                  }
+
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({
+                          'error': str(e)
+                      })
+                  }
+
+          def get_tag_value(tags, key, default=''):
+              """Get tag value by key"""
+              for tag in tags:
+                  if tag['Key'] == key:
+                      return tag['Value']
+              return default
+
+          def cleanup_old_snapshots(ec2, environment, retention_days):
+              """Clean up snapshots older than retention period"""
+              try:
+                  snapshots_response = ec2.describe_snapshots(
+                      OwnerIds=['self'],
+                      Filters=[
+                          {'Name': 'tag:Environment', 'Values': [environment]},
+                          {'Name': 'tag:BackupType', 'Values': ['PrePatch']},
+                          {'Name': 'tag:AutoCreated', 'Values': ['true']}
+                      ]
+                  )
+
+                  deletion_date = datetime.now().strftime('%Y-%m-%d')
+
+                  for snapshot in snapshots_response['Snapshots']:
+                      for tag in snapshot.get('Tags', []):
+                          if tag['Key'] == 'DeletionDate' and tag['Value'] <= deletion_date:
+                              try:
+                                  ec2.delete_snapshot(SnapshotId=snapshot['SnapshotId'])
+                                  print(f"Deleted expired snapshot {snapshot['SnapshotId']}")
+                              except Exception as e:
+                                  print(f"Error deleting snapshot {snapshot['SnapshotId']}: {str(e)}")
+                              break
+
+              except Exception as e:
+                  print(f"Error during cleanup: {str(e)}")
+
+  # Lambda function for restoring from snapshots
+  SnapshotRestoreFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-snapshot-restore'
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt SnapshotLambdaRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import os
+
+          def lambda_handler(event, context):
+              ec2 = boto3.client('ec2')
+              environment = os.environ['ENVIRONMENT']
+
+              # This function provides utilities for snapshot restoration
+              # Actual restoration requires manual intervention for safety
+
+              try:
+                  if 'action' not in event:
+                      return {
+                          'statusCode': 400,
+                          'body': json.dumps({'error': 'Action parameter required'})
+                      }
+
+                  if event['action'] == 'list_snapshots':
+                      # List available pre-patch snapshots
+                      snapshots = list_prepatch_snapshots(ec2, environment, event.get('instance_id'))
+                      return {
+                          'statusCode': 200,
+                          'body': json.dumps({'snapshots': snapshots})
+                      }
+
+                  elif event['action'] == 'create_volume':
+                      # Create volume from snapshot (for manual restoration)
+                      if 'snapshot_id' not in event or 'availability_zone' not in event:
+                          return {
+                              'statusCode': 400,
+                              'body': json.dumps({'error': 'snapshot_id and availability_zone required'})
+                          }
+
+                      volume = create_volume_from_snapshot(
+                          ec2,
+                          event['snapshot_id'],
+                          event['availability_zone'],
+                          environment
+                      )
+                      return {
+                          'statusCode': 200,
+                          'body': json.dumps({'volume': volume})
+                      }
+
+                  else:
+                      return {
+                          'statusCode': 400,
+                          'body': json.dumps({'error': 'Invalid action'})
+                      }
+
+              except Exception as e:
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({'error': str(e)})
+                  }
+
+          def list_prepatch_snapshots(ec2, environment, instance_id=None):
+              """List pre-patch snapshots"""
+              filters = [
+                  {'Name': 'tag:Environment', 'Values': [environment]},
+                  {'Name': 'tag:BackupType', 'Values': ['PrePatch']},
+                  {'Name': 'tag:AutoCreated', 'Values': ['true']},
+                  {'Name': 'status', 'Values': ['completed']}
+              ]
+
+              if instance_id:
+                  filters.append({'Name': 'tag:InstanceId', 'Values': [instance_id]})
+
+              snapshots_response = ec2.describe_snapshots(
+                  OwnerIds=['self'],
+                  Filters=filters
+              )
+
+              snapshots = []
+              for snapshot in snapshots_response['Snapshots']:
+                  snapshot_info = {
+                      'SnapshotId': snapshot['SnapshotId'],
+                      'StartTime': snapshot['StartTime'].isoformat(),
+                      'VolumeSize': snapshot['VolumeSize'],
+                      'Description': snapshot['Description']
+                  }
+
+                  # Add tag information
+                  for tag in snapshot.get('Tags', []):
+                      if tag['Key'] in ['InstanceId', 'Hostname', 'VolumeId', 'DeviceName']:
+                          snapshot_info[tag['Key']] = tag['Value']
+
+                  snapshots.append(snapshot_info)
+
+              # Sort by creation time (newest first)
+              snapshots.sort(key=lambda x: x['StartTime'], reverse=True)
+              return snapshots
+
+          def create_volume_from_snapshot(ec2, snapshot_id, availability_zone, environment):
+              """Create a new volume from snapshot"""
+              volume_response = ec2.create_volume(
+                  SnapshotId=snapshot_id,
+                  AvailabilityZone=availability_zone,
+                  VolumeType='gp3',
+                  TagSpecifications=[
+                      {
+                          'ResourceType': 'volume',
+                          'Tags': [
+                              {'Key': 'Name', 'Value': f"restored-volume-{snapshot_id}"},
+                              {'Key': 'Environment', 'Value': environment},
+                              {'Key': 'RestoreSource', 'Value': snapshot_id},
+                              {'Key': 'CreatedBy', 'Value': 'SnapshotRestore'}
+                          ]
+                      }
+                  ]
+              )
+
+              return {
+                  'VolumeId': volume_response['VolumeId'],
+                  'State': volume_response['State'],
+                  'SnapshotId': snapshot_id
+              }
+
+  # EventBridge Rule for scheduled backup
+  SnapshotScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${AWS::StackName}-snapshot-schedule'
+      Description: 'Scheduled EBS snapshot creation before patch management'
+      ScheduleExpression: !Ref BackupSchedule
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SnapshotCreatorFunction.Arn
+          Id: SnapshotCreatorTarget
+
+  # Permission for EventBridge to invoke Lambda
+  SnapshotSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SnapshotCreatorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SnapshotScheduleRule.Arn
+
+  # CloudWatch Log Groups
+  SnapshotCreatorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SnapshotCreatorFunction}'
+      RetentionInDays: 14
+
+  SnapshotRestoreLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${SnapshotRestoreFunction}'
+      RetentionInDays: 14
+
+  # SNS Topic for notifications
+  SnapshotNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-snapshot-notifications'
+      DisplayName: 'EBS Snapshot Backup Notifications'
+
+  # CloudWatch Alarm for failed snapshots
+  SnapshotFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-snapshot-failures'
+      AlarmDescription: 'Alert when snapshot creation fails'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref SnapshotCreatorFunction
+      AlarmActions:
+        - !Ref SnapshotNotificationTopic
+
+Outputs:
+  SnapshotCreatorFunctionArn:
+    Description: 'Snapshot Creator Lambda Function ARN'
+    Value: !GetAtt SnapshotCreatorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-creator-function-arn'
+
+  SnapshotRestoreFunctionArn:
+    Description: 'Snapshot Restore Lambda Function ARN'
+    Value: !GetAtt SnapshotRestoreFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-restore-function-arn'
+
+  SnapshotScheduleArn:
+    Description: 'Snapshot Schedule Rule ARN'
+    Value: !GetAtt SnapshotScheduleRule.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-schedule-arn'
+
+  NotificationTopicArn:
+    Description: 'SNS Topic ARN for notifications'
+    Value: !Ref SnapshotNotificationTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-notification-topic'
+
+  BackupSchedule:
+    Description: 'Backup schedule cron expression'
+    Value: !Ref BackupSchedule
+
+  RetentionDays:
+    Description: 'Snapshot retention period in days'
+    Value: !Ref RetentionDays

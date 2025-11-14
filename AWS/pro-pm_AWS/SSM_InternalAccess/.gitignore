@@ -1,0 +1,73 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+.env
+
+# UV package manager
+uv.lock
+
+# AWS credentials and temporary files
+.aws/
+*.pem
+*.key
+*.crt
+
+# Configuration files with secrets
+config.json
+secrets.yaml
+.env.*
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+
+# CloudFormation outputs
+outputs/
+*.outputs
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Personal information and sensitive data
+personal_info/
+sensitive_data/
+*.personal
+*.sensitive

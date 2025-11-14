@@ -1,0 +1,14 @@
+template_path: securitygroup.yaml
+dependencies:
+  - poc/vpc.yaml
+  - poc/alb-securitygroup.yaml
+
+parameters:
+  VPCId: !stack_output poc/vpc.yaml::VpcId
+  VPCCidr: !stack_output poc/vpc.yaml::VpcCidr
+  AllowedCidrBlocks: ["0.0.0.0/0"]
+  ALBSecurityGroupId: !stack_output poc/alb-securitygroup.yaml::ALBSecurityGroupId
+
+tags:
+  Name: poc-security-groups
+  Environment: poc

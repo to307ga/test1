@@ -1,0 +1,411 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['poc', 'dev', 'staging', 'prod'],
+            description: 'Target environment for deployment'
+        )
+        choice(
+            name: 'DEPLOYMENT_TYPE',
+            choices: ['patch', 'application', 'full'],
+            description: 'Type of deployment: patch (OS/middleware updates), application (app updates), full (both)'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip application tests and validation'
+        )
+        booleanParam(
+            name: 'DRY_RUN',
+            defaultValue: false,
+            description: 'Perform a dry run without actual deployment'
+        )
+        string(
+            name: 'AMI_VERSION',
+            defaultValue: '',
+            description: 'Custom AMI version (leave empty for auto-generated timestamp)'
+        )
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'ap-northeast-1'
+        PROJECT_CODE = 'poc'
+        PACKER_LOG = '1'
+        ANSIBLE_HOST_KEY_CHECKING = 'False'
+        ANSIBLE_STDOUT_CALLBACK = 'yaml'
+    }
+
+    stages {
+        stage('Preparation') {
+            steps {
+                script {
+                    // Set AMI version if not provided
+                    if (params.AMI_VERSION == '') {
+                        env.AMI_VERSION = new Date().format('yyyyMMdd-HHmmss')
+                    } else {
+                        env.AMI_VERSION = params.AMI_VERSION
+                    }
+
+                    // Display build information
+                    echo """
+                    ===== Immutable Deployment Pipeline =====
+                    Environment: ${params.ENVIRONMENT}
+                    Deployment Type: ${params.DEPLOYMENT_TYPE}
+                    AMI Version: ${env.AMI_VERSION}
+                    Skip Tests: ${params.SKIP_TESTS}
+                    Dry Run: ${params.DRY_RUN}
+                    =========================================
+                    """
+                }
+
+                // Clean workspace and checkout code
+                cleanWs()
+                checkout scm
+
+                // Validate Packer template
+                dir('packer') {
+                    sh 'packer validate golden-ami.pkr.hcl'
+                }
+            }
+        }
+
+        stage('AMI Build') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Checkout Ansible playbooks from Gitea
+                    dir('ansible-playbooks') {
+                        git branch: 'main',
+                            url: 'http://gitea/tomo/ansible-playbooks.git',
+                            credentialsId: 'gitea-credentials'
+                    }
+
+                    // Copy Ansible playbooks to packer directory
+                    sh """
+                        cp -r ansible-playbooks/* packer/ansible/
+                    """
+
+                    dir('packer') {
+                        // Build Golden AMI with Packer
+                        sh """
+                            packer build \\
+                                -var 'environment=${params.ENVIRONMENT}' \\
+                                -var 'project_code=${env.PROJECT_CODE}' \\
+                                -var 'ami_version=${env.AMI_VERSION}' \\
+                                golden-ami.pkr.hcl
+                        """
+
+                        // Extract AMI ID from manifest
+                        script {
+                            def manifest = readJSON file: 'manifest.json'
+                            env.NEW_AMI_ID = manifest.builds[0].artifact_id.split(':')[1]
+                            echo "New AMI created: ${env.NEW_AMI_ID}"
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    // Archive Packer logs and manifest
+                    archiveArtifacts artifacts: 'packer/manifest.json', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'packer/packer.log', allowEmptyArchive: true
+                }
+            }
+        stage('Infrastructure Update (Green Environment)') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    dir('sceptre') {
+                        // Update Launch Template with new AMI
+                        sh """
+                            # Update EC2 configuration with new AMI ID
+                            sed -i 's/ImageId:.*/ImageId: ${env.NEW_AMI_ID}/' config/${params.ENVIRONMENT}/ec2.yaml
+
+                            # Deploy Green environment
+                            uv run sceptre create ${params.ENVIRONMENT}/ec2-green --yes || \\
+                            uv run sceptre update ${params.ENVIRONMENT}/ec2-green --yes
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Application Deployment to Green Environment') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Checkout application code from Gitea
+                    dir('application') {
+                        git branch: 'main',
+                            url: 'http://gitea/tomo/application.git',
+                            credentialsId: 'gitea-credentials'
+                    }
+
+                    // Deploy application using Ansible
+                    dir('deployment-playbooks') {
+                        git branch: 'main',
+                            url: 'http://gitea/tomo/deployment-playbooks.git',
+                            credentialsId: 'gitea-credentials'
+                    }
+
+                    // Execute deployment
+                    sh """
+                        # Get Green environment instances
+                        aws ec2 describe-instances \\
+                            --filters "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                      "Name=tag:Color,Values=Green" \\
+                                      "Name=instance-state-name,Values=running" \\
+                            --query 'Reservations[].Instances[].InstanceId' \\
+                            --output text > green_instances.txt
+
+                        # Create dynamic inventory for Ansible
+                        echo "[green_servers]" > inventory/green_hosts
+                        for instance in \$(cat green_instances.txt); do
+                            echo "\$instance ansible_connection=aws_ssm" >> inventory/green_hosts
+                        done
+
+                        # Deploy application to Green environment
+                        ansible-playbook -i inventory/green_hosts \\
+                            deployment-playbooks/deploy-application.yml \\
+                            --extra-vars "environment=${params.ENVIRONMENT}" \\
+                            --extra-vars "deployment_type=${params.DEPLOYMENT_TYPE}" \\
+                            --extra-vars "app_source_dir=\$(pwd)/application"
+                    """
+                }
+            }
+        }
+
+        stage('Application Validation') {
+            when {
+                allOf {
+                    not { params.DRY_RUN }
+                    not { params.SKIP_TESTS }
+                }
+            }
+            parallel {
+                stage('Health Check') {
+                    steps {
+                        script {
+                            // Wait for instances to be ready and perform health checks
+                            sh """
+                                # Wait for Green environment instances to be ready
+                                sleep 180
+
+                                # Get Green environment instances
+                                aws ec2 describe-instances \\
+                                    --filters "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                              "Name=tag:Color,Values=Green" \\
+                                              "Name=instance-state-name,Values=running" \\
+                                    --query 'Reservations[].Instances[].InstanceId' \\
+                                    --output text > green_instances.txt
+
+                                # Perform health checks via SSM
+                                for instance in \$(cat green_instances.txt); do
+                                    echo "Checking health of instance: \$instance"
+                                    aws ssm send-command \\
+                                        --instance-ids \$instance \\
+                                        --document-name "AWS-RunShellScript" \\
+                                        --parameters 'commands=["curl -f http://localhost/health.php || exit 1"]'
+                                done
+                            """
+                        }
+                    }
+                }
+
+                stage('Application Tests') {
+                    steps {
+                        script {
+                            // Run Playwright E2E tests against Green environment
+                            sh """
+                                # Install Playwright dependencies if not already installed
+                                pip install playwright pytest-playwright
+                                playwright install chromium
+
+                                # Run E2E tests
+                                python -m pytest tests/e2e/ \\
+                                    --browser chromium \\
+                                    --environment ${params.ENVIRONMENT} \\
+                                    --target green \\
+                                    --junit-xml=test-results.xml
+                            """
+                        }
+                    }
+                    post {
+                        always {
+                            // Publish test results
+                            publishTestResults testResultsPattern: 'test-results.xml'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Blue-Green Traffic Switch') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Implement gradual traffic switching
+                    def switchSteps = [10, 25, 50, 75, 100]
+
+                    for (step in switchSteps) {
+                        echo "Switching ${step}% of traffic to Green environment..."
+
+                        dir('sceptre') {
+                            sh """
+                                # Update Load Balancer weights
+                                aws elbv2 modify-listener \\
+                                    --listener-arn \$(aws elbv2 describe-listeners \\
+                                        --load-balancer-arn \$(aws elbv2 describe-load-balancers \\
+                                            --names ${env.PROJECT_CODE}-alb-${params.ENVIRONMENT} \\
+                                            --query 'LoadBalancers[0].LoadBalancerArn' --output text) \\
+                                        --query 'Listeners[0].ListenerArn' --output text) \\
+                                    --default-actions Type=forward,ForwardConfig='{
+                                        TargetGroups=[
+                                            {TargetGroupArn=\$(aws elbv2 describe-target-groups --names ${env.PROJECT_CODE}-tg-blue-${params.ENVIRONMENT} --query 'TargetGroups[0].TargetGroupArn' --output text),Weight=$((100-${step}))},
+                                            {TargetGroupArn=\$(aws elbv2 describe-target-groups --names ${env.PROJECT_CODE}-tg-green-${params.ENVIRONMENT} --query 'TargetGroups[0].TargetGroupArn' --output text),Weight=${step}}
+                                        ]
+                                    }'
+                            """
+                        }
+
+                        if (step < 100) {
+                            // Wait and monitor before next step
+                            echo "Waiting 2 minutes before next traffic switch step..."
+                            sleep(120)
+
+                            // Check error rates and performance metrics
+                            sh """
+                                # Monitor CloudWatch metrics for error rates
+                                aws cloudwatch get-metric-statistics \\
+                                    --namespace AWS/ApplicationELB \\
+                                    --metric-name HTTPCode_Target_5XX_Count \\
+                                    --dimensions Name=LoadBalancer,Value=${env.PROJECT_CODE}-alb-${params.ENVIRONMENT} \\
+                                    --start-time \$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S) \\
+                                    --end-time \$(date -u +%Y-%m-%dT%H:%M:%S) \\
+                                    --period 300 \\
+                                    --statistics Sum
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Cleanup Old Environment') {
+            when {
+                not { params.DRY_RUN }
+            }
+            steps {
+                script {
+                    // Terminate Blue environment instances after successful switch
+                    echo "Cleaning up Blue environment..."
+
+                    dir('sceptre') {
+                        sh """
+                            # Terminate Blue environment
+                            uv run sceptre delete ${params.ENVIRONMENT}/ec2-blue --yes || true
+
+                            # Clean up old AMIs (keep last 3 versions)
+                            aws ec2 describe-images \\
+                                --owners self \\
+                                --filters "Name=tag:Project,Values=${env.PROJECT_CODE}" \\
+                                          "Name=tag:Environment,Values=${params.ENVIRONMENT}" \\
+                                --query 'sort_by(Images, &CreationDate)[:-3].[ImageId]' \\
+                                --output text | xargs -r -n1 aws ec2 deregister-image --image-id
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Clean up workspace
+            cleanWs()
+        }
+
+        success {
+            script {
+                // Send success notification
+                def message = """
+                ✅ Immutable Deployment Successful!
+
+                Environment: ${params.ENVIRONMENT}
+                Deployment Type: ${params.DEPLOYMENT_TYPE}
+                New AMI: ${env.NEW_AMI_ID ?: 'N/A (Dry Run)'}
+                Version: ${env.AMI_VERSION}
+                Build: ${env.BUILD_NUMBER}
+                """
+
+                echo message
+
+                // Send Slack notification (if configured)
+                // slackSend(
+                //     channel: '#deployments',
+                //     color: 'good',
+                //     message: message
+                // )
+            }
+        }
+
+        failure {
+            script {
+                // Send failure notification and initiate rollback
+                def message = """
+                ❌ Immutable Deployment Failed!
+
+                Environment: ${params.ENVIRONMENT}
+                Deployment Type: ${params.DEPLOYMENT_TYPE}
+                Build: ${env.BUILD_NUMBER}
+
+                Initiating automatic rollback...
+                """
+
+                echo message
+
+                // Automatic rollback
+                if (!params.DRY_RUN) {
+                    echo "Performing automatic rollback..."
+                    dir('sceptre') {
+                        sh """
+                            # Switch traffic back to Blue environment
+                            aws elbv2 modify-listener \\
+                                --listener-arn \$(aws elbv2 describe-listeners \\
+                                    --load-balancer-arn \$(aws elbv2 describe-load-balancers \\
+                                        --names ${env.PROJECT_CODE}-alb-${params.ENVIRONMENT} \\
+                                        --query 'LoadBalancers[0].LoadBalancerArn' --output text) \\
+                                    --query 'Listeners[0].ListenerArn' --output text) \\
+                                --default-actions Type=forward,ForwardConfig='{
+                                    TargetGroups=[
+                                        {TargetGroupArn=\$(aws elbv2 describe-target-groups --names ${env.PROJECT_CODE}-tg-blue-${params.ENVIRONMENT} --query 'TargetGroups[0].TargetGroupArn' --output text),Weight=100},
+                                        {TargetGroupArn=\$(aws elbv2 describe-target-groups --names ${env.PROJECT_CODE}-tg-green-${params.ENVIRONMENT} --query 'TargetGroups[0].TargetGroupArn' --output text),Weight=0}
+                                    ]
+                                }'
+
+                            # Terminate failed Green environment
+                            uv run sceptre delete ${params.ENVIRONMENT}/ec2-green --yes || true
+                        """
+                    }
+                }
+
+                // Send Slack notification (if configured)
+                // slackSend(
+                //     channel: '#deployments',
+                //     color: 'danger',
+                //     message: message
+                // )
+            }
+        }
+    }
+}
