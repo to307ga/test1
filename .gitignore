@@ -71,3 +71,4 @@ personal_info/
 sensitive_data/
 *.personal
 *.sensitive
+aws_mfa_credentials*
