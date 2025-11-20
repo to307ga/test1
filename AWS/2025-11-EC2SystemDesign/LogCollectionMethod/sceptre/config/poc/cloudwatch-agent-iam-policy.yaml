@@ -1,0 +1,5 @@
+template:
+  path: cloudwatch-agent-iam-policy.yaml
+  type: file
+parameters:
+  ProjectName: poc

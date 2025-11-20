@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Policy for Lambda to access EC2 via SSM and send emails via SES'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: poc
+    Description: Name of the project
+
+Resources:
+  LambdaEC2SSMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${ProjectName}-lambda-ec2-ssm-policy
+      Description: Policy allowing Lambda to execute SSM commands on EC2 and send emails via SES
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # SSM permissions to send commands to any EC2 instance
+          - Sid: SSMSendCommand
+            Effect: Allow
+            Action:
+              - ssm:SendCommand
+              - ssm:GetCommandInvocation
+              - ssm:ListCommandInvocations
+            Resource:
+              - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*'
+              - !Sub 'arn:aws:ssm:${AWS::Region}::document/AWS-RunShellScript'
+              - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:*'
+
+          # SSM permissions to describe instance status
+          - Sid: SSMDescribeInstance
+            Effect: Allow
+            Action:
+              - ssm:DescribeInstanceInformation
+              - ec2:DescribeInstances
+              - ec2:DescribeInstanceStatus
+            Resource: '*'
+
+          # SES permissions to send emails
+          - Sid: SESSendEmail
+            Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource: '*'
+
+          # CloudWatch Logs permissions
+          - Sid: CloudWatchLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-ec2-to-email:*'
+
+Outputs:
+  PolicyArn:
+    Description: ARN of the IAM policy
+    Value: !Ref LambdaEC2SSMPolicy
+    Export:
+      Name: !Sub ${ProjectName}-lambda-ec2-ssm-policy-arn
+
+  PolicyName:
+    Description: Name of the IAM policy
+    Value: !Sub ${ProjectName}-lambda-ec2-ssm-policy
+    Export:
+      Name: !Sub ${ProjectName}-lambda-ec2-ssm-policy-name

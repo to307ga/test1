@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Role for Lambda function to send emails via SES'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: poc
+    Description: Name of the project
+
+Resources:
+  LambdaSESSendRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-lambda-ses-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !ImportValue
+          Fn::Sub: ${ProjectName}-ses-policy-arn
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Description: Role for Lambda to send emails via SES
+
+Outputs:
+  RoleArn:
+    Description: ARN of the Lambda SES role
+    Value: !GetAtt LambdaSESSendRole.Arn
+    Export:
+      Name: !Sub ${ProjectName}-lambda-role-arn

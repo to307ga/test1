@@ -1,0 +1,118 @@
+
+# 既存インスタンスにアタッチ
+aws ec2 associate-iam-instance-profile \
+  --instance-id i-xxxxxxxxx \
+  --iam-instance-profile Name=poc-ec2-cloudwatch-agent-profile
+  
+i-0134c94a753025b8b
+i-0297dec34ad7ea77b
+i-0f464ba83118e3114
+
+IMDSv2対応の認証情報取得方法
+
+# インスタンスプロファイルがアタッチされているか確認
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/info
+curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/poc-poc-ec2-ec2-role
+
+# CloudWatch Agentのインストール
+
+sudo yum install -y amazon-cloudwatch-agent
+rpm -qa | grep amazon-cloudwatch-agent
+
+
+# 設定ファイルを作成
+sudo vi /opt/aws/amazon-cloudwatch-agent/etc/config.json
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "cwagent"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "/aws/ec2/poc/system",
+            "log_stream_name": "{instance_id}/messages",
+            "timezone": "Local"
+          },
+          {
+            "file_path": "/var/log/httpd/access_log",
+            "log_group_name": "/aws/ec2/poc/apache",
+            "log_stream_name": "{instance_id}/access",
+            "timezone": "Local"
+          },
+          {
+            "file_path": "/var/log/httpd/error_log",
+            "log_group_name": "/aws/ec2/poc/apache",
+            "log_stream_name": "{instance_id}/error",
+            "timezone": "Local"
+          }
+        ]
+      }
+    }
+  }
+}
+
+# CloudWatch Agentを起動
+# エージェント起動
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/config.json \
+  -s
+
+# 起動確認
+# エージェントの状態確認
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a status \
+  -m ec2
+
+# systemdサービス確認
+sudo systemctl status amazon-cloudwatch-agent
+
+# 4. systemdサービスの自動起動を有効化
+sudo systemctl enable amazon-cloudwatch-agent
+
+###############################
+/aws/ec2/poc-system/messages というログループが見つかりました！
+設定ファイルの /aws/ec2/poc/system とは異なる名前です。
+ログストリームを確認します。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

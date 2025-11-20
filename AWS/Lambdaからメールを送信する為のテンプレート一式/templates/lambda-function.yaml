@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda function to send emails via SES'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: poc
+    Description: Name of the project
+
+Resources:
+  SESSendEmailFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-ses-send-email
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler
+      Role: !ImportValue
+        Fn::Sub: ${ProjectName}-lambda-role-arn
+      Code:
+        S3Bucket: !ImportValue
+          Fn::Sub: ${ProjectName}-lambda-code-bucket
+        S3Key: lambda-function.zip
+      Description: Lambda function to send emails via SES
+      Timeout: 30
+      MemorySize: 128
+
+Outputs:
+  FunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt SESSendEmailFunction.Arn
+    Export:
+      Name: !Sub ${ProjectName}-lambda-function-arn
+
+  FunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref SESSendEmailFunction
+    Export:
+      Name: !Sub ${ProjectName}-lambda-function-name

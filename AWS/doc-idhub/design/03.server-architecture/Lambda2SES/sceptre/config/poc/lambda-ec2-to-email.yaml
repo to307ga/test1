@@ -1,0 +1,8 @@
+template:
+  path: lambda-ec2-to-email.yaml
+  type: file
+parameters:
+  ProjectName: poc
+dependencies:
+  - poc/iam-role-ec2-ssm.yaml
+  - poc/s3-bucket.yaml

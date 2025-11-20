@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Role for Lambda to access EC2 via SSM'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: poc
+    Description: Name of the project
+
+Resources:
+  LambdaEC2SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-lambda-ec2-ssm-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !ImportValue
+          Fn::Sub: ${ProjectName}-lambda-ec2-ssm-policy-arn
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Description: IAM role for Lambda to execute SSM commands on EC2 and send emails via SES
+
+Outputs:
+  RoleArn:
+    Description: ARN of the IAM role
+    Value: !GetAtt LambdaEC2SSMRole.Arn
+    Export:
+      Name: !Sub ${ProjectName}-lambda-ec2-ssm-role-arn
+
+  RoleName:
+    Description: Name of the IAM role
+    Value: !Ref LambdaEC2SSMRole
+    Export:
+      Name: !Sub ${ProjectName}-lambda-ec2-ssm-role-name

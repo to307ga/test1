@@ -1,0 +1,7 @@
+{
+  "instance_id": "i-0134c94a753025b8b",
+  "file_path": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log",
+  "email_source": "noreply@goo.ne.jp",
+  "email_destination": "toshimitsu.tomonaga.zd@s1.nttdocomo.com",
+  "email_subject": "CloudWatch Agent Log from pochub-001"
+}

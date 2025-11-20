@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Role for EC2 instances to use CloudWatch Logs Agent'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: poc
+    Description: Name of the project
+
+Resources:
+  CloudWatchAgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-ec2-cloudwatch-agent-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Custom CloudWatch Agent Policy
+        - !ImportValue
+          Fn::Sub: ${ProjectName}-cloudwatch-agent-policy-arn
+        # AWS Managed Policy for CloudWatch Agent Server
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        # AWS Managed Policy for SSM (Session Manager)
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Description: Role for EC2 instances to send logs to CloudWatch and use Session Manager
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-ec2-cloudwatch-agent-role
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # Instance Profile for EC2
+  CloudWatchAgentInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${ProjectName}-ec2-cloudwatch-agent-profile
+      Roles:
+        - !Ref CloudWatchAgentRole
+
+Outputs:
+  RoleArn:
+    Description: ARN of the CloudWatch Agent role
+    Value: !GetAtt CloudWatchAgentRole.Arn
+    Export:
+      Name: !Sub ${ProjectName}-ec2-cloudwatch-agent-role-arn
+
+  RoleName:
+    Description: Name of the CloudWatch Agent role
+    Value: !Ref CloudWatchAgentRole
+    Export:
+      Name: !Sub ${ProjectName}-ec2-cloudwatch-agent-role-name
+
+  InstanceProfileArn:
+    Description: ARN of the Instance Profile
+    Value: !GetAtt CloudWatchAgentInstanceProfile.Arn
+    Export:
+      Name: !Sub ${ProjectName}-ec2-cloudwatch-agent-profile-arn
+
+  InstanceProfileName:
+    Description: Name of the Instance Profile
+    Value: !Ref CloudWatchAgentInstanceProfile
+    Export:
+      Name: !Sub ${ProjectName}-ec2-cloudwatch-agent-profile-name

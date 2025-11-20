@@ -1,0 +1,31 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Policy for SES Email Sending'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: poc
+    Description: Name of the project
+
+Resources:
+  SESSendEmailPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${ProjectName}-ses-send-policy
+      Description: Policy to allow sending emails via SES
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+              - ses:SendTemplatedEmail
+            Resource: '*'
+
+Outputs:
+  PolicyArn:
+    Description: ARN of the SES send email policy
+    Value: !Ref SESSendEmailPolicy
+    Export:
+      Name: !Sub ${ProjectName}-ses-policy-arn

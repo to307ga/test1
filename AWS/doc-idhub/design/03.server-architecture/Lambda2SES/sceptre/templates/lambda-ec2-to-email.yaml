@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda function to retrieve EC2 file content and send via SES'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: poc
+    Description: Name of the project
+
+Resources:
+  EC2ToEmailFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-ec2-to-email
+      Runtime: python3.12
+      Handler: lambda_ec2_to_email.lambda_handler
+      Role: !ImportValue
+        Fn::Sub: ${ProjectName}-lambda-ec2-ssm-role-arn
+      Code:
+        S3Bucket: !ImportValue
+          Fn::Sub: ${ProjectName}-lambda-code-bucket
+        S3Key: lambda-ec2-to-email.zip
+      Description: Lambda function to retrieve EC2 file content via SSM and send via SES
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          DEFAULT_INSTANCE_ID: i-0297dec34ad7ea77b
+          DEFAULT_FILE_PATH: /tmp/aaa
+
+Outputs:
+  FunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt EC2ToEmailFunction.Arn
+    Export:
+      Name: !Sub ${ProjectName}-ec2-to-email-function-arn
+
+  FunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref EC2ToEmailFunction
+    Export:
+      Name: !Sub ${ProjectName}-ec2-to-email-function-name

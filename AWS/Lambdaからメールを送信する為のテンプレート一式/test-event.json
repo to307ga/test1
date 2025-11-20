@@ -1,0 +1,6 @@
+{
+  "source": "noreply@goo.ne.jp",
+  "destination": "toshimitsu.tomonaga.zd@s1.nttdocomo.com",
+  "subject": "Lambda-SES テストメール",
+  "body": "これはLambda関数からSES経由で送信されたテストメールです。\n\n送信日時: 2025年11月17日\n環境: POC\nドメイン: goo.ne.jp (検証済み)"
+}

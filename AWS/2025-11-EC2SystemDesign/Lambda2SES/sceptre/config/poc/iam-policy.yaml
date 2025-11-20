@@ -1,0 +1,5 @@
+template:
+  path: iam-policy.yaml
+  type: file
+parameters:
+  ProjectName: poc

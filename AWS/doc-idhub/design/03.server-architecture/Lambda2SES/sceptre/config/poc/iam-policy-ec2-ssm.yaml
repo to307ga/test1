@@ -1,0 +1,5 @@
+template:
+  path: iam-policy-ec2-ssm.yaml
+  type: file
+parameters:
+  ProjectName: poc
